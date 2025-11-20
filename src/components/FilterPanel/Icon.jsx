@@ -2,7 +2,7 @@
 export default function Icon({ children, className = "" }) {
   return (
     <div
-      className={`w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white shadow-sm ${className}`}
+      className={`w-4 h-4 rounded-lg flex items-center justify-center text-slate-500 shadow-sm ${className}`}
     >
       {children}
     </div>

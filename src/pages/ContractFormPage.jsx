@@ -730,13 +730,23 @@ export default function ContractFormPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Ngân hàng
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={contract.bank || ""}
                     onChange={(e) => handleInputChange("bank", e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm"
-                    placeholder="Ngân hàng"
-                  />
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm bg-white"
+                  >
+                    <option value="">Chọn ngân hàng</option>
+                    <option value="VPbank">VPbank</option>
+                    <option value="TPbank">TPbank</option>
+                    <option value="CTY Tài chính Lotte">CTY Tài chính Lotte</option>
+                    {/* Show current value if it doesn't match any option (for editing existing contracts) */}
+                    {contract.bank && 
+                     !["VPbank", "TPbank", "CTY Tài chính Lotte"].includes(contract.bank) && (
+                      <option value={contract.bank}>
+                        {contract.bank} (giá trị hiện tại)
+                      </option>
+                    )}
+                  </select>
                 </div>
 
                 {/* Status */}

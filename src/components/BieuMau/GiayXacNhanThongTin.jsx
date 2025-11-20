@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { getBranchByShowroomName } from "../../data/branchData";
+import { ref, get } from "firebase/database";
+import { database } from "../../firebase/config";
 
 const GiayXacNhanThongTin = () => {
   const location = useLocation();
@@ -20,28 +22,51 @@ const GiayXacNhanThongTin = () => {
   };
 
   useEffect(() => {
-    if (location.state) {
-      const incoming = location.state;
-      const processedData = {
-        contractNumber: incoming.vso || "S00901-VSO-24-10-0042",
-        customerName: incoming.customerName || incoming["Tên KH"] || "BÙI THỊ KIM OANH",
-        contractDate: incoming.contractDate || incoming.createdAt || "2022-10-08",
-        model: incoming.model || incoming.dongXe || "VINFAST VF5",
-        variant: incoming.variant || "VF 5",
-        showroom: incoming.showroom || "Chi Nhánh Trường Chinh",
-      };
-      setData(processedData);
-    } else {
-      setData({
-        contractNumber: "S00901-VSO-24-10-0042",
-        customerName: "BÙI THỊ KIM OANH",
-        contractDate: "2022-10-08",
-        model: "VINFAST VF5",
-        variant: "S",
-        showroom: "Chi Nhánh Trường Chinh",
-      });
-    }
-    setLoading(false);
+    const loadData = async () => {
+      let showroomName = "Chi Nhánh Trường Chinh";
+      
+      // Nếu có firebaseKey, thử lấy showroom từ contracts
+      if (location.state?.firebaseKey) {
+        try {
+          const contractId = location.state.firebaseKey;
+          const contractsRef = ref(database, `contracts/${contractId}`);
+          const snapshot = await get(contractsRef);
+          if (snapshot.exists()) {
+            const contractData = snapshot.val();
+            if (contractData.showroom) {
+              showroomName = contractData.showroom;
+            }
+          }
+        } catch (err) {
+          console.error("Error loading showroom from contracts:", err);
+        }
+      }
+      
+      if (location.state) {
+        const incoming = location.state;
+        const processedData = {
+          contractNumber: incoming.vso || "S00901-VSO-24-10-0042",
+          customerName: incoming.customerName || incoming["Tên KH"] || "BÙI THỊ KIM OANH",
+          contractDate: incoming.contractDate || incoming.createdAt || "2022-10-08",
+          model: incoming.model || incoming.dongXe || "VINFAST VF5",
+          variant: incoming.variant || "VF 5",
+          showroom: incoming.showroom || showroomName,
+        };
+        setData(processedData);
+      } else {
+        setData({
+          contractNumber: "S00901-VSO-24-10-0042",
+          customerName: "BÙI THỊ KIM OANH",
+          contractDate: "2022-10-08",
+          model: "VINFAST VF5",
+          variant: "S",
+          showroom: showroomName,
+        });
+      }
+      setLoading(false);
+    };
+    
+    loadData();
   }, [location.state]);
 
   const formatDate = (dateStr) => {

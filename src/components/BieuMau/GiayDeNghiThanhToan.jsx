@@ -4,6 +4,8 @@ import {
   getBranchByShowroomName,
   getDefaultBranch,
 } from "../../data/branchData";
+import { ref, get } from "firebase/database";
+import { database } from "../../firebase/config";
 import { uniqueNgoaiThatColors } from "../../data/calculatorData";
 
 const GiayDeNghiThanhToan = () => {
@@ -32,7 +34,9 @@ const GiayDeNghiThanhToan = () => {
   const getColorName = (colorCode) => {
     if (!colorCode) return colorCode || "";
     const found = uniqueNgoaiThatColors.find(
-      (color) => color.code === colorCode || color.name.toLowerCase() === colorCode.toLowerCase()
+      (color) =>
+        color.code === colorCode ||
+        color.name.toLowerCase() === colorCode.toLowerCase()
     );
     return found ? found.name : colorCode; // Return name if found, otherwise return original value
   };
@@ -40,91 +44,98 @@ const GiayDeNghiThanhToan = () => {
   // Helper function to calculate remaining amount (salePrice - advancePayment)
   const calculateRemainingAmount = (salePrice, advancePayment) => {
     const salePriceNum =
-      typeof salePrice === "string" ? salePrice.replace(/\D/g, "") : String(salePrice);
+      typeof salePrice === "string"
+        ? salePrice.replace(/\D/g, "")
+        : String(salePrice);
     const advancePaymentNum =
-      typeof advancePayment === "string" ? advancePayment.replace(/\D/g, "") : String(advancePayment);
-    
+      typeof advancePayment === "string"
+        ? advancePayment.replace(/\D/g, "")
+        : String(advancePayment);
+
     const sale = parseInt(salePriceNum, 10) || 0;
     const advance = parseInt(advancePaymentNum, 10) || 0;
     const remaining = sale - advance;
-    
+
     return remaining > 0 ? remaining.toString() : "0";
   };
 
   useEffect(() => {
-    if (location.state) {
-      const incoming = location.state;
-      const formatDateString = (val) => {
-        if (!val) return null;
-        // if already dd/mm/yyyy
-        if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(val)) return val;
-        const d = new Date(val);
-        if (isNaN(d)) return val;
-        const pad = (n) => String(n).padStart(2, "0");
-        return `${pad(d.getDate())}/${pad(
-          d.getMonth() + 1
-        )}/${d.getFullYear()}`;
-      };
+    const loadData = async () => {
+      if (location.state) {
+        const incoming = location.state;
+        const formatDateString = (val) => {
+          if (!val) return null;
+          // if already dd/mm/yyyy
+          if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(val)) return val;
+          const d = new Date(val);
+          if (isNaN(d)) return val;
+          const pad = (n) => String(n).padStart(2, "0");
+          return `${pad(d.getDate())}/${pad(
+            d.getMonth() + 1
+          )}/${d.getFullYear()}`;
+        };
 
-      // Lấy thông tin chi nhánh
-      const showroomName = incoming.showroom || "Chi Nhánh Trường Chinh";
-      const branchInfo =
-        getBranchByShowroomName(showroomName) || getDefaultBranch();
-      setBranch(branchInfo);
+        // Lấy thông tin chi nhánh
+        let showroomName = incoming.showroom || "Chi Nhánh Trường Chinh";
 
-      const salePrice = incoming.contractPrice || "230.400.000";
-      const advancePayment = incoming.deposit || "216.000.000";
-      const calculatedRemaining = calculateRemainingAmount(salePrice, advancePayment);
-      
-      const processedData = {
-        customerName:
-          incoming.customerName || incoming["Tên KH"] || "Trần Thị B",
-        contractNumber: incoming.vso || "S00901-VSO-25-01-0041",
-        createdAt: formatDateString(incoming.createdAt) || "28/06/2024",
-        model: incoming.model || "VF8",
-        salePrice: salePrice,
-        advancePayment: advancePayment,
-        remainingAmount: incoming.remainingAmount || calculatedRemaining,
-        bankAccount: incoming.bankAccount || branchInfo.bankAccount,
-        bankBranch:
-          incoming.bankBranch ||
-          `${branchInfo.bankName} - ${branchInfo.bankBranch}`,
-        exterior: incoming.exterior || "Đỏ",
-        showroom: incoming.showroom || branchInfo.shortName,
-      };
-      setData(processedData);
-      // Initialize vehicleInfo from data
-      const defaultVehicleInfo = `Mua 01 chiếc xe ô tô con, chỗ, Nhãn hiệu: ${processedData.model}, màu ${getColorName(processedData.exterior)}, số tự động, mới 100%.`;
-      setVehicleInfo(incoming.vehicleInfo || defaultVehicleInfo);
-      if (incoming.recipientInfo) {
-        setRecipientInfo(incoming.recipientInfo);
+        // Nếu có firebaseKey, thử lấy showroom từ contracts
+        if (incoming.firebaseKey) {
+          try {
+            const contractId = incoming.firebaseKey;
+            const contractsRef = ref(database, `contracts/${contractId}`);
+            const snapshot = await get(contractsRef);
+            if (snapshot.exists()) {
+              const contractData = snapshot.val();
+              if (contractData.showroom) {
+                showroomName = contractData.showroom;
+              }
+            }
+          } catch (err) {
+            console.error("Error loading showroom from contracts:", err);
+          }
+        }
+
+        const branchInfo =
+          getBranchByShowroomName(showroomName) || getDefaultBranch();
+        setBranch(branchInfo);
+
+        const salePrice = incoming.contractPrice || "230.400.000";
+        const advancePayment = incoming.deposit || "216.000.000";
+        const calculatedRemaining = calculateRemainingAmount(
+          salePrice,
+          advancePayment
+        );
+
+        const processedData = {
+          customerName:
+            incoming.customerName || incoming["Tên KH"] || "Trần Thị B",
+          contractNumber: incoming.vso || "S00901-VSO-25-01-0041",
+          createdAt: formatDateString(incoming.createdAt) || "28/06/2024",
+          model: incoming.model || "VF8",
+          salePrice: salePrice,
+          advancePayment: advancePayment,
+          remainingAmount: incoming.remainingAmount || calculatedRemaining,
+          bankAccount: incoming.bankAccount || branchInfo.bankAccount,
+          bankBranch:
+            incoming.bankBranch ||
+            `${branchInfo.bankName} - ${branchInfo.bankBranch}`,
+          exterior: incoming.exterior || "Đỏ",
+          showroom: incoming.showroom || branchInfo.shortName,
+        };
+        setData(processedData);
+        // Initialize vehicleInfo from data
+        const defaultVehicleInfo = `Mua 01 chiếc xe ô tô con, chỗ, Nhãn hiệu: ${
+          processedData.model
+        }, màu ${getColorName(processedData.exterior)}, số tự động, mới 100%.`;
+        setVehicleInfo(incoming.vehicleInfo || defaultVehicleInfo);
+        if (incoming.recipientInfo) {
+          setRecipientInfo(incoming.recipientInfo);
+        }
       }
-    } else {
-      // Sử dụng chi nhánh mặc định
-      const defaultBranch = getDefaultBranch();
-      setBranch(defaultBranch);
-      const defaultSalePrice = "230.400.000";
-      const defaultAdvancePayment = "216.000.000";
-      const calculatedRemaining = calculateRemainingAmount(defaultSalePrice, defaultAdvancePayment);
-      
-      const defaultData = {
-        customerName: "Trần Thị B",
-        contractNumber: "S00901-VSO-25-01-0041",
-        createdAt: "28/06/2024",
-        model: "VF8",
-        salePrice: defaultSalePrice,
-        advancePayment: defaultAdvancePayment,
-        remainingAmount: calculatedRemaining,
-        bankAccount: defaultBranch.bankAccount,
-        bankBranch: `${defaultBranch.bankName} - ${defaultBranch.bankBranch}`,
-        exterior: "Đỏ",
-        showroom: defaultBranch.shortName,
-      };
-      setData(defaultData);
-      const defaultVehicleInfo = `Mua 01 chiếc xe ô tô con, chỗ, Nhãn hiệu: ${defaultData.model}, màu ${getColorName(defaultData.exterior)} mới 100%.`;
-      setVehicleInfo(defaultVehicleInfo);
-    }
-    setLoading(false);
+      setLoading(false);
+    };
+
+    loadData();
   }, [location.state]);
 
   const formatCurrency = (amount) => {
@@ -138,14 +149,14 @@ const GiayDeNghiThanhToan = () => {
   // Helper function to convert number to Vietnamese words
   const numberToWords = (amount) => {
     if (!amount) return "";
-    
+
     // Convert to number
     const numericAmount =
       typeof amount === "string" ? amount.replace(/\D/g, "") : String(amount);
     const num = parseInt(numericAmount, 10);
-    
+
     if (isNaN(num) || num === 0) return "Không đồng";
-    
+
     const ones = [
       "",
       "một",
@@ -185,19 +196,19 @@ const GiayDeNghiThanhToan = () => {
 
     const readGroup = (n, showZeroHundred = false) => {
       if (n === 0) return "";
-      
+
       let result = "";
       const hundred = Math.floor(n / 100);
       const ten = Math.floor((n % 100) / 10);
       const one = n % 10;
-      
+
       if (hundred > 0) {
         result += hundreds[hundred] + " ";
       } else if (showZeroHundred && ten > 0) {
         // Show "không trăm" when hundred is 0 but there are tens (not just ones)
         result += "không trăm ";
       }
-      
+
       if (ten > 0) {
         if (ten === 1) {
           result += "mười ";
@@ -229,7 +240,7 @@ const GiayDeNghiThanhToan = () => {
           result += ones[one] + " ";
         }
       }
-      
+
       return result.trim();
     };
 
@@ -344,25 +355,40 @@ const GiayDeNghiThanhToan = () => {
             <p className="font-bold mb-1">
               Kính gửi: NGÂN HÀNG TMCP VIỆT NAM THỊNH VƯỢNG-VP BANK
             </p>
-            <p className="font-bold">-{recipientInfo}</p>
+            <p className="font-bold">
+              -
+              <span className="print:hidden">
+                <input
+                  type="text"
+                  value={recipientInfo}
+                  onChange={(e) => setRecipientInfo(e.target.value)}
+                  className="border-b border-gray-400 px-2 py-1 text-sm font-bold w-full max-w-md focus:outline-none focus:border-blue-500"
+                  placeholder="Trung Tâm Thế Chấp Vùng 9"
+                />
+              </span>
+              <span className="hidden print:inline">{recipientInfo}</span>
+            </p>
           </div>
 
           {/* Căn cứ */}
-          <div className="mb-6 text-sm">
+          <div className="text-sm">
             <p className="mb-2">
               <em>Căn cứ Hợp đồng mua bán xe ô tô số:</em>{" "}
               <strong>{data.contractNumber}</strong>,{" "}
               <em>
                 ngày <strong>{data.createdAt}</strong> giữa Ông/Bà{" "}
-                <strong>{data.customerName}</strong> và <strong>CHI NHÁNH {" "}
-                {getShowroomShortName(data?.showroom).toUpperCase()} - CÔNG TY CP ĐẦU TƯ THƯƠNG MẠI VÀ DỊCH VỤ Ô TÔ ĐÔNG SÀI GÒN</strong>
+                <strong>{data.customerName}</strong> và{" "}
+                <strong>
+                  CHI NHÁNH {getShowroomShortName(data?.showroom).toUpperCase()}{" "}
+                  - CÔNG TY CP ĐẦU TƯ THƯƠNG MẠI VÀ DỊCH VỤ Ô TÔ ĐÔNG SÀI GÒN
+                </strong>
               </em>
             </p>
-            <p className="mb-4">
+            <p className="mb-1">
               <em>- Căn cứ vào tình hình thực tế.</em>
             </p>
 
-            <p className="mb-4">
+            <p className="mb-1">
               Nay{" "}
               <strong>
                 CHI NHÁNH {getShowroomShortName(data?.showroom).toUpperCase()} -
@@ -382,16 +408,24 @@ const GiayDeNghiThanhToan = () => {
             <div>
               - Tên khách hàng vay: <strong>{data.customerName}</strong>
               <em className="ml-4">
-                Loại xe mua: {vehicleInfo || `Mua 01 chiếc xe ô tô con, chỗ, Nhãn hiệu: ${data.model}, màu ${getColorName(data.exterior)} mới 100%.`}
+                Loại xe mua:{" "}
+                <span className="print:hidden ">
+                  <input
+                    type="text"
+                    value={vehicleInfo}
+                    onChange={(e) => setVehicleInfo(e.target.value)}
+                    className="border-b border-gray-400 px-2 py-1 text-sm font-normal italic w-full max-w-lg focus:outline-none focus:border-blue-500"
+                    placeholder={`Mua 01 chiếc xe ô tô con, chỗ, Nhãn hiệu: ${
+                      data.model
+                    }, màu ${getColorName(data.exterior)} mới 100%.`}
+                  />
+                </span>
               </em>
             </div>
 
             <div>
-              - Giá bán:<strong> {formatCurrency(data.salePrice)}</strong>
-              {" "}(Bằng chữ: {" "} 
-              <strong>
-                {numberToWords(data.salePrice)}
-              </strong>)
+              - Giá bán:<strong> {formatCurrency(data.salePrice)}</strong> (Bằng
+              chữ: <strong>{numberToWords(data.salePrice)}</strong>)
             </div>
 
             <div>
@@ -427,7 +461,9 @@ const GiayDeNghiThanhToan = () => {
                     className="border border-gray-800 px-4 py-3 text-center"
                   >
                     <strong>
-                      CHI NHÁNH {getShowroomShortName(data?.showroom).toUpperCase()} - CÔNG TY CỔ PHẦN ĐẦU TƯ THƯƠNG MẠI VÀ DỊCH VỤ Ô TÔ ĐÔNG SÀI
+                      CHI NHÁNH{" "}
+                      {getShowroomShortName(data?.showroom).toUpperCase()} -
+                      CÔNG TY CỔ PHẦN ĐẦU TƯ THƯƠNG MẠI VÀ DỊCH VỤ Ô TÔ ĐÔNG SÀI
                       GÒN
                     </strong>
                   </td>
@@ -451,49 +487,16 @@ const GiayDeNghiThanhToan = () => {
                     <br />
                     Chức vụ
                   </td>
-                  <td className="border border-gray-800 px-4 py-2 w-3/4">
-                    
-                  </td>
+                  <td className="border border-gray-800 px-4 py-2 w-3/4"></td>
                 </tr>
                 <tr>
                   <td className="border border-gray-800 px-4 py-2 w-1/4 text-center">
                     Ngày
                   </td>
-                  <td className="border border-gray-800 px-4 py-2 w-3/4 text-center font-semibold">
-                  </td>
+                  <td className="border border-gray-800 px-4 py-2 w-3/4 text-center font-semibold"></td>
                 </tr>
               </tbody>
             </table>
-          </div>
-        </div>
-
-        {/* Sidebar với input */}
-        <div className="w-120 print:hidden flex-shrink-0">
-          <div className="bg-white p-4 rounded-lg shadow-md sticky top-8 space-y-4">
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
-                Thông tin "Kính gửi":
-              </label>
-              <input
-                type="text"
-                value={recipientInfo}
-                onChange={(e) => setRecipientInfo(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Nhập thông tin kính gửi"
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
-                Thông tin loại xe:
-              </label>
-              <textarea
-                value={vehicleInfo}
-                onChange={(e) => setVehicleInfo(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y min-h-[80px]"
-                placeholder="Nhập thông tin loại xe"
-                rows={3}
-              />
-            </div>
           </div>
         </div>
       </div>

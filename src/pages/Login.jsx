@@ -57,7 +57,7 @@ function Login() {
             localStorage.setItem('username', userData.user || userData.username || userData.TVBH || userData.name || '');
             localStorage.setItem('userRole', userData.quyen || userData['Quyền'] || userData.role || 'user');
             localStorage.setItem('userEmail', userData.mail || userData.Mail || userData.email || '');
-            localStorage.setItem('userTeam', userData.team || userData.Team || '');
+            localStorage.setItem('userDepartment', userData.phongBan || userData['Phòng Ban'] || userData.department || userData['Bộ phận'] || '');
 
             toast.success('Đăng nhập thành công!', {
               position: "top-right",

@@ -16,10 +16,13 @@ import Header from './components/Header';
 import GiayXacNhanThongTin from './components/BieuMau/GiayXacNhanThongTin';
 import GiayDeNghiThanhToan from './components/BieuMau/GiayDeNghiThanhToan';
 import GiayXacNhanTangBaoHiem from './components/BieuMau/GiayXacNhanTangBaoHiem';
+import PhuLucHopDong from './components/BieuMau/PhuLucHopDong';
+import DeNghiXuatHoaDon from './components/BieuMau/DeNghiXuatHoaDon';
 import Dashboard from './pages/Dashboard';
 import CalculatorPage from './pages/CalculatorPage';
 import Invoice2Page from './pages/Invoice2Page';
 import QuanLyKhachHangPage from './pages/QuanLyKhachHangPage';
+import HopDongMuaBanXe from './components/BieuMau/HopDongMuaBanXe';
 
 function App() {
   return (
@@ -46,8 +49,11 @@ function App() {
           <Route path="/giay-xac-nhan-thong-tin" element={<ProtectedRoute><GiayXacNhanThongTin /></ProtectedRoute>} />
           <Route path="/giay-de-nghi-thanh-toan" element={<ProtectedRoute><GiayDeNghiThanhToan /></ProtectedRoute>} />
           <Route path="/giay-xac-nhan-tang-bao-hiem" element={<ProtectedRoute><GiayXacNhanTangBaoHiem /></ProtectedRoute>} />
+          <Route path="/phu-luc-hop-dong" element={<ProtectedRoute><PhuLucHopDong /></ProtectedRoute>} />
           <Route path="/bao-gia" element={<ProtectedRoute><CalculatorPage /></ProtectedRoute>} />
           <Route path="/in-bao-gia-2" element={<ProtectedRoute><Invoice2Page /></ProtectedRoute>} />
+          <Route path="/hop-dong-mua-ban-xe" element={<ProtectedRoute><HopDongMuaBanXe /></ProtectedRoute>} />
+          <Route path="/de-nghi-xuat-hoa-don" element={<ProtectedRoute><DeNghiXuatHoaDon /></ProtectedRoute>} />
         </Routes>
 
         {/* Toast notifications */}

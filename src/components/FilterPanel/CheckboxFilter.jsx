@@ -22,23 +22,20 @@ const CheckboxFilter = memo(
     if (!visible) return null;
 
     return (
-      <div className="mb-3">
+      <div className="">
         <button
           ref={anchorRef}
           type="button"
           onClick={() => setOpenDropdown((prev) => (prev === id ? null : id))}
-          className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-all duration-200 flex items-center justify-between group shadow-sm"
+          className="w-full px-4 py-2 bg-white border border-gray-200 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-all duration-200 flex items-center justify-between group shadow-sm"
         >
           <div className="flex items-center gap-3">
             <Icon>{icon}</Icon>
             <div className="text-left">
-              <div className="font-medium text-gray-800 text-sm">{title}</div>
-              <div className="text-xs text-gray-500">
-                {count > 0 ? `${count} đã chọn` : emptyLabel}
-              </div>
+              <div className="font-medium mr-2 text-gray-800 text-sm">{title}</div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             {count > 0 && (
               <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">
                 {count}

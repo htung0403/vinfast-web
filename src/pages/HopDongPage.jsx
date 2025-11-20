@@ -32,8 +32,6 @@ export default function HopDongPage() {
   const [contracts, setContracts] = useState([]);
   const [filteredContracts, setFilteredContracts] = useState([]);
   const [deletingContract, setDeletingContract] = useState(null);
-  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-  const [printContract, setPrintContract] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedContracts, setSelectedContracts] = useState(new Set());
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -560,6 +558,7 @@ export default function HopDongPage() {
       });
 
       // Prepare data for export with all required fields
+      const exportedKeys = []; // Store exported keys to pass to next page
       const exportPromises = contractsToExport.map(async (contract) => {
         const safeValue = (val) => val !== undefined && val !== null ? val : "";
         
@@ -591,10 +590,12 @@ export default function HopDongPage() {
           "Số Khung": safeValue(contract.soKhung || contract.chassisNumber || contract["Số Khung"] || ""),
           "Số Máy": safeValue(contract.soMay || contract.engineNumber || contract["Số Máy"] || ""),
           "Tình Trạng": safeValue(contract.tinhTrangXe || contract.vehicleStatus || contract["Tình Trạng Xe"] || ""), // Tình trạng xe, không phải tình trạng hợp đồng
+          "ngân hàng": safeValue(contract.bank || contract.nganHang || contract["ngân hàng"] || ""),
         };
 
         // Use firebaseKey as the key in exportedContracts, or generate new key
         const exportKey = contract.firebaseKey || `exported_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        exportedKeys.push(exportKey); // Store the key
         const exportRef = ref(database, `exportedContracts/${exportKey}`);
         await set(exportRef, exportedData);
       });
@@ -639,9 +640,17 @@ export default function HopDongPage() {
       closeExportModal();
       toast.success(`Đã xuất ${contractsToExport.length} hợp đồng thành công!`);
       
-      // Navigate to exported contracts page after successful export
+      // Navigate to exported contracts page after successful export with state to open image modal
+      // Pass the first exported contract's key to open image modal
+      const firstExportedKey = exportedKeys[0] || contractsToExport[0]?.firebaseKey;
       setTimeout(() => {
-        navigate("/hop-dong-da-xuat");
+        navigate("/hop-dong-da-xuat", { 
+          state: { 
+            openImageModal: true, 
+            contractKey: firstExportedKey,
+            exportedCount: contractsToExport.length
+          } 
+        });
       }, 1000); // Small delay to show the success message
     } catch (err) {
       console.error("Error exporting contracts:", err);
@@ -664,22 +673,8 @@ export default function HopDongPage() {
 
   return (
     <div className="mx-auto px-8 py-8 bg-gradient-to-br from-slate-100 to-slate-200">
-      <div className="grid grid-cols-1 lg:grid-cols-6 gap-6">
-        <FilterPanel
-          activeTab={'hopdong'}
-          filters={filters}
-          handleFilterChange={handleFilterChange}
-          quickSelectValue={quickSelectValue}
-          handleQuickDateSelect={handleQuickDateSelect}
-          availableFilters={availableFilters}
-          userRole={userRole}
-          hasActiveFilters={hasActiveFilters}
-          clearAllFilters={clearAllFilters}
-        />
-
-        <div className="lg:col-span-5">
-          {/* Header with Add Button */}
-          <div className="flex items-center justify-between mb-6">
+      {/* Header with Add Button */}
+      <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4">
               <button
                 onClick={() => navigate("/menu")}
@@ -691,30 +686,43 @@ export default function HopDongPage() {
               </button>
               <h2 className="text-2xl font-bold text-primary-700">Hợp đồng</h2>
             </div>
-            {userRole === "admin" && (
-              <div className="flex items-center gap-3">
-                {selectedContracts.size > 0 && (
-                  <button
-                    onClick={openExportModal}
-                    className="px-4 py-2 bg-primary-600 text-white rounded-lg border-2 border-transparent hover:bg-white hover:border-primary-600 hover:text-primary-600 transition-all duration-200 flex items-center gap-2 font-medium"
-                  >
-                    <Download className="w-4 h-4" />
-                    <span>Xuất hợp đồng ({selectedContracts.size})</span>
-                  </button>
-                )}
+            <div className="flex items-center gap-3">
+              {userRole === "admin" && selectedContracts.size > 0 && (
                 <button
-                  onClick={openAddModal}
-                  className="px-4 py-2 bg-secondary-600 text-white rounded-lg  border-2 border-transparent  hover:bg-white hover:border-secondary-600 hover:text-secondary-600 transition-all duration-200 flex items-center gap-2 font-medium"
+                  onClick={openExportModal}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg border-2 border-transparent hover:bg-white hover:border-primary-600 hover:text-primary-600 transition-all duration-200 flex items-center gap-2 font-medium"
                 >
-                  <Plus className="w-4 h-4" />
-                  <span>Thêm mới</span>
+                  <Download className="w-4 h-4" />
+                  <span>Xuất hợp đồng ({selectedContracts.size})</span>
                 </button>
-              </div>
-            )}
+              )}
+              <button
+                onClick={openAddModal}
+                className="px-4 py-2 bg-secondary-600 text-white rounded-lg  border-2 border-transparent  hover:bg-white hover:border-secondary-600 hover:text-secondary-600 transition-all duration-200 flex items-center gap-2 font-medium"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Thêm mới</span>
+              </button>
+            </div>
           </div>
 
-          {/* Statistics */}
-          <div className="mb-4 flex items-center justify-between">
+      {/* Filter Panel - Horizontal */}
+      <div className="mb-6">
+        <FilterPanel
+          activeTab={'hopdong'}
+          filters={filters}
+          handleFilterChange={handleFilterChange}
+          quickSelectValue={quickSelectValue}
+          handleQuickDateSelect={handleQuickDateSelect}
+          availableFilters={availableFilters}
+          userRole={userRole}
+          hasActiveFilters={hasActiveFilters}
+          clearAllFilters={clearAllFilters}
+        />
+      </div>
+
+      {/* Statistics */}
+      <div className="mb-4 flex items-center justify-between">
             <p className="text-secondary-600">
               Tổng số:{" "}
               <span className="font-semibold text-primary-600">
@@ -733,8 +741,8 @@ export default function HopDongPage() {
             </p>
           </div>
 
-          {/* User Management Table */}
-          {filteredContracts.length === 0 ? (
+      {/* User Management Table */}
+      {filteredContracts.length === 0 ? (
             <div className="text-center py-8 bg-secondary-50 rounded-lg">
               <p className="text-secondary-600">Không có dữ liệu hợp đồng</p>
             </div>
@@ -964,10 +972,10 @@ export default function HopDongPage() {
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
-                          {/* Print / Giấy xác nhận button */}
+                          {/* Print / In hợp đồng button */}
                           <button
                             onClick={() => {
-                              // open print selection modal with prepared data
+                              // Navigate to print contract page with prepared data
                               const printData = {
                                 id: contract.id,
                                 stt: contract.stt || startIndex + index + 1,
@@ -1003,11 +1011,10 @@ export default function HopDongPage() {
                                 engineNumber: contract.soMay || contract["Số Máy"] || contract.engineNumber || "",
                                 representativeName: contract.TVBH || contract.tvbh || "",
                               };
-                              setPrintContract(printData);
-                              setIsPrintModalOpen(true);
+                              navigate("/hop-dong-mua-ban-xe", { state: printData });
                             }}
                             className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center gap-2 text-sm"
-                            aria-label={`Chọn mẫu in ${
+                            aria-label={`In hợp đồng ${
                               contract.customerName || contract.id
                             }`}
                           >
@@ -1034,93 +1041,10 @@ export default function HopDongPage() {
                 </tbody>
               </table>
             </div>
-          )}
+      )}
 
-          {/* Print Selection Modal */}
-          {isPrintModalOpen && printContract && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-                <div className="px-6 py-4 border-b">
-                  <h3 className="text-lg font-bold">Chọn mẫu in</h3>
-                </div>
-
-                <div className="p-6 space-y-4">
-                  <p className="text-sm text-secondary-600">
-                    Chọn mẫu in cho hợp đồng:{" "}
-                    <span className="font-semibold">
-                      {printContract.customerName || printContract.id}
-                    </span>
-                  </p>
-
-                  <div className="grid grid-cols-1 gap-3">
-                    <button
-                      onClick={() => {
-                        setIsPrintModalOpen(false);
-                        // navigate to Giấy xác nhận template and pass contract data
-                        navigate("/giay-xac-nhan", { state: printContract });
-                        setPrintContract(null);
-                      }}
-                      className="w-full px-4 py-2 bg-secondary-500 text-white rounded-md"
-                    >
-                      Giấy xác nhận
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        // Example: navigate to a different template route (if exists)
-                        setIsPrintModalOpen(false);
-                        navigate("/giay-xac-nhan-thong-tin", {
-                          state: printContract,
-                        });
-                        setPrintContract(null);
-                      }}
-                      className="w-full px-4 py-2 bg-secondary-500 text-white rounded-md"
-                    >
-                      Giấy xác nhận thông tin
-                    </button>
-                    <button
-                      onClick={() => {
-                        // Example: navigate to a different template route (if exists)
-                        setIsPrintModalOpen(false);
-                        navigate("/giay-de-nghi-thanh-toan", {
-                          state: printContract,
-                        });
-                        setPrintContract(null);
-                      }}
-                      className="w-full px-4 py-2 bg-secondary-500 text-white rounded-md"
-                    >
-                      Giấy đề nghị thanh toán
-                    </button>
-                    <button
-                      onClick={() => {
-                        // Example: navigate to a different template route (if exists)
-                        setIsPrintModalOpen(false);
-                        navigate("/giay-xac-nhan-tang-bao-hiem", {
-                          state: printContract,
-                        });
-                        setPrintContract(null);
-                      }}
-                      className="w-full px-4 py-2 bg-secondary-500 text-white rounded-md"
-                    >
-                      Giấy xác nhận tặng bảo hiểm
-                    </button>
-                    <button
-                      onClick={() => {
-                        setIsPrintModalOpen(false);
-                        setPrintContract(null);
-                      }}
-                      className="w-full px-4 py-2 border border-secondary-200 rounded-md"
-                    >
-                      Hủy
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Pagination */}
-          {filteredContracts.length > itemsPerPage && (
+      {/* Pagination */}
+      {filteredContracts.length > itemsPerPage && (
             <div className="mt-6 flex items-center justify-between border-t border-secondary-100 bg-neutral-white px-4 py-3 sm:px-6 rounded-lg shadow">
               <div className="flex flex-1 justify-between sm:hidden">
                 <button
@@ -1255,10 +1179,10 @@ export default function HopDongPage() {
                 </div>
               </div>
             </div>
-          )}
+      )}
 
-          {/* Delete Confirmation Modal */}
-          {deletingContract && (
+      {/* Delete Confirmation Modal */}
+      {deletingContract && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
               <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
                 {/* Header */}
@@ -1351,10 +1275,10 @@ export default function HopDongPage() {
                 </div>
               </div>
             </div>
-          )}
+      )}
 
-          {/* Export Confirmation Modal */}
-          {isExportModalOpen && (
+      {/* Export Confirmation Modal */}
+      {isExportModalOpen && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
               <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
                 {/* Header */}
@@ -1417,9 +1341,7 @@ export default function HopDongPage() {
                 </div>
               </div>
             </div>
-          )}
-        </div>
-      </div>
+      )}
     </div>
   );
 }

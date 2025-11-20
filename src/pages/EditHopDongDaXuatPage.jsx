@@ -1,20 +1,30 @@
-import { useState, useEffect, useMemo } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { ref, get, update } from "firebase/database";
 import { database } from "../firebase/config";
-import { X, Edit, ArrowLeft } from "lucide-react";
+import { X, Edit, ArrowLeft, Image } from "lucide-react";
 import { toast } from "react-toastify";
 import { carPriceData, uniqueNgoaiThatColors, uniqueNoiThatColors } from '../data/calculatorData';
 import { provinces } from '../data/provincesData';
+import { uploadImageToCloudinary } from '../config/cloudinary';
 
 export default function EditHopDongDaXuatPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
   // State for employees list
   const [employees, setEmployees] = useState([]);
+
+  // State for image modal
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [depositImage, setDepositImage] = useState("");
+  const [counterpartImage, setCounterpartImage] = useState("");
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingImageType, setUploadingImageType] = useState(null); // 'deposit' or 'counterpart'
+  const hasOpenedImageModalRef = useRef(false); // Track if we've already opened the modal
 
   // Load employees from Firebase
   useEffect(() => {
@@ -66,6 +76,7 @@ export default function EditHopDongDaXuatPage() {
     soKhung: "",
     soMay: "",
     tinhTrang: "",
+    nganHang: "",
   });
 
   // Load contract data
@@ -133,9 +144,14 @@ export default function EditHopDongDaXuatPage() {
           soKhung: contractData.soKhung || contractData["Số Khung"] || contractData.chassisNumber || "",
           soMay: contractData.soMay || contractData["Số Máy"] || contractData.engineNumber || "",
           tinhTrang: contractData.tinhTrang || contractData["Tình Trạng"] || contractData.status || "",
+          nganHang: contractData.nganHang || contractData["ngân hàng"] || contractData.bank || "",
         };
 
         setContract(mapped);
+        
+        // Load images if they exist
+        setDepositImage(contractData.depositImage || contractData["Ảnh chụp hình đặt cọc"] || "");
+        setCounterpartImage(contractData.counterpartImage || contractData["Ảnh chụp đối ứng"] || "");
         setLoading(false);
       } catch (err) {
         console.error("Error loading contract:", err);
@@ -149,6 +165,21 @@ export default function EditHopDongDaXuatPage() {
       loadContract();
     }
   }, [id, navigate]);
+
+  // Reset ref when id changes (new contract loaded)
+  useEffect(() => {
+    hasOpenedImageModalRef.current = false;
+  }, [id]);
+
+  // Auto-open image modal if navigated from list page with flag (only once)
+  useEffect(() => {
+    if (location.state?.openImageModal && !loading && !hasOpenedImageModalRef.current) {
+      hasOpenedImageModalRef.current = true;
+      setIsImageModalOpen(true);
+      // Clear the state to prevent reopening on re-render
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, loading, navigate, location.pathname]);
 
   // Get unique car models from carPriceData
   const carModels = useMemo(() => {
@@ -260,6 +291,77 @@ export default function EditHopDongDaXuatPage() {
     handleChange(field, rawValue);
   };
 
+  // Handle image file upload to Cloudinary
+  const handleImageUpload = async (e, imageType) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Check if file is an image
+    if (!file.type.startsWith('image/')) {
+      toast.error("Vui lòng chọn file ảnh");
+      return;
+    }
+
+    // Check file size (max 10MB for Cloudinary)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Kích thước file không được vượt quá 10MB");
+      return;
+    }
+
+    try {
+      setUploadingImage(true);
+      setUploadingImageType(imageType);
+      
+      // Upload to Cloudinary
+      const imageUrl = await uploadImageToCloudinary(file);
+      
+      // Update the corresponding image state
+      if (imageType === 'deposit') {
+        setDepositImage(imageUrl);
+      } else if (imageType === 'counterpart') {
+        setCounterpartImage(imageUrl);
+      }
+      
+      toast.success("Upload ảnh thành công!");
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      toast.error(error.message || "Lỗi khi upload ảnh. Vui lòng thử lại.");
+    } finally {
+      setUploadingImage(false);
+      setUploadingImageType(null);
+      // Reset file input
+      e.target.value = '';
+    }
+  };
+
+  // Open image modal
+  const openImageModal = () => {
+    setIsImageModalOpen(true);
+  };
+
+  // Close image modal
+  const closeImageModal = () => {
+    setIsImageModalOpen(false);
+  };
+
+  // Save images
+  const handleSaveImages = async () => {
+    try {
+      const contractRef = ref(database, `exportedContracts/${id}`);
+      await update(contractRef, {
+        "Ảnh chụp hình đặt cọc": depositImage || "",
+        "Ảnh chụp đối ứng": counterpartImage || "",
+        depositImage: depositImage || "",
+        counterpartImage: counterpartImage || "",
+      });
+      toast.success("Lưu ảnh thành công!");
+      closeImageModal();
+    } catch (err) {
+      console.error("Error saving images:", err);
+      toast.error("Lỗi khi lưu ảnh");
+    }
+  };
+
   // Save contract
   const handleSave = async () => {
     try {
@@ -291,6 +393,11 @@ export default function EditHopDongDaXuatPage() {
         "Số Khung": safeValue(contract.soKhung),
         "Số Máy": safeValue(contract.soMay),
         "Tình Trạng": safeValue(contract.tinhTrang),
+        "ngân hàng": safeValue(contract.nganHang),
+        "Ảnh chụp hình đặt cọc": safeValue(depositImage),
+        "Ảnh chụp đối ứng": safeValue(counterpartImage),
+        depositImage: safeValue(depositImage),
+        counterpartImage: safeValue(counterpartImage),
       });
 
       toast.success("Cập nhật hợp đồng thành công!");
@@ -449,14 +556,14 @@ export default function EditHopDongDaXuatPage() {
                 {/* Address */}
                 <div className="md:col-span-2 lg:col-span-3">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Địa chỉ
+                    Địa chỉ lấy theo VNeid
                   </label>
                   <input
                     type="text"
                     value={contract.diaChi || ""}
                     onChange={(e) => handleChange("diaChi", e.target.value)}
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm"
-                    placeholder="Địa chỉ"
+                    placeholder="Địa chỉ lấy theo VNeid"
                   />
                 </div>
 
@@ -714,6 +821,20 @@ export default function EditHopDongDaXuatPage() {
                     placeholder="Tình trạng"
                   />
                 </div>
+
+                {/* Bank */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Ngân hàng
+                  </label>
+                  <input
+                    type="text"
+                    value={contract.nganHang || ""}
+                    onChange={(e) => handleChange("nganHang", e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm"
+                    placeholder="Ngân hàng"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -747,6 +868,166 @@ export default function EditHopDongDaXuatPage() {
           </div>
         </div>
       </div>
+
+      {/* Image Modal */}
+      {isImageModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-auto">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-primary-600 to-primary-400 px-6 py-4 rounded-t-lg sticky top-0 z-10">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-bold text-white">
+                  Quản lý ảnh
+                </h3>
+                <button
+                  onClick={closeImageModal}
+                  className="text-white hover:text-gray-200 transition-colors"
+                  aria-label="Đóng"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-6">
+              {/* Deposit Image */}
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Ảnh chụp hình đặt cọc
+                </label>
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={depositImage}
+                    onChange={(e) => setDepositImage(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm"
+                    placeholder="Nhập URL ảnh hoặc upload file"
+                  />
+                  <div className="flex items-center gap-2">
+                    <label className={`flex-1 px-4 py-2.5 border border-gray-300 rounded-lg transition-colors text-sm text-center ${
+                      uploadingImage && uploadingImageType === 'deposit' 
+                        ? 'bg-gray-200 cursor-not-allowed opacity-50' 
+                        : 'cursor-pointer hover:bg-gray-50'
+                    }`}>
+                      <span className="text-gray-700">
+                        {uploadingImage && uploadingImageType === 'deposit' 
+                          ? 'Đang upload...' 
+                          : 'Chọn file ảnh'}
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleImageUpload(e, 'deposit')}
+                        className="hidden"
+                        disabled={uploadingImage && uploadingImageType === 'deposit'}
+                      />
+                    </label>
+                    {depositImage && !(uploadingImage && uploadingImageType === 'deposit') && (
+                      <button
+                        onClick={() => setDepositImage("")}
+                        className="px-4 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm"
+                      >
+                        Xóa
+                      </button>
+                    )}
+                  </div>
+                  {depositImage && (
+                    <div className="mt-2">
+                      <img
+                        src={depositImage}
+                        alt="Ảnh chụp hình đặt cọc"
+                        className="max-w-full h-auto max-h-64 rounded-lg border border-gray-300"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          toast.error("Không thể tải ảnh. Vui lòng kiểm tra lại URL hoặc file.");
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Counterpart Image */}
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Ảnh chụp đối ứng
+                </label>
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={counterpartImage}
+                    onChange={(e) => setCounterpartImage(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm"
+                    placeholder="Nhập URL ảnh hoặc upload file"
+                  />
+                  <div className="flex items-center gap-2">
+                    <label className={`flex-1 px-4 py-2.5 border border-gray-300 rounded-lg transition-colors text-sm text-center ${
+                      uploadingImage && uploadingImageType === 'counterpart' 
+                        ? 'bg-gray-200 cursor-not-allowed opacity-50' 
+                        : 'cursor-pointer hover:bg-gray-50'
+                    }`}>
+                      <span className="text-gray-700">
+                        {uploadingImage && uploadingImageType === 'counterpart' 
+                          ? 'Đang upload...' 
+                          : 'Chọn file ảnh'}
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleImageUpload(e, 'counterpart')}
+                        className="hidden"
+                        disabled={uploadingImage && uploadingImageType === 'counterpart'}
+                      />
+                    </label>
+                    {counterpartImage && !(uploadingImage && uploadingImageType === 'counterpart') && (
+                      <button
+                        onClick={() => setCounterpartImage("")}
+                        className="px-4 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm"
+                      >
+                        Xóa
+                      </button>
+                    )}
+                  </div>
+                  {counterpartImage && (
+                    <div className="mt-2">
+                      <img
+                        src={counterpartImage}
+                        alt="Ảnh chụp đối ứng"
+                        className="max-w-full h-auto max-h-64 rounded-lg border border-gray-300"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          toast.error("Không thể tải ảnh. Vui lòng kiểm tra lại URL hoặc file.");
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="bg-gray-50 px-6 py-4 flex flex-col sm:flex-row justify-end items-center gap-4 border-t border-gray-200 rounded-b-lg">
+              <button
+                onClick={closeImageModal}
+                className="w-full sm:w-auto px-6 py-3 bg-gray-500 text-white font-medium rounded-lg hover:bg-gray-600 transition-all duration-200 flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
+                aria-label="Hủy"
+              >
+                <X className="w-4 h-4" />
+                <span>Hủy</span>
+              </button>
+              <button
+                onClick={handleSaveImages}
+                className="w-full sm:w-auto px-8 py-3 bg-secondary-600 text-white font-medium rounded-lg hover:bg-secondary-700 transition-all duration-200 flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
+                aria-label="Lưu ảnh"
+              >
+                <Edit className="w-5 h-5" />
+                <span>Lưu ảnh</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

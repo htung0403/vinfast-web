@@ -1,15 +1,31 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Users, FileText, Briefcase, DollarSign, FileCheck } from 'lucide-react';
 import VinfastLogo from '../assets/vinfast.svg';
 
 export default function Menu() {
-  const cards = [
+  const [userRole, setUserRole] = useState('user');
+
+  useEffect(() => {
+    const role = localStorage.getItem('userRole') || 'user';
+    setUserRole(role);
+  }, []);
+
+  const allCards = [
     { to: '/nhan-su', label: 'Nhân sự', color: 'primary', icon: Users, isExternal: false },
     { to: '/hop-dong', label: 'Hợp đồng', color: 'secondary', icon: FileText, isExternal: false },
     { to: '/hop-dong-da-xuat', label: 'Hợp đồng đã xuất', color: 'accent', icon: FileCheck, isExternal: false },
     { to: '/quan-ly-khach-hang', label: 'Khách hàng', color: 'accent', icon: Briefcase, isExternal: false },
     { to: '/bao-gia', label: 'Báo giá', color: 'primary', icon: DollarSign, isExternal: false },
   ];
+
+  // Filter out "Nhân sự" card if userRole is "user"
+  const cards = allCards.filter((card) => {
+    if (card.to === '/nhan-su' && userRole === 'user') {
+      return false;
+    }
+    return true;
+  });
 
   return (
     <div className="max-w mx-auto px-4 sm:px-6 lg:px-8 py-12 bg-gradient-to-br from-slate-50 to-slate-300 min-h-screen">

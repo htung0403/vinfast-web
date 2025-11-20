@@ -6,7 +6,6 @@ import React, {
   useMemo,
 } from "react";
 import CheckboxFilter from "./FilterPanel/CheckboxFilter";
-import CollapsibleSection from "./FilterPanel/CollapsibleSection";
 import { ref, get } from "firebase/database";
 import { database } from "../firebase/config";
 
@@ -53,6 +52,11 @@ export default function FilterPanel({
   });
 
   useEffect(() => {
+    // Don't fetch departments if on HopDong page (activeTab === "hopdong")
+    if (activeTab === "hopdong") {
+      return;
+    }
+
     // if parent already supplies departments, don't fetch
     if (
       availableFilters &&
@@ -95,7 +99,7 @@ export default function FilterPanel({
     return () => {
       cancelled = true;
     };
-  }, [availableFilters]);
+  }, [availableFilters, activeTab]);
 
   useEffect(() => {
     const handler = (e) => {
@@ -127,17 +131,17 @@ export default function FilterPanel({
   );
 
   return (
-    <div className="lg:col-span-1">
+    <div className="w-full">
       <div
         ref={panelRef}
-        className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto"
+        className="bg-white rounded-2xl shadow-xl border border-gray-100 p-4"
       >
         {/* Header */}
-        <div className="flex items-center justify-between mb-6 pb-4 border-b-2 border-gray-100">
+        <div className="flex items-center justify-between mb-4 pb-3 border-b-2 border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center shadow-lg">
+            <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center shadow-sm">
               <svg
-                className="w-6 h-6 text-white"
+                className="w-4 h-4 text-white"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -150,12 +154,12 @@ export default function FilterPanel({
                 />
               </svg>
             </div>
-            <h3 className="text-xl font-bold text-gray-800">Bộ lọc</h3>
+            <h3 className="text-lg font-bold text-gray-800">Bộ lọc</h3>
           </div>
           {hasActiveFilters?.() && (
             <button
               onClick={clearAllFilters}
-              className="px-2 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-xl hover:shadow-lg transition-all duration-200 flex items-center gap-2 hover:scale-105"
+              className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-xl hover:shadow-lg transition-all duration-200 flex items-center gap-2"
             >
               <svg
                 className="w-4 h-4"
@@ -175,174 +179,112 @@ export default function FilterPanel({
           )}
         </div>
 
-        {/* Tìm kiếm */}
-        {activeTab !== "market" && (
-          <CollapsibleSection
-            id="search"
-            title="Tìm kiếm"
-            icon={
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-            }
-          >
-            <div className="relative">
-              <input
-                type="text"
-                value={filters.searchText || ""}
-                onChange={(e) =>
-                  handleFilterChange("searchText", e.target.value)
-                }
-                placeholder={
-                  // Make it clear the search applies to the whole table
-                  "Tìm kiếm"
-                }
-                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm transition-all"
-              />
-              <svg
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-            </div>
-          </CollapsibleSection>
-        )}
-
-        {/* Ngày tháng */}
-        {activeTab !== "users" && (
-          <CollapsibleSection
-            id="date"
-            title="Ngày tháng"
-            icon={
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                />
-              </svg>
-            }
-          >
-            <select
-              onChange={handleQuickDateSelect}
-              value={quickSelectValue || ""}
-              className="appearance-none w-full px-4 py-3 pr-10 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 bg-white text-sm shadow-sm hover:border-blue-500 transition-all cursor-pointer"
-            >
-              <option value="">-- Chọn nhanh --</option>
-              <optgroup label="Ngày">
-                <option value="today">Hôm nay</option>
-                <option value="yesterday">Hôm qua</option>
-              </optgroup>
-              <optgroup label="Tuần">
-                <option value="this-week">Tuần này</option>
-                <option value="last-week">Tuần trước</option>
-                <option value="next-week">Tuần sau</option>
-              </optgroup>
-              <optgroup label="Tháng">
-                <option value="this-month">Tháng này</option>
-                {[...Array(12)].map((_, i) => (
-                  <option key={i + 1} value={`month-${i + 1}`}>
-                    Tháng {i + 1}
-                  </option>
-                ))}
-              </optgroup>
-              <optgroup label="Quý">
-                {[1, 2, 3, 4].map((q) => (
-                  <option key={q} value={`q${q}`}>
-                    Quý {q}
-                  </option>
-                ))}
-              </optgroup>
-            </select>
-            <svg
-              className="pointer-events-none absolute right-3 top-10 w-5 h-5 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 9l-7 7-7-7"
-              />
-            </svg>
-
-            <div className="grid grid-cols-1 gap-3 mt-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Từ
-                </label>
+        {/* Horizontal Layout for Filters - All in one row */}
+        <div className="flex flex-nowrap gap-4 items-center overflow-x-auto pb-2">
+          {/* Tìm kiếm */}
+          {activeTab !== "market" && (
+            <div className="flex-shrink-0 flex items-center gap-2">
+              <label className="text-xs font-medium text-gray-600 whitespace-nowrap">
+                Tìm kiếm:
+              </label>
+              <div className="relative" style={{ minWidth: '200px' }}>
                 <input
-                  type="date"
-                  value={filters.startDate || ""}
+                  type="text"
+                  value={filters.searchText || ""}
                   onChange={(e) =>
-                    handleFilterChange("startDate", e.target.value)
+                    handleFilterChange("searchText", e.target.value)
                   }
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500"
+                  placeholder="Tìm kiếm"
+                  className="w-full pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm transition-all"
                 />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Đến
-                </label>
-                <input
-                  type="date"
-                  value={filters.endDate || ""}
-                  onChange={(e) =>
-                    handleFilterChange("endDate", e.target.value)
-                  }
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500"
-                />
+                <svg
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
               </div>
             </div>
-          </CollapsibleSection>
-        )}
+          )}
 
-        {/* Bộ lọc chi tiết */}
-        <CollapsibleSection
-          id="filters"
-          title="Bộ lọc chi tiết"
-          icon={
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"
-              />
-            </svg>
-          }
-        >
+          {/* Ngày tháng */}
+          {activeTab !== "users" && (
+            <div className="flex-shrink-0 flex items-center gap-2" style={{ minWidth: '500px' }}>
+              <label className="text-xs font-medium text-gray-600 whitespace-nowrap">
+                Ngày tháng:
+              </label>
+              <div className="flex gap-2 items-center flex-1">
+                <div className="flex-1">
+                  <select
+                    onChange={handleQuickDateSelect}
+                    value={quickSelectValue || ""}
+                    className="appearance-none w-full px-3 py-2 pr-8 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 bg-white shadow-sm hover:border-blue-500 transition-all cursor-pointer"
+                  >
+                    <option value="">-- Chọn nhanh --</option>
+                    <optgroup label="Ngày">
+                      <option value="today">Hôm nay</option>
+                      <option value="yesterday">Hôm qua</option>
+                    </optgroup>
+                    <optgroup label="Tuần">
+                      <option value="this-week">Tuần này</option>
+                      <option value="last-week">Tuần trước</option>
+                      <option value="next-week">Tuần sau</option>
+                    </optgroup>
+                    <optgroup label="Tháng">
+                      <option value="this-month">Tháng này</option>
+                      {[...Array(12)].map((_, i) => (
+                        <option key={i + 1} value={`month-${i + 1}`}>
+                          Tháng {i + 1}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Quý">
+                      {[1, 2, 3, 4].map((q) => (
+                        <option key={q} value={`q${q}`}>
+                          Quý {q}
+                        </option>
+                      ))}
+                    </optgroup>
+                  </select>
+                </div>
+                <div className="flex items-center gap-1">
+                  <label className="text-xs font-medium text-gray-600 whitespace-nowrap">
+                    Từ:
+                  </label>
+                  <input
+                    type="date"
+                    value={filters.startDate || ""}
+                    onChange={(e) =>
+                      handleFilterChange("startDate", e.target.value)
+                    }
+                    className="px-2 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="flex items-center gap-1">
+                  <label className="text-xs font-medium text-gray-600 whitespace-nowrap">
+                    Đến:
+                  </label>
+                  <input
+                    type="date"
+                    value={filters.endDate || ""}
+                    onChange={(e) =>
+                      handleFilterChange("endDate", e.target.value)
+                    }
+                    className="px-2 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Checkbox Filters */}
           <CheckboxFilter
             id="products"
             title="Dòng xe"
@@ -367,8 +309,6 @@ export default function FilterPanel({
               </svg>
             }
           />
-
-          {/* Shift filter removed (field 'Ca' removed from employee model) */}
 
           <CheckboxFilter
             id="markets"
@@ -433,8 +373,7 @@ export default function FilterPanel({
             }
             selected={filters.departments || []}
             onToggle={(v) => handleToggle("departments", v)}
-            // Show departments checkbox filter for admin, but hide on HopDong page per requirements
-            visible={userRole === "admin" && activeTab !== "hopdong"}
+            visible={userRole === "admin" && activeTab !== "hopdong" && activeTab !== "hopdongdaxuat"}
             icon={
               <svg
                 className="w-4 h-4"
@@ -451,7 +390,7 @@ export default function FilterPanel({
               </svg>
             }
           />
-        </CollapsibleSection>
+        </div>
       </div>
     </div>
   );

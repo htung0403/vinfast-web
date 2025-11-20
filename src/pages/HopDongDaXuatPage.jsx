@@ -1,14 +1,17 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import FilterPanel from "../components/FilterPanel";
-import { ref, get, remove } from "firebase/database";
+import { ref, get, remove, update } from "firebase/database";
 import { database } from "../firebase/config";
-import { ArrowLeft, X, Trash2, Edit, AlertTriangle } from "lucide-react";
+import { ArrowLeft, X, Trash2, Edit, AlertTriangle, Image } from "lucide-react";
 import { toast } from "react-toastify";
 import { uniqueNgoaiThatColors, uniqueNoiThatColors } from '../data/calculatorData';
+import { uploadImageToCloudinary } from '../config/cloudinary';
 
 export default function HopDongDaXuatPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const hasOpenedImageModalRef = useRef(false); // Track if we've already opened the modal
   const [userTeam, setUserTeam] = useState("");
   const [userRole, setUserRole] = useState("user");
   const [userEmail, setUserEmail] = useState("");
@@ -35,6 +38,16 @@ export default function HopDongDaXuatPage() {
   const [deletingContract, setDeletingContract] = useState(null);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [printContract, setPrintContract] = useState(null);
+  const [bankLoanFile, setBankLoanFile] = useState(null); // File cho vay của NH cho Đề xuất bán hàng
+  const [uploadingBankLoanFile, setUploadingBankLoanFile] = useState(false);
+  
+  // Image modal states
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [currentImageContract, setCurrentImageContract] = useState(null);
+  const [depositImage, setDepositImage] = useState("");
+  const [counterpartImage, setCounterpartImage] = useState("");
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingImageType, setUploadingImageType] = useState(null); // 'deposit' or 'counterpart'
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
@@ -144,6 +157,17 @@ export default function HopDongDaXuatPage() {
       soKhung: c["Số Khung"] || "",
       soMay: c["Số Máy"] || "",
       tinhTrang: c["Tình Trạng"] || "",
+      nganHang: c["ngân hàng"] || c.nganHang || c.bank || "",
+      // Tiền đặt cọc
+      tienDatCoc: c["Tiền đặt cọc"] || c.tienDatCoc || c["Số tiền cọc"] || c.soTienCoc || c.deposit || c.giaGiam || "",
+      // Tiền đối ứng
+      tienDoiUng: c["Tiền đối ứng"] || c.tienDoiUng || c.counterpartPayment || c.payment || "",
+      // Tiền vay ngân hàng
+      tienVayNganHang: c["Tiền vay ngân hàng"] || c.tienVayNganHang || c.loanAmount || c["Tiền vay"] || c.tienVay || "",
+      depositImage: c.depositImage || c["Ảnh chụp hình đặt cọc"] || "",
+      counterpartImage: c.counterpartImage || c["Ảnh chụp đối ứng"] || "",
+      "Ảnh chụp hình đặt cọc": c.depositImage || c["Ảnh chụp hình đặt cọc"] || "",
+      "Ảnh chụp đối ứng": c.counterpartImage || c["Ảnh chụp đối ứng"] || "",
     });
 
     const loadFromFirebase = async () => {
@@ -410,6 +434,49 @@ export default function HopDongDaXuatPage() {
     return new Intl.NumberFormat("vi-VN").format(num);
   };
 
+  // Calculate bank loan amount (tiền vay ngân hàng)
+  const calculateBankLoan = (contract) => {
+    // If already has tienVayNganHang, use it
+    if (contract.tienVayNganHang) {
+      return contract.tienVayNganHang;
+    }
+    
+    // Otherwise calculate: giaHopDong - tienDatCoc
+    const parseValue = (val) => {
+      if (!val) return 0;
+      if (typeof val === "string") {
+        return parseFloat(val.replace(/[^\d]/g, "")) || 0;
+      }
+      return typeof val === "number" ? val : 0;
+    };
+    
+    const giaHopDong = parseValue(contract.giaHopDong);
+    const tienDatCoc = parseValue(contract.tienDatCoc || contract.giaGiam);
+    
+    const loanAmount = giaHopDong - tienDatCoc;
+    return loanAmount > 0 ? loanAmount : 0;
+  };
+
+  // Calculate days from export date to today
+  const calculateDaysFromExport = (exportDate) => {
+    if (!exportDate) return "-";
+    try {
+      const exportDateObj = new Date(exportDate);
+      if (isNaN(exportDateObj.getTime())) return "-";
+      
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      exportDateObj.setHours(0, 0, 0, 0);
+      
+      const diffTime = today - exportDateObj;
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      
+      return diffDays;
+    } catch (e) {
+      return "-";
+    }
+  };
+
   // Check if contract has missing required fields
   const hasMissingData = (contract) => {
     if (!contract) return true;
@@ -494,9 +561,171 @@ export default function HopDongDaXuatPage() {
     }
   };
 
+  // Open image modal
+  const openImageModal = (contract) => {
+    setCurrentImageContract(contract);
+    // Load existing images from contract data (use contract directly as it already has the image data)
+    setDepositImage(contract.depositImage || contract["Ảnh chụp hình đặt cọc"] || "");
+    setCounterpartImage(contract.counterpartImage || contract["Ảnh chụp đối ứng"] || "");
+    setIsImageModalOpen(true);
+  };
+
+  // Reset ref when contracts change (new contracts loaded)
+  useEffect(() => {
+    hasOpenedImageModalRef.current = false;
+  }, [contracts.length]);
+
+  // Auto-open image modal when navigated from export with flag
+  useEffect(() => {
+    if (location.state?.openImageModal && !loading && !hasOpenedImageModalRef.current && contracts.length > 0) {
+      const contractKey = location.state.contractKey;
+      
+      // Find the contract by firebaseKey, or use first contract if not found
+      const contractToOpen = contractKey 
+        ? contracts.find(c => c.firebaseKey === contractKey) 
+        : contracts[0];
+      
+      if (contractToOpen) {
+        hasOpenedImageModalRef.current = true;
+        // Small delay to ensure UI is ready
+        setTimeout(() => {
+          openImageModal(contractToOpen);
+          // Clear the state to prevent reopening on re-render
+          navigate(location.pathname, { replace: true, state: {} });
+        }, 500);
+      }
+    }
+  }, [location.state, loading, contracts, navigate, location.pathname]);
+
+  // Close image modal
+  const closeImageModal = () => {
+    setIsImageModalOpen(false);
+    setCurrentImageContract(null);
+    setDepositImage("");
+    setCounterpartImage("");
+    setUploadingImage(false);
+    setUploadingImageType(null);
+  };
+
+  // Handle image file upload to Cloudinary
+  const handleImageUpload = async (e, imageType) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Check if file is an image
+    if (!file.type.startsWith('image/')) {
+      toast.error("Vui lòng chọn file ảnh");
+      return;
+    }
+
+    // Check file size (max 10MB for Cloudinary)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Kích thước file không được vượt quá 10MB");
+      return;
+    }
+
+    try {
+      setUploadingImage(true);
+      setUploadingImageType(imageType);
+      
+      // Upload to Cloudinary
+      const imageUrl = await uploadImageToCloudinary(file);
+      
+      // Update the corresponding image state
+      if (imageType === 'deposit') {
+        setDepositImage(imageUrl);
+      } else if (imageType === 'counterpart') {
+        setCounterpartImage(imageUrl);
+      }
+      
+      toast.success("Upload ảnh thành công!");
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      toast.error(error.message || "Lỗi khi upload ảnh. Vui lòng thử lại.");
+    } finally {
+      setUploadingImage(false);
+      setUploadingImageType(null);
+      // Reset file input
+      e.target.value = '';
+    }
+  };
+
+  // Save images
+  const handleSaveImages = async () => {
+    if (!currentImageContract) return;
+
+    try {
+      const contractKey = currentImageContract.firebaseKey || currentImageContract.id;
+      if (!contractKey) {
+        toast.error("Không tìm thấy hợp đồng!");
+        return;
+      }
+
+      const contractRef = ref(database, `exportedContracts/${contractKey}`);
+      await update(contractRef, {
+        "Ảnh chụp hình đặt cọc": depositImage || "",
+        "Ảnh chụp đối ứng": counterpartImage || "",
+        depositImage: depositImage || "",
+        counterpartImage: counterpartImage || "",
+      });
+
+      // Update local state
+      setContracts((prev) =>
+        prev.map((contract) => {
+          const key = contract.firebaseKey || contract.id;
+          if (key === contractKey) {
+            return {
+              ...contract,
+              depositImage: depositImage || "",
+              counterpartImage: counterpartImage || "",
+              "Ảnh chụp hình đặt cọc": depositImage || "",
+              "Ảnh chụp đối ứng": counterpartImage || "",
+            };
+          }
+          return contract;
+        })
+      );
+      setFilteredContracts((prev) =>
+        prev.map((contract) => {
+          const key = contract.firebaseKey || contract.id;
+          if (key === contractKey) {
+            return {
+              ...contract,
+              depositImage: depositImage || "",
+              counterpartImage: counterpartImage || "",
+              "Ảnh chụp hình đặt cọc": depositImage || "",
+              "Ảnh chụp đối ứng": counterpartImage || "",
+            };
+          }
+          return contract;
+        })
+      );
+
+      toast.success("Lưu ảnh thành công!");
+      closeImageModal();
+    } catch (err) {
+      console.error("Error saving images:", err);
+      toast.error("Lỗi khi lưu ảnh");
+    }
+  };
+
   return (
     <div className="mx-auto px-8 py-8 bg-gradient-to-br from-slate-100 to-slate-200">
-      <div className="grid grid-cols-1 lg:grid-cols-6 gap-6">
+      {/* Header with Back Button and Title */}
+      <div className="flex items-center gap-4 mb-6">
+            <button
+              onClick={() => navigate("/menu")}
+              className="text-gray-700 hover:text-gray-900 transition-colors flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100"
+              aria-label="Quay lại"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              <span className="hidden sm:inline">Quay lại</span>
+            </button>
+        <h2 className="text-2xl font-bold text-primary-700">Hợp đồng đã xuất</h2>
+      </div>
+
+      {/* Filter Panel - Horizontal */}
+      <div className="mb-6">
         <FilterPanel
           activeTab={"hopdongdaxuat"}
           filters={filters}
@@ -508,32 +737,19 @@ export default function HopDongDaXuatPage() {
           hasActiveFilters={hasActiveFilters}
           clearAllFilters={clearAllFilters}
         />
+      </div>
 
-        <div className="lg:col-span-5">
-          {/* Header with Back Button and Title */}
-          <div className="flex items-center gap-4 mb-6">
-            <button
-              onClick={() => navigate("/menu")}
-              className="text-gray-700 hover:text-gray-900 transition-colors flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100"
-              aria-label="Quay lại"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              <span className="hidden sm:inline">Quay lại</span>
-            </button>
-            <h2 className="text-2xl font-bold text-primary-700">Hợp đồng đã xuất</h2>
-          </div>
-
-          {loading ? (
+      {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto mb-4"></div>
                 <p className="text-secondary-600">Đang tải dữ liệu hợp đồng đã xuất...</p>
               </div>
             </div>
-          ) : (
-            <div>
-              {/* Statistics */}
-              <div className="mb-4 flex items-center justify-between">
+      ) : (
+        <div>
+          {/* Statistics */}
+          <div className="mb-4 flex items-center justify-between">
                 <p className="text-secondary-600">
                   Tổng số:{" "}
                   <span className="font-semibold text-primary-600">
@@ -550,10 +766,10 @@ export default function HopDongDaXuatPage() {
                     </span>
                   )}
                 </p>
-              </div>
+          </div>
 
-              {/* Contracts Table */}
-              {filteredContracts.length === 0 ? (
+          {/* Contracts Table */}
+          {filteredContracts.length === 0 ? (
                 <div className="text-center py-8 bg-secondary-50 rounded-lg">
                   <p className="text-secondary-600">Không có dữ liệu hợp đồng đã xuất</p>
                 </div>
@@ -584,7 +800,7 @@ export default function HopDongDaXuatPage() {
                           Email
                         </th>
                         <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
-                          Địa Chỉ
+                          Địa Chỉ lấy theo VNeid
                         </th>
                         <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
                           CCCD
@@ -624,6 +840,21 @@ export default function HopDongDaXuatPage() {
                         </th>
                         <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
                           Tình Trạng
+                        </th>
+                        <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
+                          Ngân hàng
+                        </th>
+                        <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
+                          Tiền đặt cọc
+                        </th>
+                        <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
+                          Tiền đối ứng
+                        </th>
+                        <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
+                          Tiền vay ngân hàng
+                        </th>
+                        <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
+                          Số Ngày
                         </th>
                         <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400 sticky right-0 z-30 bg-primary-400">
                           Thao tác
@@ -701,9 +932,33 @@ export default function HopDongDaXuatPage() {
                           <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
                             {contract.tinhTrang || "-"}
                           </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
+                            {contract.nganHang || "-"}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
+                            {formatCurrency(contract.tienDatCoc || contract.giaGiam)}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
+                            {formatCurrency(contract.tienDoiUng)}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
+                            {formatCurrency(calculateBankLoan(contract))}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400 text-center font-semibold">
+                            {calculateDaysFromExport(contract.ngayXhd)}
+                            {calculateDaysFromExport(contract.ngayXhd) !== "-" && " ngày"}
+                          </td>
                           {/* Actions column - sticky to right */}
                           <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400 sticky right-0 z-20 bg-primary-200">
                             <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => openImageModal(contract)}
+                                className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm"
+                                aria-label={`Quản lý ảnh ${contract.tenKh || contract.id}`}
+                                title="Quản lý ảnh"
+                              >
+                                <Image className="w-4 h-4" />
+                              </button>
                               <button
                                 onClick={() => navigate(`/hop-dong-da-xuat/edit/${contract.firebaseKey || contract.id}`)}
                                 className="px-3 py-1 bg-secondary-600 text-white rounded-md hover:bg-secondary-700 transition-colors flex items-center gap-2 text-sm"
@@ -727,6 +982,7 @@ export default function HopDongDaXuatPage() {
                                   }
                                   const printData = {
                                     id: contract.id,
+                                    firebaseKey: contract.firebaseKey,
                                     stt: startIndex + index + 1,
                                     createdAt: contract.ngayXhd,
                                     TVBH: contract.tvbh,
@@ -746,7 +1002,7 @@ export default function HopDongDaXuatPage() {
                                     contractPrice: contract.giaHopDong,
                                     deposit: contract.giaGiam,
                                     payment: "",
-                                    bank: "",
+                                    bank: contract.nganHang || "",
                                     status: contract.tinhTrang,
                                     soKhung: contract.soKhung,
                                     soMay: contract.soMay,
@@ -791,10 +1047,10 @@ export default function HopDongDaXuatPage() {
                     </tbody>
                   </table>
                 </div>
-              )}
+          )}
 
-              {/* Pagination */}
-              {totalPages > 1 && (
+          {/* Pagination */}
+          {totalPages > 1 && (
                 <div className="mt-6 flex items-center justify-center gap-2">
                   <button
                     onClick={() => handlePageChange(currentPage - 1)}
@@ -814,10 +1070,10 @@ export default function HopDongDaXuatPage() {
                     Sau
                   </button>
                 </div>
-              )}
+          )}
 
-              {/* Delete Confirmation Modal */}
-              {deletingContract && (
+          {/* Delete Confirmation Modal */}
+          {deletingContract && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                   <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
                     {/* Header */}
@@ -896,90 +1152,467 @@ export default function HopDongDaXuatPage() {
                     </div>
                   </div>
                 </div>
-              )}
+          )}
 
               {/* Print Selection Modal */}
-              {isPrintModalOpen && printContract && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                  <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-                    <div className="px-6 py-4 border-b">
-                      <h3 className="text-lg font-bold">Chọn mẫu in</h3>
-                    </div>
+              {isPrintModalOpen && printContract && (() => {
+                // Helper to parse currency string to number
+                const parseCurrency = (value) => {
+                  if (!value) return 0;
+                  const str = String(value).replace(/[^\d]/g, ''); // Remove all non-digits
+                  return parseFloat(str) || 0;
+                };
 
-                    <div className="p-6 space-y-4">
-                      <p className="text-sm text-secondary-600">
-                        Chọn mẫu in cho hợp đồng:{" "}
-                        <span className="font-semibold">
-                          {printContract.customerName || printContract.id}
-                        </span>
-                      </p>
+                // Determine loan amount and bank for conditional display
+                const bank = (printContract.bank || "").toLowerCase();
+                const contractPrice = parseCurrency(printContract.contractPrice || printContract.giaHopDong || 0);
+                const deposit = parseCurrency(printContract.deposit || printContract.giaGiam || 0);
+                const loanAmount = contractPrice - deposit;
+                const loanPercentage = contractPrice > 0 ? (loanAmount / contractPrice) * 100 : 0;
+                const isLoan0 = loanPercentage < 1; // Vay 0 đồng
+                const isLoan90 = loanPercentage >= 85 && loanPercentage <= 95; // Vay khoảng 90%
+                const isVPBank = bank.includes("vpbank") || bank.includes("vp bank") || bank.includes("vietnam prosperity");
+                const isTPBank = bank.includes("tpbank") || bank.includes("tp bank") || bank.includes("tien phong");
+                const isLotte = bank.includes("lotte") || bank.includes("cty tài chính lotte") || bank.includes("công ty tài chính lotte");
 
-                      <div className="grid grid-cols-1 gap-3">
-                        <button
-                          onClick={() => {
-                            setIsPrintModalOpen(false);
-                            navigate("/giay-xac-nhan", { state: printContract });
-                            setPrintContract(null);
-                          }}
-                          className="w-full px-4 py-2 bg-secondary-500 text-white rounded-md"
-                        >
-                          Giấy xác nhận
-                        </button>
+                // Handle bank loan file upload
+                const handleBankLoanFileUpload = async (e) => {
+                  const file = e.target.files[0];
+                  if (!file) return;
 
+                  if (!file.type.startsWith('image/') && !file.type.includes('pdf')) {
+                    toast.error("Vui lòng chọn file ảnh hoặc PDF");
+                    return;
+                  }
+
+                  if (file.size > 10 * 1024 * 1024) {
+                    toast.error("Kích thước file không được vượt quá 10MB");
+                    return;
+                  }
+
+                  try {
+                    setUploadingBankLoanFile(true);
+                    // Upload to Cloudinary
+                    const fileUrl = await uploadImageToCloudinary(file);
+                    setBankLoanFile(fileUrl);
+                    toast.success("Upload file thành công!");
+                  } catch (error) {
+                    console.error("Error uploading file:", error);
+                    toast.error(error.message || "Lỗi khi upload file. Vui lòng thử lại.");
+                  } finally {
+                    setUploadingBankLoanFile(false);
+                    e.target.value = '';
+                  }
+                };
+
+                // Handle print navigation with file
+                const handlePrintNavigate = (route, includeFile = false) => {
+                  const printData = {
+                    ...printContract,
+                    ...(includeFile && bankLoanFile ? { bankLoanFile } : {})
+                  };
+                  setIsPrintModalOpen(false);
+                  navigate(route, { state: printData });
+                  setPrintContract(null);
+                  setBankLoanFile(null);
+                };
+
+                // Handle print file directly
+                const handlePrintFile = () => {
+                  if (!bankLoanFile) {
+                    toast.warning("Vui lòng upload file trước khi in!");
+                    return;
+                  }
+                  window.open(bankLoanFile, '_blank');
+                };
+
+                return (
+                  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+                    <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full my-8">
+                      <div className="px-6 py-4 border-b bg-gradient-to-r from-primary-600 to-primary-400">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-lg font-bold text-white">Chọn mẫu in</h3>
+                          <button
+                            onClick={() => {
+                              setIsPrintModalOpen(false);
+                              setPrintContract(null);
+                              setBankLoanFile(null);
+                            }}
+                            className="text-white hover:text-gray-200 transition-colors"
+                            aria-label="Đóng"
+                          >
+                            <X className="w-6 h-6" />
+                          </button>
+                        </div>
+                        <p className="text-sm text-white/90 mt-1">
+                          Hợp đồng: <span className="font-semibold">{printContract.customerName || printContract.id}</span>
+                        </p>
+                      </div>
+
+                      <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+                        {/* Group 1: XUẤT HÓA ĐƠN */}
+                        <div className="space-y-3">
+                          <h4 className="text-base font-bold text-primary-700 border-b-2 border-primary-300 pb-2">
+                            1. XUẤT HÓA ĐƠN
+                          </h4>
+                          
+                          {/* Đề xuất bán hàng */}
+                          <div className="space-y-2">
+                            <button
+                              onClick={() => handlePrintNavigate("/de-xuat-ban-hang", true)}
+                              className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-left flex items-center justify-between"
+                            >
+                              <span>Đề xuất bán hàng</span>
+                              <span className="text-xs opacity-75">(Có upload file cho vay của NH)</span>
+                            </button>
+                            
+                            {/* File upload section for Đề xuất bán hàng */}
+                            <div className="bg-gray-50 p-3 rounded-md border border-gray-200">
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Upload file cho vay của Ngân hàng:
+                              </label>
+                              <div className="flex items-center gap-2">
+                                <label className={`flex-1 px-4 py-2 border border-gray-300 rounded-md transition-colors text-sm text-center ${
+                                  uploadingBankLoanFile 
+                                    ? 'bg-gray-200 cursor-not-allowed opacity-50' 
+                                    : 'cursor-pointer hover:bg-gray-50'
+                                }`}>
+                                  <span className="text-gray-700">
+                                    {uploadingBankLoanFile ? 'Đang upload...' : bankLoanFile ? 'Đã upload file' : 'Chọn file (ảnh/PDF)'}
+                                  </span>
+                                  <input
+                                    type="file"
+                                    accept="image/*,.pdf"
+                                    onChange={handleBankLoanFileUpload}
+                                    className="hidden"
+                                    disabled={uploadingBankLoanFile}
+                                  />
+                                </label>
+                                {bankLoanFile && (
+                                  <>
+                                    <button
+                                      onClick={handlePrintFile}
+                                      className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm"
+                                    >
+                                      In file
+                                    </button>
+                                    <button
+                                      onClick={() => setBankLoanFile(null)}
+                                      className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors text-sm"
+                                    >
+                                      Xóa
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={() => handlePrintNavigate("/de-nghi-xuat-hoa-don")}
+                            className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                          >
+                            Đề nghị xuất hóa đơn
+                          </button>
+
+                          <button
+                            onClick={() => handlePrintNavigate("/phu-luc-hop-dong")}
+                            className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                          >
+                            Phụ lục hợp đồng
+                            <span className="block text-xs opacity-75 mt-1">(Đi kèm thông tin CCCD trên VNeid, tiền đặt cọc, tiền đối ứng)</span>
+                          </button>
+                        </div>
+
+                        {/* Group 2: BỘ GIẢI NGÂN CỦA NGÂN HÀNG */}
+                        <div className="space-y-3">
+                          <h4 className="text-base font-bold text-primary-700 border-b-2 border-primary-300 pb-2">
+                            2. BỘ GIẢI NGÂN CỦA NGÂN HÀNG
+                          </h4>
+
+                          <button
+                            onClick={() => handlePrintNavigate("/giay-de-nghi-thanh-toan")}
+                            className="w-full px-4 py-2.5 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                          >
+                            Đề nghị thanh toán
+                          </button>
+
+                          <button
+                            onClick={() => handlePrintNavigate("/xac-nhan-so-khung-so-may")}
+                            className="w-full px-4 py-2.5 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                          >
+                            Xác nhận Số khung số máy
+                          </button>
+
+                          <button
+                            onClick={() => handlePrintNavigate("/xac-nhan-kieu-loai")}
+                            className="w-full px-4 py-2.5 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                          >
+                            Xác nhận kiểu loại
+                          </button>
+
+                          <button
+                            onClick={() => handlePrintNavigate("/giay-xac-nhan-tang-bao-hiem")}
+                            className="w-full px-4 py-2.5 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                          >
+                            Xác nhận bảo hiểm
+                          </button>
+
+                          {/* Conditional options based on loan amount */}
+                          {isLoan0 && (
+                            <div className="space-y-2 mt-3 pl-4 border-l-4 border-yellow-400 bg-yellow-50 p-3 rounded">
+                              <p className="text-sm font-semibold text-yellow-800 mb-2">
+                                KH vay 0 đồng - Các biểu mẫu bổ sung:
+                              </p>
+                              <button
+                                onClick={() => handlePrintNavigate("/thoa-thuan-ho-tro-tra-thay-tra-cham")}
+                                className="w-full px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors text-sm"
+                              >
+                                Thỏa thuận hỗ trợ trả thay, trả chậm
+                              </button>
+                              <button
+                                onClick={() => handlePrintNavigate("/xac-nhan-cong-no")}
+                                className="w-full px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors text-sm"
+                              >
+                                Xác nhận công nợ
+                              </button>
+                              <button
+                                onClick={() => handlePrintNavigate("/xac-nhan-thanh-toan-loan0")}
+                                className="w-full px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors text-sm"
+                              >
+                                Xác nhận thanh toán
+                              </button>
+                            </div>
+                          )}
+
+                          {isLoan90 && (
+                            <div className="space-y-2 mt-3 pl-4 border-l-4 border-blue-400 bg-blue-50 p-3 rounded">
+                              <p className="text-sm font-semibold text-blue-800 mb-2">
+                                KH vay 90% - Biểu mẫu theo ngân hàng:
+                              </p>
+                              {isVPBank && (
+                                <button
+                                  onClick={() => handlePrintNavigate("/thoa-thuan-ho-tro-lai-suat-vpbank")}
+                                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                                >
+                                  Thỏa thuận hỗ trợ lãi suất ngân hàng VPBank
+                                </button>
+                              )}
+                              {(isTPBank || isLotte) && (
+                                <button
+                                  onClick={() => handlePrintNavigate(`/bieu-mau-${isTPBank ? 'tpbank' : 'lotte'}`)}
+                                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                                >
+                                  {isTPBank ? 'Biểu mẫu TPBank' : 'Biểu mẫu CTY tài chính Lotte'}
+                                </button>
+                              )}
+                              {!isVPBank && !isTPBank && !isLotte && bank && (
+                                <p className="text-sm text-gray-600 italic">
+                                  Ngân hàng: {printContract.bank} - Vui lòng chọn biểu mẫu phù hợp
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Legacy options (keep for backward compatibility) */}
+                        <div className="space-y-3 pt-4 border-t border-gray-200">
+                          <h4 className="text-sm font-semibold text-gray-600">Các mẫu in khác:</h4>
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              onClick={() => handlePrintNavigate("/giay-xac-nhan")}
+                              className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors text-sm"
+                            >
+                              Giấy xác nhận
+                            </button>
+                            <button
+                              onClick={() => handlePrintNavigate("/giay-xac-nhan-thong-tin")}
+                              className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors text-sm"
+                            >
+                              Giấy xác nhận thông tin
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="px-6 py-4 bg-gray-50 border-t flex justify-end">
                         <button
                           onClick={() => {
                             setIsPrintModalOpen(false);
-                            navigate("/giay-xac-nhan-thong-tin", {
-                              state: printContract,
-                            });
                             setPrintContract(null);
+                            setBankLoanFile(null);
                           }}
-                          className="w-full px-4 py-2 bg-secondary-500 text-white rounded-md"
-                        >
-                          Giấy xác nhận thông tin
-                        </button>
-                        <button
-                          onClick={() => {
-                            setIsPrintModalOpen(false);
-                            navigate("/giay-de-nghi-thanh-toan", {
-                              state: printContract,
-                            });
-                            setPrintContract(null);
-                          }}
-                          className="w-full px-4 py-2 bg-secondary-500 text-white rounded-md"
-                        >
-                          Giấy đề nghị thanh toán
-                        </button>
-                        <button
-                          onClick={() => {
-                            setIsPrintModalOpen(false);
-                            navigate("/giay-xac-nhan-tang-bao-hiem", {
-                              state: printContract,
-                            });
-                            setPrintContract(null);
-                          }}
-                          className="w-full px-4 py-2 bg-secondary-500 text-white rounded-md"
-                        >
-                          Giấy xác nhận tặng bảo hiểm
-                        </button>
-                        <button
-                          onClick={() => {
-                            setIsPrintModalOpen(false);
-                            setPrintContract(null);
-                          }}
-                          className="w-full px-4 py-2 border border-secondary-200 rounded-md"
+                          className="px-6 py-2 border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
                         >
                           Hủy
                         </button>
                       </div>
                     </div>
                   </div>
+                );
+              })()}
+
+              {/* Image Management Modal */}
+              {isImageModalOpen && currentImageContract && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                  <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-auto">
+                    {/* Modal Header */}
+                    <div className="bg-gradient-to-r from-primary-600 to-primary-400 px-6 py-4 rounded-t-lg sticky top-0 z-10">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-xl font-bold text-white">
+                          Quản lý ảnh - {currentImageContract.tenKh || currentImageContract.customerName || currentImageContract.id}
+                        </h3>
+                        <button
+                          onClick={closeImageModal}
+                          className="text-white hover:text-gray-200 transition-colors"
+                          aria-label="Đóng"
+                        >
+                          <X className="w-6 h-6" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Modal Body */}
+                    <div className="p-6 space-y-6">
+                      {/* Deposit Image */}
+                      <div className="space-y-2">
+                        <label className="block text-sm font-medium text-gray-700">
+                          Ảnh chụp hình đặt cọc
+                        </label>
+                        <div className="space-y-2">
+                          <input
+                            type="text"
+                            value={depositImage}
+                            onChange={(e) => setDepositImage(e.target.value)}
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm"
+                            placeholder="Nhập URL ảnh hoặc upload file"
+                          />
+                          <div className="flex items-center gap-2">
+                            <label className={`flex-1 px-4 py-2.5 border border-gray-300 rounded-lg transition-colors text-sm text-center ${
+                              uploadingImage && uploadingImageType === 'deposit' 
+                                ? 'bg-gray-200 cursor-not-allowed opacity-50' 
+                                : 'cursor-pointer hover:bg-gray-50'
+                            }`}>
+                              <span className="text-gray-700">
+                                {uploadingImage && uploadingImageType === 'deposit' 
+                                  ? 'Đang upload...' 
+                                  : 'Chọn file ảnh'}
+                              </span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => handleImageUpload(e, 'deposit')}
+                                className="hidden"
+                                disabled={uploadingImage && uploadingImageType === 'deposit'}
+                              />
+                            </label>
+                            {depositImage && !(uploadingImage && uploadingImageType === 'deposit') && (
+                              <button
+                                onClick={() => setDepositImage("")}
+                                className="px-4 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm"
+                              >
+                                Xóa
+                              </button>
+                            )}
+                          </div>
+                          {depositImage && (
+                            <div className="mt-2">
+                              <img
+                                src={depositImage}
+                                alt="Ảnh chụp hình đặt cọc"
+                                className="max-w-full h-auto max-h-64 rounded-lg border border-gray-300"
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                  toast.error("Không thể tải ảnh. Vui lòng kiểm tra lại URL hoặc file.");
+                                }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Counterpart Image */}
+                      <div className="space-y-2">
+                        <label className="block text-sm font-medium text-gray-700">
+                          Ảnh chụp đối ứng
+                        </label>
+                        <div className="space-y-2">
+                          <input
+                            type="text"
+                            value={counterpartImage}
+                            onChange={(e) => setCounterpartImage(e.target.value)}
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm"
+                            placeholder="Nhập URL ảnh hoặc upload file"
+                          />
+                          <div className="flex items-center gap-2">
+                            <label className={`flex-1 px-4 py-2.5 border border-gray-300 rounded-lg transition-colors text-sm text-center ${
+                              uploadingImage && uploadingImageType === 'counterpart' 
+                                ? 'bg-gray-200 cursor-not-allowed opacity-50' 
+                                : 'cursor-pointer hover:bg-gray-50'
+                            }`}>
+                              <span className="text-gray-700">
+                                {uploadingImage && uploadingImageType === 'counterpart' 
+                                  ? 'Đang upload...' 
+                                  : 'Chọn file ảnh'}
+                              </span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => handleImageUpload(e, 'counterpart')}
+                                className="hidden"
+                                disabled={uploadingImage && uploadingImageType === 'counterpart'}
+                              />
+                            </label>
+                            {counterpartImage && !(uploadingImage && uploadingImageType === 'counterpart') && (
+                              <button
+                                onClick={() => setCounterpartImage("")}
+                                className="px-4 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm"
+                              >
+                                Xóa
+                              </button>
+                            )}
+                          </div>
+                          {counterpartImage && (
+                            <div className="mt-2">
+                              <img
+                                src={counterpartImage}
+                                alt="Ảnh chụp đối ứng"
+                                className="max-w-full h-auto max-h-64 rounded-lg border border-gray-300"
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                  toast.error("Không thể tải ảnh. Vui lòng kiểm tra lại URL hoặc file.");
+                                }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Modal Footer */}
+                    <div className="bg-gray-50 px-6 py-4 flex flex-col sm:flex-row justify-end items-center gap-4 border-t border-gray-200 rounded-b-lg">
+                      <button
+                        onClick={closeImageModal}
+                        className="w-full sm:w-auto px-6 py-3 bg-gray-500 text-white font-medium rounded-lg hover:bg-gray-600 transition-all duration-200 flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
+                        aria-label="Hủy"
+                      >
+                        <X className="w-4 h-4" />
+                        <span>Hủy</span>
+                      </button>
+                      <button
+                        onClick={handleSaveImages}
+                        className="w-full sm:w-auto px-8 py-3 bg-secondary-600 text-white font-medium rounded-lg hover:bg-secondary-700 transition-all duration-200 flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
+                        aria-label="Lưu ảnh"
+                      >
+                        <Edit className="w-5 h-5" />
+                        <span>Lưu ảnh</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
-            </div>
-          )}
         </div>
-      </div>
+      )}
     </div>
   );
 }

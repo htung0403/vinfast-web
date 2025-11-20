@@ -5,11 +5,29 @@ import { useNavigate } from 'react-router-dom';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import bcrypt from 'bcryptjs';
+import { 
+  User, 
+  FileText, 
+  Briefcase, 
+  Phone, 
+  Share2, 
+  Lock, 
+  Key, 
+  Edit, 
+  Save, 
+  X, 
+  Lightbulb, 
+  CheckCircle, 
+  XCircle, 
+  Loader2, 
+  Info,
+  Calendar,
+  MapPin
+} from 'lucide-react';
 
 function Profile() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [loadingTeams, setLoadingTeams] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
@@ -17,17 +35,19 @@ function Profile() {
     username: '',
     name: '',
     email: '',
+    phone: '',
     role: '',
-    team: '',
     department: '',
     position: '',
-    branch: '',
-    
+    birthdate: '',
+    startDate: '',
+    status: '',
+    zalo: '',
+    tiktok: '',
+    facebook: '',
+    fanpage: '',
+    web: '',
   });
-
-  const [teams, setTeams] = useState([
-    { value: '', label: 'Chưa chọn team' }
-  ]);
 
   const [departments, setDepartments] = useState([
     { value: '', label: 'Chưa chọn bộ phận' }
@@ -51,48 +71,14 @@ function Profile() {
   });
   const [changingPassword, setChangingPassword] = useState(false);
 
-  // Check if user can edit (only admin and leader)
-  const canEdit = userData.role === 'admin' || userData.role === 'leader';
+  // All users can edit their own profile
+  const canEdit = true;
 
   useEffect(() => {
-    loadTeamsFromUsers();
     loadDepartmentsFromUsers();
     loadPositionsFromUsers();
     loadUserProfile();
   }, []);
-
-  const loadTeamsFromUsers = async () => {
-    setLoadingTeams(true);
-    try {
-      const usersRef = ref(database, 'employees');
-      const snapshot = await get(usersRef);
-
-      if (snapshot.exists()) {
-        const usersData = snapshot.val();
-
-        // Extract unique teams from users (support canonical 'team')
-        const uniqueTeams = [...new Set(
-          Object.values(usersData)
-            .map(item => item.team || item.Team)
-            .filter(Boolean)
-        )];
-
-        const teamOptions = [
-          { value: '', label: 'Chưa chọn team' },
-          ...uniqueTeams.sort().map(team => ({ value: team, label: team }))
-        ];
-
-        setTeams(teamOptions);
-      } else {
-        setTeams([{ value: '', label: 'Chưa chọn team' }]);
-      }
-    } catch (error) {
-      console.error('Error loading teams from users:', error);
-      setTeams([{ value: '', label: 'Lỗi tải danh sách team' }]);
-    } finally {
-      setLoadingTeams(false);
-    }
-  };
 
   const loadDepartmentsFromUsers = async () => {
     try {
@@ -189,11 +175,18 @@ function Profile() {
           username: u.user || u.username || '',
           name: u.TVBH || u.name || '',
           email: u.mail || u.Mail || u.email || '',
+          phone: u.soDienThoai || u.phone || u.phoneNumber || '',
           role: u.quyen || u['Quyền'] || u.role || 'user',
-          team: u.team || u.Team || '',
           department: u.phongBan || u['Phòng Ban'] || u.department || '',
           position: u.chucVu || u['Chức Vị'] || u.position || '',
-          branch: u.chi_nhanh || u['chi nhánh'] || u.branch || '',
+          birthdate: u.sinhNhat || u['Sinh Nhật'] || u.birthday || u.birthdate || '',
+          startDate: u.ngayVaoLam || u['Ngày vào làm'] || u.createdAt || u.startDate || '',
+          status: u.tinhTrang || u['tình trạng'] || u.status || 'active',
+          zalo: u.zalo || u.Zalo || '',
+          tiktok: u.tiktok || u.TikTok || '',
+          facebook: u.facebook || u.Facebook || '',
+          fanpage: u.fanpage || '',
+          web: u.web || '',
         });
       }
     } catch (error) {
@@ -243,15 +236,6 @@ function Profile() {
   const handleSave = async (e) => {
     e.preventDefault();
     
-    // Check permission
-    if (!canEdit) {
-      toast.error('Bạn không có quyền chỉnh sửa thông tin!', {
-        position: "top-right",
-        autoClose: 4000,
-      });
-      return;
-    }
-    
     // Chỉ lưu khi đang ở chế độ edit
     if (!isEditing) {
       console.log('Not in edit mode, preventing save');
@@ -275,16 +259,20 @@ function Profile() {
         user: userData.username,
         TVBH: userData.name,
         mail: userData.email,
-        team: userData.team,
+        soDienThoai: userData.phone || '',
         phongBan: finalDepartment,
         chucVu: finalPosition,
-        chi_nhanh: userData.branch,
+        sinhNhat: userData.birthdate || '',
+        zalo: userData.zalo || '',
+        tiktok: userData.tiktok || '',
+        facebook: userData.facebook || '',
+        fanpage: userData.fanpage || '',
+        web: userData.web || '',
       });
 
       // Update localStorage
       localStorage.setItem('username', userData.username);
       localStorage.setItem('userEmail', userData.email);
-      localStorage.setItem('userTeam', userData.team);
 
       toast.success('Cập nhật profile thành công!', {
         position: "top-right",
@@ -426,10 +414,7 @@ function Profile() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <svg className="animate-spin h-12 w-12 text-primary mx-auto mb-4" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
+          <Loader2 className="animate-spin h-12 w-12 text-primary mx-auto mb-4" />
           <p className="text-gray-600">Đang tải thông tin...</p>
         </div>
       </div>
@@ -437,11 +422,14 @@ function Profile() {
   }
 
   return (
-    <div className="mx-auto px-8 py-8 max-w-4xl">
+    <div className="mx-auto px-6 py-6 max-w-7xl">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">👤 Thông tin cá nhân</h1>
-        <p className="text-gray-600">Quản lý thông tin profile và team của bạn</p>
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-gray-800 mb-2 flex items-center gap-2">
+          <User className="w-8 h-8" />
+          Thông tin cá nhân
+        </h1>
+        <p className="text-gray-600 text-lg">Quản lý thông tin profile của bạn</p>
       </div>
 
       {/* Message Alert */}
@@ -453,13 +441,9 @@ function Profile() {
         }`}>
           <div className="flex items-center">
             {message.type === 'success' ? (
-              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
+              <CheckCircle className="w-5 h-5 mr-2" />
             ) : (
-              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
+              <XCircle className="w-5 h-5 mr-2" />
             )}
             {message.text}
           </div>
@@ -469,7 +453,13 @@ function Profile() {
       {/* Profile Form */}
       <div className="bg-white rounded-lg shadow-lg p-8">
         <form onSubmit={handleSave}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Basic Information Section */}
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200 flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              Thông tin cơ bản
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {/* Username - Read Only */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -479,7 +469,7 @@ function Profile() {
                 type="text"
                 value={userData.username}
                 disabled
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed"
               />
               <p className="text-xs text-gray-500 mt-1">Không thể thay đổi</p>
             </div>
@@ -498,7 +488,7 @@ function Profile() {
                   'Nhân viên'
                 }
                 disabled
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed"
               />
             </div>
 
@@ -512,10 +502,10 @@ function Profile() {
                 name="name"
                 value={userData.name}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition"
                 placeholder="Nhập họ và tên"
                 required
-                disabled={saving || !isEditing || !canEdit}
+                disabled={saving || !isEditing}
               />
             </div>
 
@@ -529,48 +519,23 @@ function Profile() {
                 name="email"
                 value={userData.email}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition"
                 placeholder="email@example.com"
                 required
-                disabled={saving || !isEditing || !canEdit}
+                disabled={saving || !isEditing}
               />
             </div>
 
-            {/* Team - Full Width */}
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Team
-              </label>
-              <div className="relative">
-                <select
-                  name="team"
-                  value={userData.team}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition"
-                  disabled={saving || loadingTeams || !isEditing || !canEdit}
-                >
-                  {loadingTeams ? (
-                    <option value="">Đang tải danh sách team...</option>
-                  ) : (
-                    teams.map(team => (
-                      <option key={team.value} value={team.value}>
-                        {team.label}
-                      </option>
-                    ))
-                  )}
-                </select>
-              </div>
-              {loadingTeams && (
-                <p className="text-xs text-gray-500 mt-1 flex items-center">
-                  <svg className="animate-spin h-3 w-3 mr-1" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Đang tải danh sách team...
-                </p>
-              )}
             </div>
+          </div>
 
+          {/* Work Information Section */}
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200 flex items-center gap-2">
+              <Briefcase className="w-5 h-5" />
+              Thông tin công việc
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {/* Department */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -584,7 +549,7 @@ function Profile() {
                     onChange={(e) => setCustomDepartment(e.target.value)}
                     className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition"
                     placeholder="Nhập bộ phận mới"
-                    disabled={saving || !isEditing || !canEdit}
+                    disabled={saving || !isEditing}
                   />
                   <button
                     type="button"
@@ -592,10 +557,10 @@ function Profile() {
                       setShowCustomDepartment(false);
                       setCustomDepartment('');
                     }}
-                    className="px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition"
-                    disabled={saving || !isEditing || !canEdit}
+                    className="px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition flex items-center justify-center"
+                    disabled={saving || !isEditing}
                   >
-                    ✕
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
               ) : (
@@ -603,8 +568,8 @@ function Profile() {
                   name="department"
                   value={userData.department}
                   onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition"
-                  disabled={saving || !isEditing || !canEdit}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition"
+                  disabled={saving || !isEditing}
                 >
                   {departments.map(dept => (
                     <option key={dept.value} value={dept.value}>
@@ -628,7 +593,7 @@ function Profile() {
                     onChange={(e) => setCustomPosition(e.target.value)}
                     className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition"
                     placeholder="Nhập vị trí mới"
-                    disabled={saving || !isEditing || !canEdit}
+                    disabled={saving || !isEditing}
                   />
                   <button
                     type="button"
@@ -636,10 +601,10 @@ function Profile() {
                       setShowCustomPosition(false);
                       setCustomPosition('');
                     }}
-                    className="px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition"
-                    disabled={saving || !isEditing || !canEdit}
+                    className="px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition flex items-center justify-center"
+                    disabled={saving || !isEditing}
                   >
-                    ✕
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
               ) : (
@@ -647,8 +612,8 @@ function Profile() {
                   name="position"
                   value={userData.position}
                   onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition"
-                  disabled={saving || !isEditing || !canEdit}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition"
+                  disabled={saving || !isEditing}
                 >
                   {positions.map(pos => (
                     <option key={pos.value} value={pos.value}>
@@ -659,30 +624,167 @@ function Profile() {
               )}
             </div>
 
-            {/* Branch */}
+            {/* Status - Read Only */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Chi nhánh
+                Tình trạng
               </label>
-              <select
-                name="branch"
-                value={userData.branch}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition"
-                disabled={saving || !isEditing || !canEdit}
-              >
-                <option value="">-- Chọn chi nhánh --</option>
-                <option value="Hà Nội">Hà Nội</option>
-                <option value="HCM">HCM</option>
-              </select>
+              <input
+                type="text"
+                value={userData.status === 'active' ? 'Hoạt động' : userData.status === 'inactive' ? 'Không hoạt động' : userData.status || 'N/A'}
+                disabled
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed"
+              />
+              <p className="text-xs text-gray-500 mt-1">Không thể thay đổi</p>
             </div>
-
-            {/* Shift removed */}
+            </div>
           </div>
 
-          {/* Action Buttons - Only for Admin and Leader */}
-          {canEdit && (
-            <div className="mt-8 flex gap-4">
+          {/* Personal Information Section */}
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200 flex items-center gap-2">
+              <Phone className="w-5 h-5" />
+              Thông tin liên hệ
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {/* Phone */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Số điện thoại
+              </label>
+              <input
+                type="tel"
+                name="phone"
+                value={userData.phone}
+                onChange={handleChange}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition"
+                placeholder="Nhập số điện thoại"
+                disabled={saving || !isEditing}
+              />
+            </div>
+
+            {/* Birthdate */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Sinh nhật
+              </label>
+              <input
+                type="date"
+                name="birthdate"
+                value={userData.birthdate ? userData.birthdate.split('T')[0] : ''}
+                onChange={(e) => setUserData(prev => ({ ...prev, birthdate: e.target.value }))}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition"
+                disabled={saving || !isEditing}
+              />
+            </div>
+
+            {/* Start Date - Read Only */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Ngày vào làm
+              </label>
+              <input
+                type="text"
+                value={userData.startDate ? (userData.startDate.includes('T') ? userData.startDate.split('T')[0] : userData.startDate) : 'N/A'}
+                disabled
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed"
+              />
+              <p className="text-xs text-gray-500 mt-1">Không thể thay đổi</p>
+            </div>
+            </div>
+          </div>
+
+          {/* Social Media Section */}
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200 flex items-center gap-2">
+              <Share2 className="w-5 h-5" />
+              Mạng xã hội
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {/* Zalo */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Zalo
+                </label>
+                <input
+                  type="text"
+                  name="zalo"
+                  value={userData.zalo}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition"
+                  placeholder="Nhập tên Zalo"
+                  disabled={saving || !isEditing}
+                />
+              </div>
+
+              {/* TikTok */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  TikTok
+                </label>
+                <input
+                  type="text"
+                  name="tiktok"
+                  value={userData.tiktok}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition"
+                  placeholder="Nhập tên TikTok"
+                  disabled={saving || !isEditing}
+                />
+              </div>
+
+              {/* Facebook */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Facebook
+                </label>
+                <input
+                  type="text"
+                  name="facebook"
+                  value={userData.facebook}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition"
+                  placeholder="Nhập tên Facebook"
+                  disabled={saving || !isEditing}
+                />
+              </div>
+
+              {/* Fanpage */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Fanpage
+                </label>
+                <input
+                  type="text"
+                  name="fanpage"
+                  value={userData.fanpage}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition"
+                  placeholder="Nhập tên Fanpage"
+                  disabled={saving || !isEditing}
+                />
+              </div>
+
+              {/* Web */}
+              <div className="md:col-span-2 lg:col-span-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Website
+                </label>
+                <input
+                  type="url"
+                  name="web"
+                  value={userData.web}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition"
+                  placeholder="https://example.com"
+                  disabled={saving || !isEditing}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="mt-8 flex gap-4">
               {!isEditing ? (
                 // View Mode - Show Edit Button
                 <>
@@ -694,9 +796,10 @@ function Profile() {
                       console.log('Edit button clicked');
                       setIsEditing(true);
                     }}
-                    className="flex-1 py-3 px-6 rounded-lg font-semibold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 transition"
+                    className="flex-1 py-3 px-6 rounded-lg font-semibold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 transition flex items-center justify-center gap-2"
                   >
-                    ✏️ Chỉnh sửa thông tin
+                    <Edit className="w-5 h-5" />
+                    Chỉnh sửa thông tin
                   </button>
                   <button
                     type="button"
@@ -715,19 +818,19 @@ function Profile() {
                     className={`flex-1 py-3 px-6 rounded-lg font-semibold text-white transition ${
                       saving
                         ? 'bg-gray-400 cursor-not-allowed'
-                        : 'bg-primary hover:bg-green-700 active:bg-green-800'
+                        : 'bg-green-500 hover:bg-green-700 active:bg-green-800'
                     }`}
                   >
                     {saving ? (
                       <span className="flex items-center justify-center">
-                        <svg className="animate-spin h-5 w-5 mr-3" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
+                        <Loader2 className="animate-spin h-5 w-5 mr-3" />
                         Đang lưu...
                       </span>
                     ) : (
-                      '💾 Lưu thay đổi'
+                      <span className="flex items-center justify-center gap-2">
+                        <Save className="w-5 h-5" />
+                        Lưu thay đổi
+                      </span>
                     )}
                   </button>
 
@@ -745,28 +848,17 @@ function Profile() {
                 </>
               )}
             </div>
-          )}
-          
-          {/* Back Button for Regular Users */}
-          {!canEdit && (
-            <div className="mt-8">
-              <button
-                type="button"
-                onClick={() => navigate('/home')}
-                className="w-full px-6 py-3 border border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 transition"
-              >
-                Quay lại
-              </button>
-            </div>
-          )}
         </form>
       </div>
 
       {/* Change Password Section */}
       <div className="mt-6 bg-white rounded-lg shadow-lg p-8">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200">
           <div>
-            <h2 className="text-xl font-bold text-gray-800">🔒 Đổi mật khẩu</h2>
+            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+              <Lock className="w-6 h-6" />
+              Đổi mật khẩu
+            </h2>
             <p className="text-sm text-gray-600 mt-1">Cập nhật mật khẩu để bảo mật tài khoản</p>
           </div>
           <button
@@ -781,7 +873,17 @@ function Profile() {
             }}
             className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
           >
-            {showPasswordSection ? '✕ Đóng' : '🔑 Đổi mật khẩu'}
+            {showPasswordSection ? (
+              <span className="flex items-center gap-2">
+                <X className="w-4 h-4" />
+                Đóng
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <Key className="w-4 h-4" />
+                Đổi mật khẩu
+              </span>
+            )}
           </button>
         </div>
 
@@ -855,14 +957,14 @@ function Profile() {
               >
                 {changingPassword ? (
                   <span className="flex items-center justify-center">
-                    <svg className="animate-spin h-5 w-5 mr-3" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
+                    <Loader2 className="animate-spin h-5 w-5 mr-3" />
                     Đang cập nhật...
                   </span>
                 ) : (
-                  '🔒 Cập nhật mật khẩu'
+                  <span className="flex items-center justify-center gap-2">
+                    <Lock className="w-5 h-5" />
+                    Cập nhật mật khẩu
+                  </span>
                 )}
               </button>
 
@@ -889,15 +991,15 @@ function Profile() {
       {/* Additional Info Card */}
       <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
         <div className="flex items-start">
-          <svg className="w-5 h-5 text-blue-500 mr-3 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-          </svg>
+          <Info className="w-5 h-5 text-blue-500 mr-3 mt-0.5 flex-shrink-0" />
           <div className="text-sm text-blue-700">
-            <p className="font-semibold mb-1">💡 Lưu ý:</p>
+            <p className="font-semibold mb-1 flex items-center gap-2">
+              <Lightbulb className="w-4 h-4" />
+              Lưu ý:
+            </p>
             <ul className="list-disc list-inside space-y-1">
-              <li>Tên đăng nhập và vai trò không thể thay đổi</li>
-              <li>Chỉ Admin và Leader mới có quyền chỉnh sửa thông tin profile</li>
-              <li>User thường chỉ có thể xem thông tin và đổi mật khẩu</li>
+              <li>Tên đăng nhập, vai trò, tình trạng và ngày vào làm không thể thay đổi</li>
+              <li>Tất cả user đều có thể chỉnh sửa thông tin profile của mình</li>
               <li>Bạn có thể đổi mật khẩu bất kỳ lúc nào để bảo mật tài khoản</li>
               <li>Mật khẩu mới phải có ít nhất 6 ký tự</li>
             </ul>

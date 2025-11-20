@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { getBranchByShowroomName, getDefaultBranch } from "../../data/branchData";
+import { ref, get } from "firebase/database";
+import { database } from "../../firebase/config";
 
 const GiayXacNhan = () => {
   const location = useLocation();
@@ -13,55 +15,77 @@ const GiayXacNhan = () => {
   const [branch, setBranch] = useState(null);
 
   useEffect(() => {
-    // Lấy thông tin chi nhánh
-    const showroomName = location.state?.showroom || "Chi Nhánh Trường Chinh";
-    const branchInfo = getBranchByShowroomName(showroomName) || getDefaultBranch();
-    setBranch(branchInfo);
-
-    if (location.state) {
-      const incoming = location.state;
-      const processedData = {
-        customerName: incoming.customerName || incoming["Tên Kh"] || incoming["Tên KH"] || "",
-        phone: incoming.phone || incoming["Số Điện Thoại"] || "",
-        address: incoming.address || incoming["Địa Chỉ"] || "",
-        cccd: incoming.cccd || incoming.CCCD || "",
-        issueDate: incoming.issueDate || incoming.ngayCap || incoming["Ngày Cấp"] || "",
-        issuePlace: incoming.issuePlace || incoming.noiCap || incoming["Nơi Cấp"] || "",
-        model: incoming.model || incoming.dongXe || incoming["Dòng xe"] || "",
-        contractPrice: incoming.contractPrice || incoming.giaHD || incoming["Giá Hợp Đồng"] || incoming.giaHopDong || "",
-        soKhung:
-          incoming.soKhung ||
-          incoming["Số Khung"] ||
-          incoming.chassisNumber ||
-          incoming.vin ||
-          "",
-        soMay:
-          incoming.soMay || incoming["Số Máy"] || incoming.engineNumber || "",
-        Email: incoming.Email || incoming.email || "",
-        representativeName: incoming.representativeName || incoming.tvbh || incoming.TVBH || "",
-      };
-      setData(processedData);
-      if (incoming.recipientInfo) {
-        setRecipientInfo(incoming.recipientInfo);
+    const loadShowroom = async () => {
+      let showroomName = location.state?.showroom || "Chi Nhánh Trường Chinh";
+      
+      // Nếu có firebaseKey, thử lấy showroom từ contracts
+      if (location.state?.firebaseKey) {
+        try {
+          const contractId = location.state.firebaseKey;
+          const contractsRef = ref(database, `contracts/${contractId}`);
+          const snapshot = await get(contractsRef);
+          if (snapshot.exists()) {
+            const contractData = snapshot.val();
+            if (contractData.showroom) {
+              showroomName = contractData.showroom;
+            }
+          }
+        } catch (err) {
+          console.error("Error loading showroom from contracts:", err);
+        }
       }
-    } else {
-      // Dữ liệu mẫu
-      setData({
-        customerName: "Ông Ma Văn Thuận",
-        phone: "0879333668",
-        address: "Thôn Tổng Moọc, Yên Lập, Chiêm Hóa, Tuyên Quang",
-        cccd: "008094007264",
-        issueDate: "21/01/2025",
-        issuePlace: "Bộ Công An",
-        model: "VINFAST VF 5",
-        contractPrice: "540000000",
-        soKhung: "",
-        soMay: "",
-        Email: "",
-        representativeName: "",
-      });
-    }
-    setLoading(false);
+      
+      // Lấy thông tin chi nhánh
+      const branchInfo = getBranchByShowroomName(showroomName) || getDefaultBranch();
+      setBranch(branchInfo);
+
+      if (location.state) {
+        const incoming = location.state;
+        const processedData = {
+          customerName: incoming.customerName || incoming["Tên Kh"] || incoming["Tên KH"] || "",
+          phone: incoming.phone || incoming["Số Điện Thoại"] || "",
+          address: incoming.address || incoming["Địa Chỉ"] || "",
+          cccd: incoming.cccd || incoming.CCCD || "",
+          issueDate: incoming.issueDate || incoming.ngayCap || incoming["Ngày Cấp"] || "",
+          issuePlace: incoming.issuePlace || incoming.noiCap || incoming["Nơi Cấp"] || "",
+          model: incoming.model || incoming.dongXe || incoming["Dòng xe"] || "",
+          contractPrice: incoming.contractPrice || incoming.giaHD || incoming["Giá Hợp Đồng"] || incoming.giaHopDong || "",
+          soKhung:
+            incoming.soKhung ||
+            incoming["Số Khung"] ||
+            incoming.chassisNumber ||
+            incoming.vin ||
+            "",
+          soMay:
+            incoming.soMay || incoming["Số Máy"] || incoming.engineNumber || "",
+          Email: incoming.Email || incoming.email || "",
+          representativeName: incoming.representativeName || incoming.tvbh || incoming.TVBH || "",
+        };
+        setData(processedData);
+        if (incoming.recipientInfo) {
+          setRecipientInfo(incoming.recipientInfo);
+        }
+      } else {
+        // Dữ liệu mẫu
+        setData({
+          customerName: "Ông Ma Văn Thuận",
+          phone: "0879333668",
+          address: "Thôn Tổng Moọc, Yên Lập, Chiêm Hóa, Tuyên Quang",
+          cccd: "008094007264",
+          issueDate: "21/01/2025",
+          issuePlace: "Bộ Công An",
+          model: "VINFAST VF 5",
+          contractPrice: "540000000",
+          soKhung: "",
+          soMay: "",
+          Email: "",
+          representativeName: "",
+        });
+      }
+      setLoading(false);
+    };
+    
+    loadShowroom();
   }, [location.state]);
 
   const formatDate = (dateStr) => {
@@ -127,7 +151,7 @@ const GiayXacNhan = () => {
       className="min-h-screen bg-gray-50 p-8"
       style={{ fontFamily: "Times New Roman" }}
     >
-      <div className="flex gap-6 max-w-7xl mx-auto print:max-w-4xl print:mx-auto">
+      <div className="flex gap-6 max-w-4xl mx-auto print:max-w-4xl print:mx-auto">
         <div className="flex-1 bg-white" id="printable-content">
           {/* Header */}
           <div className="mb-4">
@@ -165,7 +189,17 @@ const GiayXacNhan = () => {
           {/* Recipient */}
           <p className="text-sm mb-3">
             <span className="font-bold">
-              Kính gửi: Ngân Hàng TMCP Việt Nam Thịnh Vượng – {recipientInfo}
+              Kính gửi: Ngân Hàng TMCP Việt Nam Thịnh Vượng –{" "}
+              <span className="print:hidden">
+                <input
+                  type="text"
+                  value={recipientInfo}
+                  onChange={(e) => setRecipientInfo(e.target.value)}
+                  className="border-b border-gray-400 px-2 py-1 text-sm font-bold w-full max-w-md focus:outline-none focus:border-blue-500"
+                  placeholder="Trung tâm thế chấp vùng 9"
+                />
+              </span>
+              <span className="hidden print:inline">{recipientInfo}</span>
             </span>
           </p>
 
@@ -305,25 +339,7 @@ const GiayXacNhan = () => {
           <div className="text-right mt-8">
             <p className="text-sm font-bold mb-8">ĐẠI DIỆN BÊN BÁN</p>
           </div>
-        </div>
-
-        {/* Sidebar với input */}
-        <div className="w-120 print:hidden flex-shrink-0">
-          <div className="bg-white p-4 rounded-lg shadow-md sticky top-8">
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-gray-700 whitespace-nowrap flex-shrink-0">
-                Thông tin "Kính gửi":
-              </label>
-              <input
-                type="text"
-                value={recipientInfo}
-                onChange={(e) => setRecipientInfo(e.target.value)}
-                className="flex-1 min-w-0 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Nhập thông tin kính gửi"
-              />
-            </div>
-          </div>
-        </div>
+        </div>     
       </div>
 
       {/* Action Buttons */}

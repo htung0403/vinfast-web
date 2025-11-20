@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { getBranchByShowroomName, getDefaultBranch } from "../../data/branchData";
+import { ref, get } from "firebase/database";
+import { database } from "../../firebase/config";
 
 const GiayXacNhanTangBaoHiem = () => {
   const location = useLocation();
@@ -27,43 +29,62 @@ const GiayXacNhanTangBaoHiem = () => {
   };
 
   useEffect(() => {
-    if (location.state) {
-      const incoming = location.state;
-      const formatDateString = (val) => {
-        if (!val) return null;
-        if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(val)) return val;
-        const d = new Date(val);
-        if (isNaN(d)) return val;
-        const pad = (n) => String(n).padStart(2, "0");
-        return `${pad(d.getDate())}/${pad(
-          d.getMonth() + 1
-        )}/${d.getFullYear()}`;
-      };
+    const loadData = async () => {
+      if (location.state) {
+        const incoming = location.state;
+        const formatDateString = (val) => {
+          if (!val) return null;
+          if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(val)) return val;
+          const d = new Date(val);
+          if (isNaN(d)) return val;
+          const pad = (n) => String(n).padStart(2, "0");
+          return `${pad(d.getDate())}/${pad(
+            d.getMonth() + 1
+          )}/${d.getFullYear()}`;
+        };
 
-      const formatDateToVNPartial = (val) => {
-        if (!val) return null;
-        // if already contains 'tháng' assume it's formatted
-        if (/tháng/i.test(val) && /năm/i.test(val)) return val;
-        // parse common dd/mm/yyyy or ISO
-        let d = null;
-        if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(val)) {
-          const [dd, mm, yyyy] = val.split("/");
-          return `${dd.padStart(2, "0")} tháng ${mm.padStart(
-            2,
-            "0"
-          )} năm ${yyyy}`;
+        const formatDateToVNPartial = (val) => {
+          if (!val) return null;
+          // if already contains 'tháng' assume it's formatted
+          if (/tháng/i.test(val) && /năm/i.test(val)) return val;
+          // parse common dd/mm/yyyy or ISO
+          let d = null;
+          if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(val)) {
+            const [dd, mm, yyyy] = val.split("/");
+            return `${dd.padStart(2, "0")} tháng ${mm.padStart(
+              2,
+              "0"
+            )} năm ${yyyy}`;
+          }
+          d = new Date(val);
+          if (isNaN(d)) return val;
+          const pad = (n) => String(n).padStart(2, "0");
+          return `${pad(d.getDate())} tháng ${pad(
+            d.getMonth() + 1
+          )} năm ${d.getFullYear()}`;
+        };
+
+        // Lấy thông tin chi nhánh
+        let showroomName = incoming.showroom || "TRƯỜNG CHINH";
+        
+        // Nếu có firebaseKey, thử lấy showroom từ contracts
+        if (incoming.firebaseKey) {
+          try {
+            const contractId = incoming.firebaseKey;
+            const contractsRef = ref(database, `contracts/${contractId}`);
+            const snapshot = await get(contractsRef);
+            if (snapshot.exists()) {
+              const contractData = snapshot.val();
+              if (contractData.showroom) {
+                showroomName = contractData.showroom;
+              }
+            }
+          } catch (err) {
+            console.error("Error loading showroom from contracts:", err);
+          }
         }
-        d = new Date(val);
-        if (isNaN(d)) return val;
-        const pad = (n) => String(n).padStart(2, "0");
-        return `${pad(d.getDate())} tháng ${pad(
-          d.getMonth() + 1
-        )} năm ${d.getFullYear()}`;
-      };
-
-      // Lấy thông tin chi nhánh
-      const showroomName = incoming.showroom || "TRƯỜNG CHINH";
-      const branchInfo = getBranchByShowroomName(showroomName) || getDefaultBranch();
+        
+        const branchInfo = getBranchByShowroomName(showroomName) || getDefaultBranch();
       setBranch(branchInfo);
 
       const processedData = {
@@ -121,9 +142,12 @@ const GiayXacNhanTangBaoHiem = () => {
       setInsuranceContract(defaultData.insuranceContract);
       setInsuranceValue(defaultData.insuranceValue);
       setInsuranceStart(defaultData.insuranceStart);
-      setInsuranceEnd(defaultData.insuranceEnd);
-    }
-    setLoading(false);
+        setInsuranceEnd(defaultData.insuranceEnd);
+      }
+      setLoading(false);
+    };
+    
+    loadData();
   }, [location.state]);
 
   const formatCurrency = (amount) => {
@@ -217,7 +241,17 @@ const GiayXacNhanTangBaoHiem = () => {
             <strong>Kính gởi:</strong>{" "}
             <strong>
               NGÂN HÀNG TMCP VIỆT NAM THỊNH VƯỢNG
-              <br /> – {recipientInfo}
+              <br /> –{" "}
+              <span className="print:hidden">
+                <input
+                  type="text"
+                  value={recipientInfo}
+                  onChange={(e) => setRecipientInfo(e.target.value)}
+                  className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-full max-w-md focus:outline-none focus:border-blue-500"
+                  placeholder="TRUNG TÂM THẾ CHẤP VÙNG 9"
+                />
+              </span>
+              <span className="hidden print:inline">{recipientInfo}</span>
             </strong>
           </p>
         </div>
@@ -244,7 +278,19 @@ const GiayXacNhanTangBaoHiem = () => {
             <p>
               Người được bảo hiểm: <strong>{data.customerName}</strong>
             </p>
-            <p>Địa chỉ: {customerAddress || data.customerAddress}</p>
+            <p>
+              Địa chỉ:{" "}
+              <span className="print:hidden">
+                <input
+                  type="text"
+                  value={customerAddress}
+                  onChange={(e) => setCustomerAddress(e.target.value)}
+                  className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-full max-w-md focus:outline-none focus:border-blue-500"
+                  placeholder={data.customerAddress}
+                />
+              </span>
+              <span className="hidden print:inline">{customerAddress || data.customerAddress}</span>
+            </p>
             <p>Hiệu xe: {data.model}</p>
             <p>
               Số khung: <strong>{data.vin}</strong>
@@ -257,16 +303,59 @@ const GiayXacNhanTangBaoHiem = () => {
             </p>
             <p>
               Giá trị hợp đồng bảo hiểm :{" "}
-              <strong>{formatCurrency(insuranceValue || data.insuranceValue)}</strong>
+              <strong>
+                <span className="print:hidden">
+                  <input
+                    type="text"
+                    value={insuranceValue}
+                    onChange={(e) => setInsuranceValue(e.target.value)}
+                    className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-full max-w-md focus:outline-none focus:border-blue-500"
+                    placeholder={data.insuranceValue}
+                  />
+                </span>
+                <span className="hidden print:inline">{formatCurrency(insuranceValue || data.insuranceValue)}</span>
+              </strong>
             </p>
             <p>
-              Số hợp đồng bảo hiểm : <strong>{insuranceContract || data.insuranceContract}</strong>
+              Số hợp đồng bảo hiểm :{" "}
+              <strong>
+                <span className="print:hidden">
+                  <input
+                    type="text"
+                    value={insuranceContract}
+                    onChange={(e) => setInsuranceContract(e.target.value)}
+                    className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-full max-w-md focus:outline-none focus:border-blue-500"
+                    placeholder={data.insuranceContract}
+                  />
+                </span>
+                <span className="hidden print:inline">{insuranceContract || data.insuranceContract}</span>
+              </strong>
             </p>
             <p>
               Thời hạn bảo hiểm{" "}
               <strong>
-                Từ 10 giờ 00 phút, ngày {insuranceStart || data.insuranceStart} đến 09 giờ 59
-                phút, ngày {insuranceEnd || data.insuranceEnd}
+                Từ 10 giờ 00 phút, ngày{" "}
+                <span className="print:hidden">
+                  <input
+                    type="text"
+                    value={insuranceStart}
+                    onChange={(e) => setInsuranceStart(e.target.value)}
+                    className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-full max-w-md focus:outline-none focus:border-blue-500"
+                    placeholder={data.insuranceStart}
+                  />
+                </span>
+                <span className="hidden print:inline">{insuranceStart || data.insuranceStart}</span>{" "}
+                đến 09 giờ 59 phút, ngày{" "}
+                <span className="print:hidden">
+                  <input
+                    type="text"
+                    value={insuranceEnd}
+                    onChange={(e) => setInsuranceEnd(e.target.value)}
+                    className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-full max-w-md focus:outline-none focus:border-blue-500"
+                    placeholder={data.insuranceEnd}
+                  />
+                </span>
+                <span className="hidden print:inline">{insuranceEnd || data.insuranceEnd}</span>
               </strong>
             </p>
           </div>
@@ -299,7 +388,7 @@ const GiayXacNhanTangBaoHiem = () => {
                 type="text"
                 value={recipientInfo}
                 onChange={(e) => setRecipientInfo(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-2 py-1 text-sm font-normal border-b border-gray-400 focus:outline-none focus:border-blue-500"
                 placeholder="Nhập thông tin kính gửi"
               />
             </div>
@@ -310,7 +399,7 @@ const GiayXacNhanTangBaoHiem = () => {
               <textarea
                 value={customerAddress}
                 onChange={(e) => setCustomerAddress(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y min-h-[80px]"
+                className="w-full px-2 py-1 text-sm font-normal border-b border-gray-400 focus:outline-none focus:border-blue-500 resize-y min-h-[80px]"
                 placeholder="Nhập địa chỉ khách hàng"
                 rows={3}
               />
@@ -323,7 +412,7 @@ const GiayXacNhanTangBaoHiem = () => {
                 type="text"
                 value={insuranceContract}
                 onChange={(e) => setInsuranceContract(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-2 py-1 text-sm font-normal border-b border-gray-400 focus:outline-none focus:border-blue-500"
                 placeholder="Nhập số hợp đồng bảo hiểm"
               />
             </div>
@@ -335,7 +424,7 @@ const GiayXacNhanTangBaoHiem = () => {
                 type="text"
                 value={insuranceValue}
                 onChange={(e) => setInsuranceValue(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-2 py-1 text-sm font-normal border-b border-gray-400 focus:outline-none focus:border-blue-500"
                 placeholder="Nhập giá trị hợp đồng bảo hiểm"
               />
             </div>
@@ -350,7 +439,7 @@ const GiayXacNhanTangBaoHiem = () => {
                     type="text"
                     value={insuranceStart}
                     onChange={(e) => setInsuranceStart(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-2 py-1 text-sm font-normal border-b border-gray-400 focus:outline-none focus:border-blue-500"
                     placeholder="07/11/2025"
                   />
                 </div>
@@ -360,7 +449,7 @@ const GiayXacNhanTangBaoHiem = () => {
                     type="text"
                     value={insuranceEnd}
                     onChange={(e) => setInsuranceEnd(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-2 py-1 text-sm font-normal border-b border-gray-400 focus:outline-none focus:border-blue-500"
                     placeholder="07/11/2026"
                   />
                 </div>

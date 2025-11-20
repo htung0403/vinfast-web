@@ -13,9 +13,9 @@ import { toast } from 'react-toastify';
 
 export default function NhanSuPage() {
   const navigate = useNavigate();
-  const [userTeam, setUserTeam] = useState('');
   const [userRole, setUserRole] = useState('user');
   const [userEmail, setUserEmail] = useState('');
+  const [userDepartment, setUserDepartment] = useState('');
 
   const [filters, setFilters] = useState({
     startDate: '',
@@ -60,8 +60,6 @@ export default function NhanSuPage() {
     facebook: "",
     fanpage: "",
     web: "",
-    Team: "",
-    "chi nhánh": "",
   });
 
   // Pagination states
@@ -70,10 +68,8 @@ export default function NhanSuPage() {
 
   // Load user info from localStorage
   useEffect(() => {
-    const team = localStorage.getItem('userTeam') || '';
     const role = localStorage.getItem('userRole') || 'user';
     const email = localStorage.getItem('userEmail') || '';
-    setUserTeam(team);
     setUserRole(role);
     setUserEmail(email);
   }, []);
@@ -123,8 +119,6 @@ export default function NhanSuPage() {
             facebook: values['facebook'] || values.Facebook || '',
             fanpage: values['fanpage'] || '',
             web: values['web'] || '',
-            Team: values['Team'] || values.team || '',
-            'chi nhánh': values['chi nhánh'] || values.chi_nhanh || '',
           };
 
           return {
@@ -141,6 +135,7 @@ export default function NhanSuPage() {
             email: db.mail,
             'Họ Và Tên': db.TVBH,
             'Sinh Nhật': db.sinhNhat,
+            birthdate: db.sinhNhat, // Add birthdate alias for modal compatibility
             'Ngày vào làm': db.ngayVaoLam,
             'Vị trí': db.chucVu,
             'Bộ phận': db.phongBan,
@@ -151,13 +146,23 @@ export default function NhanSuPage() {
             facebook: db.facebook,
             fanpage: db.fanpage,
             web: db.web,
-            Team: db.Team,
-            'chi nhánh': db['chi nhánh'],
           };
         });
 
         console.log('Mapped users array:', usersArray);
         setUsers(usersArray);
+
+        // If user is leader, find their department from employees data
+        let leaderDept = '';
+        if (userRole === 'leader' && userEmail) {
+          const currentLeader = usersArray.find(
+            (u) => (u.email || u.mail || u.Mail) === userEmail
+          );
+          if (currentLeader) {
+            leaderDept = currentLeader['Bộ phận'] || currentLeader.phongBan || currentLeader.department || '';
+            setUserDepartment(leaderDept);
+          }
+        }
 
         // Extract departments from employees data for filter panel
         const departments = [
@@ -165,10 +170,13 @@ export default function NhanSuPage() {
         ].sort();
         setAvailableFilters((prev) => ({ ...prev, departments }));
 
-        // Initial filtering based on role/team only (filter logic will be handled by separate useEffect)
+        // Initial filtering based on role/department for leader
         let filtered = usersArray;
-        if (userRole === 'leader' && userTeam) {
-          filtered = usersArray.filter((user) => user.Team === userTeam);
+        if (userRole === 'leader' && leaderDept) {
+          filtered = usersArray.filter((user) => {
+            const userDept = user['Bộ phận'] || user.phongBan || user.department || '';
+            return userDept === leaderDept;
+          });
         }
 
         setFilteredUsers(filtered);
@@ -190,14 +198,18 @@ export default function NhanSuPage() {
       setFilteredUsers([]);
       setLoading(false);
     }
-  }, [userRole, userTeam]); // Removed filters.departments to prevent reloading when filter changes
+  }, [userRole, userEmail]);
 
   // Apply search filter
   useEffect(() => {
     let filtered = [...users];
 
-    if (userRole === "leader" && userTeam) {
-      filtered = filtered.filter((user) => user.Team === userTeam);
+    // Filter by department for leader
+    if (userRole === "leader" && userDepartment) {
+      filtered = filtered.filter((user) => {
+        const userDept = user['Bộ phận'] || user.phongBan || user.department || '';
+        return userDept === userDepartment;
+      });
     }
 
     if (filters.departments && filters.departments.length > 0) {
@@ -225,7 +237,7 @@ export default function NhanSuPage() {
 
     setFilteredUsers(filtered);
     setCurrentPage(1);
-  }, [users, userRole, userTeam, filters.searchText, filters.departments]);
+  }, [users, userRole, userDepartment, filters.searchText, filters.departments]);
 
   const handleFilterChange = (filterType, value) => {
     setFilters((prev) => {
@@ -297,7 +309,10 @@ export default function NhanSuPage() {
 
   // Open edit modal
   const openEditModal = (user) => {
-    setEditingUser({ ...user });
+    setEditingUser({ 
+      ...user,
+      birthdate: user.birthdate || user['Sinh Nhật'] || '', // Ensure birthdate is set for modal
+    });
     setIsModalOpen(true);
   };
 
@@ -326,8 +341,6 @@ export default function NhanSuPage() {
       facebook: "",
       fanpage: "",
       web: "",
-      Team: "",
-      "chi nhánh": "",
     });
     setIsAddModalOpen(true);
   };
@@ -340,9 +353,7 @@ export default function NhanSuPage() {
       email: "",
       password: "",
       "Bộ phận": "",
-      Team: "",
       "Vị trí": "",
-      "chi nhánh": "",
       role: "user",
     });
   };
@@ -374,7 +385,20 @@ export default function NhanSuPage() {
       const newUserRef = push(usersListRef);
       const userId = newUserRef.key;
 
-      const hashedPassword = bcrypt.hashSync(newUser.password, 10);
+      // Ensure password is plain text before hashing
+      const plainPassword = newUser.password;
+      if (!plainPassword || plainPassword.trim() === '') {
+        toast.error("Mật khẩu không được để trống!");
+        return;
+      }
+      
+      // Check if password is already hashed (bcrypt hashes start with $2a$, $2b$, or $2y$)
+      if (plainPassword.startsWith('$2a$') || plainPassword.startsWith('$2b$') || plainPassword.startsWith('$2y$')) {
+        toast.error("Lỗi: Mật khẩu đã được hash. Vui lòng nhập mật khẩu gốc.");
+        return;
+      }
+
+      const hashedPassword = bcrypt.hashSync(plainPassword, 10);
 
       const usersRef = ref(database, `employees/${userId}`);
       const userData = {
@@ -395,46 +419,104 @@ export default function NhanSuPage() {
         facebook: newUser.facebook || '',
         fanpage: newUser.fanpage || '',
         web: newUser.web || '',
-        team: newUser.Team || '',
-        chi_nhanh: newUser['chi nhánh'] || '',
         createdAt: new Date().toISOString(),
         createdBy: localStorage.getItem('username') || 'admin',
       };
 
       await set(usersRef, userData);
 
+      // Reload all employees data with the same mapping logic as initial load
       const usersSnapshotAfter = await get(ref(database, 'employees'));
       if (usersSnapshotAfter.exists()) {
         const data = usersSnapshotAfter.val();
-        const usersArray = Object.entries(data).map(([firebaseKey, values]) => ({
-          firebaseKey,
-          ...values,
-          'Họ Và Tên': values['TVBH'] || values.name || values['Họ Và Tên'] || '',
-          username: values['user'] || values.username || '',
-          password: values['pass'] || values.password || '',
-          phone: values['phone'] || '',
-          email: values['Mail'] || values.email || '',
-          'Sinh Nhật': values['birthday'] || values['Sinh Nhật'] || '',
-          'Ngày vào làm': values['Ngày vào làm'] || values.createdAt || '',
-          'Vị trí': values['Chức Vụ'] || values.position || '',
-          'Bộ phận': values['Phòng Ban'] || values.department || '',
-          status: values['tình trạng'] || values.status || '',
-          role: values['Quyền'] || values.role || '',
-          Team: values.team || values.Team || '',
-        }));
+        
+        // Use the same mapping logic as in the initial load (lines 103-157)
+        const usersArray = Object.entries(data).map(([firebaseKey, values]) => {
+          // Use id from data if exists, otherwise use firebaseKey
+          const employeeId = values['id'] || values.id || firebaseKey;
+          
+          // normalize DB shape to the exact keys (matching the sample data structure)
+          const db = {
+            id: employeeId,
+            TVBH: values['TVBH'] || values.TVBH || '',
+            user: values['user'] || values.username || '',
+            pass: values['pass'] || values.password || '',
+            soDienThoai: values['soDienThoai'] || values.phone || values.phoneNumber || '',
+            mail: values['mail'] || values['Mail'] || values.email || '',
+            sinhNhat: values['sinhNhat'] || values['Sinh Nhật'] || values.birthday || values.birthdate || '',
+            ngayVaoLam: values['ngayVaoLam'] || values['Ngày vào làm'] || values.createdAt || values.startDate || '',
+            chucVu: values['chucVu'] || values['Chức Vị'] || values.position || values['Vị trí'] || '',
+            phongBan: values['phongBan'] || values['Phòng Ban'] || values.department || values['Bộ phận'] || '',
+            tinhTrang: values['tinhTrang'] || values['tình trạng'] || values.status || '',
+            quyen: values['quyen'] || values['Quyền'] || values.role || '',
+            zalo: values['Zalo'] || values.zalo || '',
+            tiktok: values['tiktok'] || values.TikTok || '',
+            facebook: values['facebook'] || values.Facebook || '',
+            fanpage: values['fanpage'] || '',
+            web: values['web'] || '',
+          };
+
+          return {
+            firebaseKey,
+            id: employeeId,
+            // Keep original values
+            ...values,
+            // Add normalized DB fields
+            ...db,
+            // Add UI-friendly aliases
+            username: db.user,
+            password: db.pass,
+            phone: db.soDienThoai,
+            email: db.mail,
+            'Họ Và Tên': db.TVBH,
+            'Sinh Nhật': db.sinhNhat,
+            birthdate: db.sinhNhat, // Add birthdate alias for modal compatibility
+            'Ngày vào làm': db.ngayVaoLam,
+            'Vị trí': db.chucVu,
+            'Bộ phận': db.phongBan,
+            status: db.tinhTrang,
+            role: db.quyen,
+            zalo: db.zalo,
+            tiktok: db.tiktok,
+            facebook: db.facebook,
+            fanpage: db.fanpage,
+            web: db.web,
+          };
+        });
+        
         setUsers(usersArray);
 
-        if (userRole === 'leader' && userTeam) {
-          const filtered = usersArray.filter((user) => user.Team === userTeam);
-          setFilteredUsers(filtered);
-        } else if (filters.departments && filters.departments.length > 0) {
-          const filtered = usersArray.filter((user) =>
+        // Apply filters
+        let filtered = usersArray;
+        // Filter by department for leader
+        if (userRole === 'leader' && userDepartment) {
+          filtered = usersArray.filter((user) => {
+            const userDept = user['Bộ phận'] || user.phongBan || user.department || '';
+            return userDept === userDepartment;
+          });
+        }
+        if (filters.departments && filters.departments.length > 0) {
+          filtered = filtered.filter((user) =>
             filters.departments.includes(user['Bộ phận'] || user.department)
           );
-          setFilteredUsers(filtered);
-        } else {
-          setFilteredUsers(usersArray);
         }
+        if (filters.searchText) {
+          const searchLower = filters.searchText.toLowerCase();
+          filtered = filtered.filter((user) => {
+            return Object.values(user).some((val) => {
+              if (val === null || val === undefined) return false;
+              if (typeof val === "object") {
+                try {
+                  return JSON.stringify(val).toLowerCase().includes(searchLower);
+                } catch (e) {
+                  return false;
+                }
+              }
+              return String(val).toLowerCase().includes(searchLower);
+            });
+          });
+        }
+        setFilteredUsers(filtered);
       }
 
       closeAddModal();
@@ -503,23 +585,8 @@ export default function NhanSuPage() {
 
   return (
     <div className="mx-auto px-8 py-8 bg-gradient-to-br from-slate-100 to-slate-200">
-      <div className="grid grid-cols-1 lg:grid-cols-6 gap-6">
-        <FilterPanel
-          activeTab={'users'}
-          filters={filters}
-          handleFilterChange={handleFilterChange}
-          quickSelectValue={quickSelectValue}
-          handleQuickDateSelect={handleQuickDateSelect}
-          availableFilters={availableFilters}
-          userRole={userRole}
-          hasActiveFilters={hasActiveFilters}
-          clearAllFilters={clearAllFilters}
-          showMarkets={false}
-        />
-
-        <div className="lg:col-span-5">
-          {/* Header with Add Button */}
-          <div className="flex items-center justify-between mb-6">
+      {/* Header with Add Button */}
+      <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4">
               <button
                 onClick={() => navigate("/menu")}
@@ -541,8 +608,24 @@ export default function NhanSuPage() {
             )}
           </div>
 
-          {/* Statistics */}
-          <div className="mb-4 flex items-center justify-between">
+      {/* Filter Panel - Horizontal */}
+      <div className="mb-6">
+        <FilterPanel
+          activeTab={'users'}
+          filters={filters}
+          handleFilterChange={handleFilterChange}
+          quickSelectValue={quickSelectValue}
+          handleQuickDateSelect={handleQuickDateSelect}
+          availableFilters={availableFilters}
+          userRole={userRole}
+          hasActiveFilters={hasActiveFilters}
+          clearAllFilters={clearAllFilters}
+          showMarkets={false}
+        />
+      </div>
+
+      {/* Statistics */}
+      <div className="mb-4 flex items-center justify-between">
             <p className="text-secondary-600">
               Tổng số:{" "}
               <span className="font-semibold text-primary-600">
@@ -561,8 +644,8 @@ export default function NhanSuPage() {
             </p>
           </div>
 
-          {/* User Management Table */}
-          {filteredUsers.length === 0 ? (
+      {/* User Management Table */}
+      {filteredUsers.length === 0 ? (
             <div className="text-center py-8 bg-secondary-50 rounded-lg">
               <p className="text-secondary-600">Không có dữ liệu nhân sự</p>
             </div>
@@ -699,14 +782,18 @@ export default function NhanSuPage() {
                       {/* Action column */}
                       <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400 text-center">
                         <div className="flex items-center justify-center gap-2">
-                          <button
-                            onClick={() => openEditModal(user)}
-                            className="inline-flex items-center px-2 py-1 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
-                            title="Chỉnh sửa"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
+                          {/* Only admin can edit */}
+                          {userRole === 'admin' && (
+                            <button
+                              onClick={() => openEditModal(user)}
+                              className="inline-flex items-center px-2 py-1 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
+                              title="Chỉnh sửa"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                          )}
 
+                          {/* Only admin can delete */}
                           {userRole === 'admin' && (
                             <button
                               onClick={() => openDeleteConfirm(user)}
@@ -723,10 +810,10 @@ export default function NhanSuPage() {
                 </tbody>
               </table>
             </div>
-          )}
+      )}
 
-          {/* Pagination */}
-          {filteredUsers.length > itemsPerPage && (
+      {/* Pagination */}
+      {filteredUsers.length > itemsPerPage && (
             <div className="mt-6 flex items-center justify-between border-t border-secondary-100 bg-neutral-white px-4 py-3 sm:px-6 rounded-lg shadow">
               <div className="flex flex-1 justify-between sm:hidden">
                 <button
@@ -860,10 +947,10 @@ export default function NhanSuPage() {
                 </div>
               </div>
             </div>
-          )}
+      )}
 
-          {/* Edit Modal */}
-          {isModalOpen && editingUser && (
+      {/* Edit Modal */}
+      {isModalOpen && editingUser && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
               <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[calc(100vh-4rem)] overflow-auto">
                 {/* Modal Header */}
@@ -1105,8 +1192,6 @@ export default function NhanSuPage() {
                           facebook: editingUser.facebook || '',
                           fanpage: editingUser.fanpage || '',
                           web: editingUser.web || '',
-                          team: editingUser.Team || '',
-                          chi_nhanh: editingUser['chi nhánh'] || '',
                         };
 
                         if (editingUser.password && editingUser.password.length > 0) {
@@ -1164,10 +1249,10 @@ export default function NhanSuPage() {
                 </div>
               </div>
             </div>
-          )}
+      )}
 
-          {/* Add User Modal */}
-          {isAddModalOpen && (
+      {/* Add User Modal */}
+      {isAddModalOpen && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
               <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[calc(100vh-4rem)] overflow-auto">
                 <div className="bg-gradient-to-r from-primary-600 to-primary-400 px-6 py-4 rounded-t-lg">
@@ -1391,10 +1476,10 @@ export default function NhanSuPage() {
                 </div>
               </div>
             </div>
-          )}
+      )}
 
-          {/* Delete Confirmation Modal */}
-          {deletingUser && (
+      {/* Delete Confirmation Modal */}
+      {deletingUser && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
               <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
                 <div className="bg-gradient-to-r from-red-600 to-pink-600 px-6 py-4 rounded-t-lg">
@@ -1428,23 +1513,9 @@ export default function NhanSuPage() {
                       </span>
                     </p>
                     <p className="text-sm">
-                      <span className="font-semibold text-gray-700">Team:</span>{" "}
-                      <span className="text-gray-900">
-                        {deletingUser.Team || "-"}
-                      </span>
-                    </p>
-                    <p className="text-sm">
                       <span className="font-semibold text-gray-700">Vị trí:</span>{" "}
                       <span className="text-gray-900">
                         {deletingUser["Vị trí"] || "-"}
-                      </span>
-                    </p>
-                    <p className="text-sm">
-                      <span className="font-semibold text-gray-700">
-                        Chi nhánh:
-                      </span>{" "}
-                      <span className="text-gray-900">
-                        {deletingUser["chi nhánh"] || "-"}
                       </span>
                     </p>
                   </div>
@@ -1472,9 +1543,7 @@ export default function NhanSuPage() {
                 </div>
               </div>
             </div>
-          )}
-        </div>
-      </div>
+      )}
     </div>
   );
 }
