@@ -803,7 +803,7 @@ function Profile() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => navigate('/home')}
+                    onClick={() => navigate('/trang-chu')}
                     className="px-6 py-3 border border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 transition"
                   >
                     Quay lại

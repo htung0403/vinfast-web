@@ -6,6 +6,10 @@ import {
 } from "../../data/branchData";
 import { ref, get } from "firebase/database";
 import { database } from "../../firebase/config";
+import {
+  uniqueNgoaiThatColors,
+  uniqueNoiThatColors,
+} from "../../data/calculatorData";
 
 const HopDongMuaBanXe = () => {
   const location = useLocation();
@@ -30,6 +34,10 @@ const HopDongMuaBanXe = () => {
   const [diaDiemGiaoXe, setDiaDiemGiaoXe] = useState("");
   const [thoiGianGiaoXe, setThoiGianGiaoXe] = useState("");
   const [thoiGianGiaoXeRaw, setThoiGianGiaoXeRaw] = useState("");
+  const [uuDai, setUuDai] = useState("");
+  const [taxCodeOrg, setTaxCodeOrg] = useState("");
+  const [representativeOrg, setRepresentativeOrg] = useState("");
+  const [positionOrg, setPositionOrg] = useState("");
   
   const formatDateForDisplay = (dateStr) => {
     if (!dateStr) return "";
@@ -129,6 +137,10 @@ const HopDongMuaBanXe = () => {
           showroom: incoming.showroom || branchInfo.shortName,
         };
         setData(processedData);
+        setUuDai(processedData.uuDai || "");
+        setTaxCodeOrg(processedData.taxCode || "");
+        setRepresentativeOrg(processedData.representative || "");
+        setPositionOrg(processedData.position || "");
       } else {
         // Default data
         const today = new Date();
@@ -157,6 +169,10 @@ const HopDongMuaBanXe = () => {
           uuDai: "",
           showroom: branchInfo.shortName,
         });
+        setUuDai("");
+        setTaxCodeOrg("");
+        setRepresentativeOrg("");
+        setPositionOrg("");
       }
       setLoading(false);
     };
@@ -174,6 +190,16 @@ const HopDongMuaBanXe = () => {
       typeof amount === "string" ? amount.replace(/\D/g, "") : String(amount);
     if (!numericAmount) return "";
     return `${numericAmount.replace(/\B(?=(\d{3})+(?!\d))/g, ".")}`;
+  };
+
+  // Helper function to convert color code to name
+  const getColorName = (colorCode, isExterior = true) => {
+    if (!colorCode) return "";
+    const colorList = isExterior ? uniqueNgoaiThatColors : uniqueNoiThatColors;
+    const found = colorList.find(
+      (color) => color.code.toLowerCase() === colorCode.toLowerCase()
+    );
+    return found ? found.name : colorCode;
   };
 
   // Helper function to convert number to Vietnamese words
@@ -453,13 +479,43 @@ const HopDongMuaBanXe = () => {
                 <div className="mt-2">
                   <p className="font-semibold">Nếu là tổ chức:</p>
                   <p className="">
-                    MSDN: {data.taxCode || "[---]"}
+                    MSDN:{" "}
+                    <span className="print:hidden">
+                      <input
+                        type="text"
+                        value={taxCodeOrg}
+                        onChange={(e) => setTaxCodeOrg(e.target.value)}
+                        className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-auto focus:outline-none focus:border-blue-500"
+                        placeholder=""
+                      />
+                    </span>
+                    <span className="hidden print:inline">{taxCodeOrg || "[---]"}</span>
                   </p>
                   <p className="">
-                    Đại diện: {data.representative || "[---]"}
+                    Đại diện:{" "}
+                    <span className="print:hidden">
+                      <input
+                        type="text"
+                        value={representativeOrg}
+                        onChange={(e) => setRepresentativeOrg(e.target.value)}
+                        className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-auto focus:outline-none focus:border-blue-500"
+                        placeholder=""
+                      />
+                    </span>
+                    <span className="hidden print:inline">{representativeOrg || "[---]"}</span>
                   </p>
                   <p className="">
-                    Chức vụ: {data.position || "[---]"}
+                    Chức vụ:{" "}
+                    <span className="print:hidden">
+                      <input
+                        type="text"
+                        value={positionOrg}
+                        onChange={(e) => setPositionOrg(e.target.value)}
+                        className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-auto focus:outline-none focus:border-blue-500"
+                        placeholder=""
+                      />
+                    </span>
+                    <span className="hidden print:inline">{positionOrg || "[---]"}</span>
                   </p>
                   <p className="">
                     Giấy uỷ quyền:{" "}
@@ -544,7 +600,7 @@ const HopDongMuaBanXe = () => {
                       <div className="space-y-1">
                         <p>
                           VinFast {data.model || "[---]"} - Phiên bản:{" "}
-                          {data.variant || "[---]"} Màu: {data.exterior || "[---]"}
+                          {data.variant || "[---]"} Màu: {getColorName(data.exterior, true) || data.exterior || "[---]"}
                         </p>
                         <p>
                           <span className="print:hidden">
@@ -608,7 +664,17 @@ const HopDongMuaBanXe = () => {
             {/* 1.2 */}
             <div className="mb-4">
               <h3 className="font-semibold">
-                1.2 Chính sách ưu đãi áp dụng: {data.uuDai || "[---]"}
+                1.2 Chính sách ưu đãi áp dụng:{" "}
+                <span className="print:hidden">
+                  <input
+                    type="text"
+                    value={uuDai}
+                    onChange={(e) => setUuDai(e.target.value)}
+                    className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-auto focus:outline-none focus:border-blue-500"
+                    placeholder=""
+                  />
+                </span>
+                <span className="hidden print:inline">{uuDai || "[---]"}</span>
               </h3>
               <p className="mb-2 text-justify">
                 Chi tiết về chính sách ưu đãi được công bố trên Website{" "}
