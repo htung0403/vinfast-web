@@ -17,12 +17,13 @@ const HopDongMuaBanXe = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [branch, setBranch] = useState(null);
-  
+
   // Input fields for [---] placeholders
   const [giayUyQuyen1, setGiayUyQuyen1] = useState("");
   const [giayUyQuyen1Ngay, setGiayUyQuyen1Ngay] = useState("");
   const [giayUyQuyen2, setGiayUyQuyen2] = useState("");
   const [giayUyQuyen2Ngay, setGiayUyQuyen2Ngay] = useState("");
+  const [giayUyQuyen2NgayRaw, setGiayUyQuyen2NgayRaw] = useState("");
   const [thoiHanDatCoc, setThoiHanDatCoc] = useState("");
   const [thoiHanDot2, setThoiHanDot2] = useState("");
   const [soTienDot2, setSoTienDot2] = useState("");
@@ -35,10 +36,20 @@ const HopDongMuaBanXe = () => {
   const [thoiGianGiaoXe, setThoiGianGiaoXe] = useState("");
   const [thoiGianGiaoXeRaw, setThoiGianGiaoXeRaw] = useState("");
   const [uuDai, setUuDai] = useState("");
+  const [isEditingUuDai, setIsEditingUuDai] = useState(false);
   const [taxCodeOrg, setTaxCodeOrg] = useState("");
   const [representativeOrg, setRepresentativeOrg] = useState("");
   const [positionOrg, setPositionOrg] = useState("");
-  
+  // Company fields
+  const [companyName, setCompanyName] = useState("");
+  const [companyAddress, setCompanyAddress] = useState("");
+  const [companyTaxCode, setCompanyTaxCode] = useState("");
+  // Customer fields
+  const [customerName, setCustomerName] = useState("");
+  const [customerAddress, setCustomerAddress] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
+
   const formatDateForDisplay = (dateStr) => {
     if (!dateStr) return "";
     const d = new Date(dateStr);
@@ -78,7 +89,9 @@ const HopDongMuaBanXe = () => {
         const d = new Date(val);
         if (isNaN(d)) return val;
         const pad = (n) => String(n).padStart(2, "0");
-        return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+        return `${pad(d.getDate())}/${pad(
+          d.getMonth() + 1
+        )}/${d.getFullYear()}`;
       };
 
       if (location.state) {
@@ -90,8 +103,7 @@ const HopDongMuaBanXe = () => {
         )}/${today.getFullYear()}`;
 
         const processedData = {
-          contractNumber:
-            incoming.vso || incoming.contractNumber || "",
+          contractNumber: incoming.vso || incoming.contractNumber || "",
           contractDate:
             formatDateString(incoming.createdAt || incoming.ngayXhd) ||
             todayStr,
@@ -111,10 +123,7 @@ const HopDongMuaBanXe = () => {
               incoming.issueDate || incoming.ngayCap || incoming["Ngày Cấp"]
             ) || "",
           cccdIssuePlace:
-            incoming.issuePlace ||
-            incoming.noiCap ||
-            incoming["Nơi Cấp"] ||
-            "",
+            incoming.issuePlace || incoming.noiCap || incoming["Nơi Cấp"] || "",
           // Thông tin tổ chức (nếu có)
           taxCode: incoming.taxCode || incoming.MSDN || "",
           representative: incoming.representative || incoming.daiDien || "",
@@ -137,10 +146,19 @@ const HopDongMuaBanXe = () => {
           showroom: incoming.showroom || branchInfo.shortName,
         };
         setData(processedData);
-        setUuDai(processedData.uuDai || "");
+        setUuDai(String(processedData.uuDai || ""));
         setTaxCodeOrg(processedData.taxCode || "");
         setRepresentativeOrg(processedData.representative || "");
         setPositionOrg(processedData.position || "");
+        // Initialize company fields from branch
+        setCompanyName(branchInfo.name || "");
+        setCompanyAddress(branchInfo.address || "");
+        setCompanyTaxCode(branchInfo.taxCode || "");
+        // Initialize customer fields from processed data
+        setCustomerName(processedData.customerName || "");
+        setCustomerAddress(processedData.customerAddress || "");
+        setCustomerPhone(processedData.phone || "");
+        setCustomerEmail(processedData.email || "");
       } else {
         // Default data
         const today = new Date();
@@ -173,6 +191,15 @@ const HopDongMuaBanXe = () => {
         setTaxCodeOrg("");
         setRepresentativeOrg("");
         setPositionOrg("");
+        // Initialize company fields from branch
+        setCompanyName(branchInfo.name || "");
+        setCompanyAddress(branchInfo.address || "");
+        setCompanyTaxCode(branchInfo.taxCode || "");
+        // Initialize customer fields from default data
+        setCustomerName("NGÔ NGUYỄN HOÀI NAM");
+        setCustomerAddress("Số 72/14 Đường tỉnh lộ 7, Ấp Bình Hạ, Thái Mỹ, Củ Chi, Tp Hồ Chí Minh");
+        setCustomerPhone("0901234567");
+        setCustomerEmail("example@email.com");
       }
       setLoading(false);
     };
@@ -190,6 +217,46 @@ const HopDongMuaBanXe = () => {
       typeof amount === "string" ? amount.replace(/\D/g, "") : String(amount);
     if (!numericAmount) return "";
     return `${numericAmount.replace(/\B(?=(\d{3})+(?!\d))/g, ".")}`;
+  };
+
+  // Helper function to format ưu đãi as bulleted list
+  const formatUuDaiList = (text) => {
+    if (!text) return "[---]";
+    // Ensure text is a string
+    const textStr = String(text);
+    if (!textStr.trim()) return "[---]";
+    
+    let lines = [];
+    
+    // First, try splitting by newlines
+    const newlineSplit = textStr.split("\n").map((line) => line.trim()).filter((line) => line !== "");
+    
+    if (newlineSplit.length > 1) {
+      // If there are multiple lines, use them
+      lines = newlineSplit;
+    } else {
+      // If single line, try splitting by commas
+      const singleLine = textStr.trim();
+      // Split by comma (with optional space after)
+      const commaSplit = singleLine.split(/,\s*/).map((item) => item.trim()).filter((item) => item !== "");
+      
+      if (commaSplit.length > 1) {
+        lines = commaSplit;
+      } else {
+        // If no commas, use the whole line as one item
+        lines = [singleLine];
+      }
+    }
+    
+    if (lines.length === 0) return "[---]";
+    
+    return (
+      <div className="mt-2 space-y-1">
+        {lines.map((line, index) => (
+          <div key={index}>- {line}</div>
+        ))}
+      </div>
+    );
   };
 
   // Helper function to convert color code to name
@@ -259,7 +326,9 @@ const HopDongMuaBanXe = () => {
 
       if (hundred > 0) {
         result += hundreds[hundred] + " ";
-      } else if (showZeroHundred && ten > 0) {
+      } else if (showZeroHundred && ten > 0 && one > 0) {
+        // Chỉ thêm "không trăm" khi có cả ten và one (ví dụ: 101, 102, ...)
+        // Không thêm cho các số tròn chục (10, 20, 30, ...)
         result += "không trăm ";
       }
 
@@ -321,9 +390,7 @@ const HopDongMuaBanXe = () => {
     const trimmed = result.trim();
     if (!trimmed) return "Không đồng";
 
-    return (
-      trimmed.charAt(0).toUpperCase() + trimmed.slice(1) + " đồng"
-    );
+    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1) + " đồng";
   };
 
   if (loading) {
@@ -374,24 +441,19 @@ const HopDongMuaBanXe = () => {
             <h1 className="text-xl font-bold uppercase mb-2">
               HỢP ĐỒNG MUA BÁN XE ĐIỆN VINFAST
             </h1>
-            <div className="text-right text-sm mb-2">
+            <div className="text-center text-sm mb-2">
               <span>Số: {data.contractNumber || "[---]"}</span>
             </div>
             <div className="text-sm">
               <span>
+                Hợp đồng mua bán xe điện Vinfast ("<strong>Hợp Đồng</strong>")
                 được ký ngày{" "}
-                {data.contractDate
-                  ? data.contractDate.split("/")[0]
-                  : "[---]"}{" "}
+                {data.contractDate ? data.contractDate.split("/")[0] : "[---]"}{" "}
                 tháng{" "}
-                {data.contractDate
-                  ? data.contractDate.split("/")[1]
-                  : "[---]"}{" "}
+                {data.contractDate ? data.contractDate.split("/")[1] : "[---]"}{" "}
                 năm{" "}
-                {data.contractDate
-                  ? data.contractDate.split("/")[2]
-                  : "[---]"}
-                , giữa:
+                {data.contractDate ? data.contractDate.split("/")[2] : "[---]"},
+                giữa:
               </span>
             </div>
           </div>
@@ -400,15 +462,51 @@ const HopDongMuaBanXe = () => {
           <div className="grid grid-cols-2 gap-4 mb-2">
             {/* Left Column - CÔNG TY */}
             <div className="border border-gray-300">
-              <div className="bg-gray-100 p-2 font-semibold text-sm">
-                CÔNG TY
-              </div>
               <div className="p-3 text-sm space-y-2">
                 <p>
-                  <strong>Trụ sở chính:</strong> {branch.address}
+                  <strong>CÔNG TY: </strong>
+                  <span className="print:hidden">
+                    <input
+                      type="text"
+                      value={companyName}
+                      onChange={(e) => setCompanyName(e.target.value)}
+                      className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-auto focus:outline-none focus:border-blue-500 uppercase"
+                      placeholder=""
+                    />
+                  </span>
+                  <span className="hidden print:inline">
+                    {companyName || "[---]"}
+                  </span>
                 </p>
                 <p>
-                  <strong>MSDN:</strong> {branch.taxCode}
+                  <strong>Trụ sở chính:</strong>{" "}
+                  <span className="print:hidden">
+                    <input
+                      type="text"
+                      value={companyAddress}
+                      onChange={(e) => setCompanyAddress(e.target.value)}
+                      className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-auto focus:outline-none focus:border-blue-500"
+                      placeholder=""
+                    />
+                  </span>
+                  <span className="hidden print:inline">
+                    {companyAddress || "[---]"}
+                  </span>
+                </p>
+                <p>
+                  <strong>MSDN:</strong>{" "}
+                  <span className="print:hidden">
+                    <input
+                      type="text"
+                      value={companyTaxCode}
+                      onChange={(e) => setCompanyTaxCode(e.target.value)}
+                      className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-auto focus:outline-none focus:border-blue-500"
+                      placeholder=""
+                    />
+                  </span>
+                  <span className="hidden print:inline">
+                    {companyTaxCode || "[---]"}
+                  </span>
                 </p>
                 <p>
                   <strong>Đại diện:</strong> {branch.representativeName}
@@ -427,7 +525,9 @@ const HopDongMuaBanXe = () => {
                       placeholder=""
                     />
                   </span>
-                  <span className="hidden print:inline">{giayUyQuyen1 || "[---]"}</span>{" "}
+                  <span className="hidden print:inline">
+                    {giayUyQuyen1 || "[---]"}
+                  </span>{" "}
                   ngày{" "}
                   <span className="print:hidden">
                     <input
@@ -438,7 +538,9 @@ const HopDongMuaBanXe = () => {
                       placeholder=""
                     />
                   </span>
-                  <span className="hidden print:inline">{giayUyQuyen1Ngay || "[---]"}</span>
+                  <span className="hidden print:inline">
+                    {giayUyQuyen1Ngay || "[---]"}
+                  </span>
                 </p>
                 <p>
                   <strong>Tài khoản:</strong> {branch.bankAccount} -{" "}
@@ -455,18 +557,66 @@ const HopDongMuaBanXe = () => {
 
             {/* Right Column - KHÁCH HÀNG */}
             <div className="border border-gray-300">
-              <div className="bg-gray-100 p-2 font-semibold text-sm">
-                KHÁCH HÀNG
-              </div>
               <div className="p-3 text-sm space-y-2">
                 <p>
-                  <strong>Địa chỉ:</strong> {data.customerAddress || "[---]"}
+                  <strong className="uppercase">KHÁCH HÀNG: </strong>
+                  <span className="print:hidden">
+                    <input
+                      type="text"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-auto focus:outline-none focus:border-blue-500 uppercase"
+                      placeholder=""
+                    />
+                  </span>
+                  <span className="hidden print:inline">
+                    {customerName || "[---]"}
+                  </span>
                 </p>
                 <p>
-                  <strong>Điện thoại:</strong> {data.phone || "[---]"}
+                  Địa chỉ:{" "}
+                  <span className="print:hidden">
+                    <input
+                      type="text"
+                      value={customerAddress}
+                      onChange={(e) => setCustomerAddress(e.target.value)}
+                      className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-auto focus:outline-none focus:border-blue-500"
+                      placeholder=""
+                    />
+                  </span>
+                  <span className="hidden print:inline">
+                    {customerAddress || "[---]"}
+                  </span>
                 </p>
                 <p>
-                  <strong>Email:</strong> {data.email || "[---]"}
+                  Điện thoại:{" "}
+                  <span className="print:hidden">
+                    <input
+                      type="text"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-auto focus:outline-none focus:border-blue-500"
+                      placeholder=""
+                    />
+                  </span>
+                  <span className="hidden print:inline">
+                    {customerPhone || "[---]"}
+                  </span>
+                </p>
+                <p>
+                  Email:{" "}
+                  <span className="print:hidden">
+                    <input
+                      type="text"
+                      value={customerEmail}
+                      onChange={(e) => setCustomerEmail(e.target.value)}
+                      className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-auto focus:outline-none focus:border-blue-500"
+                      placeholder=""
+                    />
+                  </span>
+                  <span className="hidden print:inline">
+                    {customerEmail || "[---]"}
+                  </span>
                 </p>
                 <div className="mt-2">
                   <p className="font-semibold">Nếu là cá nhân:</p>
@@ -489,7 +639,9 @@ const HopDongMuaBanXe = () => {
                         placeholder=""
                       />
                     </span>
-                    <span className="hidden print:inline">{taxCodeOrg || "[---]"}</span>
+                    <span className="hidden print:inline">
+                      {taxCodeOrg || "[---]"}
+                    </span>
                   </p>
                   <p className="">
                     Đại diện:{" "}
@@ -502,7 +654,9 @@ const HopDongMuaBanXe = () => {
                         placeholder=""
                       />
                     </span>
-                    <span className="hidden print:inline">{representativeOrg || "[---]"}</span>
+                    <span className="hidden print:inline">
+                      {representativeOrg || "[---]"}
+                    </span>
                   </p>
                   <p className="">
                     Chức vụ:{" "}
@@ -515,7 +669,9 @@ const HopDongMuaBanXe = () => {
                         placeholder=""
                       />
                     </span>
-                    <span className="hidden print:inline">{positionOrg || "[---]"}</span>
+                    <span className="hidden print:inline">
+                      {positionOrg || "[---]"}
+                    </span>
                   </p>
                   <p className="">
                     Giấy uỷ quyền:{" "}
@@ -528,18 +684,29 @@ const HopDongMuaBanXe = () => {
                         placeholder=""
                       />
                     </span>
-                    <span className="hidden print:inline">{giayUyQuyen2 || "[---]"}</span>{" "}
+                    <span className="hidden print:inline">
+                      {giayUyQuyen2 || "[---]"}
+                    </span>{" "}
                     ngày{" "}
                     <span className="print:hidden">
                       <input
-                        type="text"
-                        value={giayUyQuyen2Ngay}
-                        onChange={(e) => setGiayUyQuyen2Ngay(e.target.value)}
+                        type="date"
+                        value={giayUyQuyen2NgayRaw}
+                        onChange={(e) => {
+                          setGiayUyQuyen2NgayRaw(e.target.value);
+                          if (e.target.value) {
+                            setGiayUyQuyen2Ngay(formatDateForDisplay(e.target.value));
+                          } else {
+                            setGiayUyQuyen2Ngay("");
+                          }
+                        }}
                         className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-auto focus:outline-none focus:border-blue-500"
                         placeholder=""
                       />
                     </span>
-                    <span className="hidden print:inline">{giayUyQuyen2Ngay || "[---]"}</span>
+                    <span className="hidden print:inline">
+                      {giayUyQuyen2Ngay || "[---/---/---]"}
+                    </span>
                   </p>
                 </div>
                 <p className="mt-2">
@@ -552,8 +719,8 @@ const HopDongMuaBanXe = () => {
           {/* General Agreement Statement */}
           <div className="mb-2 text-sm">
             <p className="italic">
-              Bên Bán và Khách Hàng sau đây được gọi riêng là <strong>"Bên"</strong> và gọi
-              chung là <strong>"Các Bên"</strong>
+              Bên Bán và Khách Hàng sau đây được gọi riêng là{" "}
+              <strong>"Bên"</strong> và gọi chung là <strong>"Các Bên"</strong>
             </p>
             <p className="mt-2">
               Các Bên cùng thỏa thuận và thống nhất như sau:
@@ -576,45 +743,85 @@ const HopDongMuaBanXe = () => {
               <table className="w-full border border-gray-800 text-sm mb-4">
                 <thead>
                   <tr className="bg-gray-100">
-                    <th className="border border-gray-800 p-2 text-center" style={{ width: "5%" }}>
+                    <th
+                      className="border border-gray-800 p-2 text-center"
+                      style={{ width: "5%" }}
+                    >
                       T/T
                     </th>
-                    <th className="border border-gray-800 p-2 text-left" style={{ width: "50%" }}>
+                    <th
+                      className="border border-gray-800 p-2 text-left"
+                      style={{ width: "50%" }}
+                    >
                       Mô tả xe
                     </th>
-                    <th className="border border-gray-800 p-2 text-center" style={{ width: "10%" }}>
+                    <th
+                      className="border border-gray-800 p-2 text-center"
+                      style={{ width: "10%" }}
+                    >
                       Số lượng
                     </th>
-                    <th className="border border-gray-800 p-2 text-right" style={{ width: "17.5%" }}>
+                    <th
+                      className="border border-gray-800 p-2 text-right"
+                      style={{ width: "17.5%" }}
+                    >
                       Đơn Giá (VNĐ)
                     </th>
-                    <th className="border border-gray-800 p-2 text-right" style={{ width: "17.5%" }}>
+                    <th
+                      className="border border-gray-800 p-2 text-right"
+                      style={{ width: "17.5%" }}
+                    >
                       Thành tiền (VNĐ)
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
-                    <td className="border border-gray-800 p-2 text-center">1</td>
+                    <td className="border border-gray-800 p-2 text-center">
+                      1
+                    </td>
                     <td className="border border-gray-800 p-2">
                       <div className="space-y-1">
                         <p>
                           VinFast {data.model || "[---]"} - Phiên bản:{" "}
-                          {data.variant || "[---]"} Màu: {getColorName(data.exterior, true) || data.exterior || "[---]"}
+                          {data.variant || "[---]"} Màu:{" "}
+                          {getColorName(data.exterior, true) ||
+                            data.exterior ||
+                            "[---]"}
                         </p>
                         <p>
                           <span className="print:hidden">
                             <input
                               type="text"
                               value={data.gomPin || ""}
-                              onChange={(e) => setData({...data, gomPin: e.target.value})}
+                              onChange={(e) =>
+                                setData({ ...data, gomPin: e.target.value })
+                              }
                               className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-auto focus:outline-none focus:border-blue-500"
                               placeholder="gồm/ không gồm pin"
                             />
                           </span>
-                          <span className="hidden print:inline">{data.gomPin || "[gồm/ không gồm pin]"}</span>
+                          <span className="hidden print:inline">
+                            {data.gomPin || "[gồm/ không gồm pin]"}
+                          </span>
                         </p>
-                        <p>Số khung: {data.soKhung || "[---]"}</p>
+                        <p>
+                          Số khung:{" "}
+                          <span className="print:hidden">
+                            <input
+                              type="text"
+                              value={data.soKhung || ""}
+                              onChange={(e) =>
+                                setData({ ...data, soKhung: e.target.value })
+                              }
+                              className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-auto focus:outline-none focus:border-blue-500"
+                              placeholder=""
+                            />
+                          </span>
+                          <span className="hidden print:inline">
+                            {data.soKhung || "[---]"}
+                          </span>
+                        </p>
                         <p>Tình trạng: Mới 100%</p>
                         <p>
                           Thông số kỹ thuật: Theo tiêu chuẩn của Nhà sản xuất
@@ -624,7 +831,9 @@ const HopDongMuaBanXe = () => {
                         </p>
                       </div>
                     </td>
-                    <td className="border border-gray-800 p-2 text-center">1</td>
+                    <td className="border border-gray-800 p-2 text-center">
+                      1
+                    </td>
                     <td className="border border-gray-800 p-2 text-right">
                       {formatCurrency(data.contractPrice) || "[---]"}
                     </td>
@@ -664,21 +873,65 @@ const HopDongMuaBanXe = () => {
             {/* 1.2 */}
             <div className="mb-4">
               <h3 className="font-semibold">
-                1.2 Chính sách ưu đãi áp dụng:{" "}
-                <span className="print:hidden">
-                  <input
-                    type="text"
+                1.2 Chính sách ưu đãi áp dụng:
+              </h3>
+              <div className="print:hidden mb-2">
+                {isEditingUuDai ? (
+                  <textarea
                     value={uuDai}
                     onChange={(e) => setUuDai(e.target.value)}
-                    className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-auto focus:outline-none focus:border-blue-500"
-                    placeholder=""
+                    onBlur={() => setIsEditingUuDai(false)}
+                    className="border border-gray-400 px-2 py-1 text-sm font-normal w-full focus:outline-none focus:border-blue-500 resize-y min-h-[80px]"
+                    placeholder="Nhập các ưu đãi, phân cách bằng dấu phẩy (,) hoặc xuống dòng..."
+                    rows={4}
+                    autoFocus
                   />
-                </span>
-                <span className="hidden print:inline">{uuDai || "[---]"}</span>
-              </h3>
+                ) : (
+                  <div
+                    onClick={() => setIsEditingUuDai(true)}
+                    className="border border-gray-400 px-2 py-1 text-sm font-normal w-full min-h-[80px] cursor-text bg-white"
+                  >
+                    {uuDai ? (
+                      <div className="space-y-1">
+                        {(() => {
+                          const textStr = String(uuDai);
+                          if (!textStr.trim()) return null;
+                          
+                          let lines = [];
+                          const newlineSplit = textStr.split("\n").map((line) => line.trim()).filter((line) => line !== "");
+                          
+                          if (newlineSplit.length > 1) {
+                            lines = newlineSplit;
+                          } else {
+                            const singleLine = textStr.trim();
+                            const commaSplit = singleLine.split(/,\s*/).map((item) => item.trim()).filter((item) => item !== "");
+                            if (commaSplit.length > 1) {
+                              lines = commaSplit;
+                            } else {
+                              lines = [singleLine];
+                            }
+                          }
+                          
+                          return lines.map((line, index) => (
+                            <div key={index}>- {line}</div>
+                          ));
+                        })()}
+                      </div>
+                    ) : (
+                      <span className="text-gray-400">
+                        Nhập các ưu đãi, phân cách bằng dấu phẩy (,) hoặc xuống dòng...
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="hidden print:block">
+                {formatUuDaiList(uuDai)}
+              </div>
               <p className="mb-2 text-justify">
                 Chi tiết về chính sách ưu đãi được công bố trên Website{" "}
-                <span className="">https://vinfastauto.com</span> ("<strong>Website</strong>").
+                <span className="">https://vinfastauto.com</span> ("
+                <strong>Website</strong>").
               </p>
               <p className="text-justify">
                 Bên Bán có quyền điều chỉnh hoặc hủy bỏ chính sách ưu đãi nếu
@@ -689,34 +942,41 @@ const HopDongMuaBanXe = () => {
 
             {/* 1.3 */}
             <div className="mb-4">
-              <h3 className="font-semibold">
-                1.3 Thanh toán tiền mua Xe
-              </h3>
+              <h3 className="font-semibold">1.3 Thanh toán tiền mua Xe</h3>
               <div className="space-y-2 text-justify">
                 <p>
                   <strong>a) Đợt 1:</strong> Khách Hàng thanh toán số tiền đặt
-                  cọc là {formatCurrency(data.deposit) || "[---]"} VNĐ (bằng chữ:{" "}
-                  {numberToWords(data.deposit) || "[---]"}) trong thời hạn{" "}
+                  cọc là {formatCurrency(data.deposit) || "[---]"} VNĐ (bằng
+                  chữ: {numberToWords(data.deposit) || "[---]"}) trong thời hạn{" "}
                   <span className="print:hidden">
                     <input
                       type="text"
-                      value={thoiHanDatCoc}
-                      onChange={(e) => setThoiHanDatCoc(e.target.value)}
+                      value={formatCurrency(thoiHanDatCoc)}
+                      onChange={(e) => {
+                        // Parse giá trị thô (loại bỏ dấu chấm)
+                        const rawValue = e.target.value.replace(/\./g, "");
+                        setThoiHanDatCoc(rawValue);
+                      }}
                       className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-auto focus:outline-none focus:border-blue-500"
                       placeholder=""
                     />
                   </span>
-                  <span className="hidden print:inline">{thoiHanDatCoc || "[---]"}</span>{" "}
-                  ngày kể từ ngày ký Hợp đồng này. Số tiền đặt cọc này sẽ
-                  được chuyển thành tiền mua Xe khi Khách Hàng thanh toán đợt
-                  cuối cùng.
+                  <span className="hidden print:inline">
+                    {thoiHanDatCoc || "[---]"}
+                  </span>{" "}
+                  ngày kể từ ngày ký Hợp đồng này. Số tiền đặt cọc này sẽ được
+                  chuyển thành tiền mua Xe khi Khách Hàng thanh toán đợt cuối
+                  cùng.
                 </p>
                 <p>
-                  <strong>b) Tiến độ các đợt thanh toán tiếp theo như sau:</strong>
+                  <strong>
+                    b) Tiến độ các đợt thanh toán tiếp theo như sau:
+                  </strong>
                 </p>
                 <p className="pl-4">
                   Khách Hàng có thể lựa chọn một trong hai phương thức thanh
-                  toán: <strong>trả thẳng</strong> hoặc <strong>trả góp</strong>.
+                  toán: <strong>trả thẳng</strong> hoặc <strong>trả góp</strong>
+                  .
                 </p>
                 <p className="pl-4">
                   <strong>Thanh toán trả thẳng:</strong>
@@ -729,8 +989,7 @@ const HopDongMuaBanXe = () => {
                         (
                           parseInt(
                             String(data.contractPrice).replace(/\D/g, "")
-                          ) -
-                          parseInt(String(data.deposit).replace(/\D/g, ""))
+                          ) - parseInt(String(data.deposit).replace(/\D/g, ""))
                         ).toString()
                       )
                     : "[---]"}{" "}
@@ -744,8 +1003,11 @@ const HopDongMuaBanXe = () => {
                       placeholder=""
                     />
                   </span>
-                  <span className="hidden print:inline">{thoiHanDot2 || "[---]"}</span>{" "}
-                  ngày kể từ ngày Bên Bán thông báo Xe sẵn sàng giao cho Khách Hàng.
+                  <span className="hidden print:inline">
+                    {thoiHanDot2 || "[---]"}
+                  </span>{" "}
+                  ngày kể từ ngày Bên Bán thông báo Xe sẵn sàng giao cho Khách
+                  Hàng.
                 </p>
                 <p className="pl-4">
                   <strong>Thanh toán trả góp:</strong>
@@ -755,13 +1017,25 @@ const HopDongMuaBanXe = () => {
                   <span className="print:hidden">
                     <input
                       type="text"
-                      value={soTienDot2}
-                      onChange={(e) => setSoTienDot2(e.target.value)}
+                      value={formatCurrency(soTienDot2)}
+                      onChange={(e) => {
+                        // Parse giá trị thô (loại bỏ dấu chấm)
+                        const rawValue = e.target.value.replace(/\./g, "");
+                        setSoTienDot2(rawValue);
+                        // Tự động cập nhật bằng chữ
+                        if (rawValue) {
+                          setSoTienDot2BangChu(numberToWords(rawValue));
+                        } else {
+                          setSoTienDot2BangChu("");
+                        }
+                      }}
                       className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-auto focus:outline-none focus:border-blue-500"
                       placeholder=""
                     />
                   </span>
-                  <span className="hidden print:inline">{soTienDot2 || "[---]"}</span>{" "}
+                  <span className="hidden print:inline">
+                    {soTienDot2 ? formatCurrency(soTienDot2) : "[---]"}
+                  </span>{" "}
                   VNĐ (bằng chữ:{" "}
                   <span className="print:hidden">
                     <input
@@ -772,21 +1046,35 @@ const HopDongMuaBanXe = () => {
                       placeholder=""
                     />
                   </span>
-                  <span className="hidden print:inline">{soTienDot2BangChu || "[---]"}</span>
-                  ) trong thời hạn 07 (bảy) ngày làm việc kể từ ngày Bên Bán thông báo Xe sẵn sàng giao cho Khách
-                  Hàng hoặc theo thỏa thuận giữa các Bên. Đồng thời, Khách Hàng
-                  giao cho Bên Bán bản chính Thông báo giải ngân của Ngân hàng
-                  về số tiền vay{" "}
+                  <span className="hidden print:inline">
+                    {soTienDot2BangChu || "[---]"}
+                  </span>
+                  ) trong thời hạn 07 (bảy) ngày làm việc kể từ ngày Bên Bán
+                  thông báo Xe sẵn sàng giao cho Khách Hàng hoặc theo thỏa thuận
+                  giữa các Bên. Đồng thời, Khách Hàng giao cho Bên Bán bản chính
+                  Thông báo giải ngân của Ngân hàng về số tiền vay{" "}
                   <span className="print:hidden">
                     <input
                       type="text"
-                      value={soTienVay}
-                      onChange={(e) => setSoTienVay(e.target.value)}
+                      value={formatCurrency(soTienVay)}
+                      onChange={(e) => {
+                        // Parse giá trị thô (loại bỏ dấu chấm)
+                        const rawValue = e.target.value.replace(/\./g, "");
+                        setSoTienVay(rawValue);
+                        // Tự động cập nhật bằng chữ
+                        if (rawValue) {
+                          setSoTienVayBangChu(numberToWords(rawValue));
+                        } else {
+                          setSoTienVayBangChu("");
+                        }
+                      }}
                       className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-auto focus:outline-none focus:border-blue-500"
                       placeholder=""
                     />
                   </span>
-                  <span className="hidden print:inline">{soTienVay || "[---]"}</span>{" "}
+                  <span className="hidden print:inline">
+                    {soTienVay ? formatCurrency(soTienVay) : "[---]"}
+                  </span>{" "}
                   VNĐ (bằng chữ:{" "}
                   <span className="print:hidden">
                     <input
@@ -797,7 +1085,9 @@ const HopDongMuaBanXe = () => {
                       placeholder=""
                     />
                   </span>
-                  <span className="hidden print:inline">{soTienVayBangChu || "[---]"}</span>
+                  <span className="hidden print:inline">
+                    {soTienVayBangChu || "[---]"}
+                  </span>
                   ) để mua Xe.
                 </p>
                 <p className="pl-8">
@@ -805,13 +1095,25 @@ const HopDongMuaBanXe = () => {
                   <span className="print:hidden">
                     <input
                       type="text"
-                      value={soTienDot3}
-                      onChange={(e) => setSoTienDot3(e.target.value)}
+                      value={formatCurrency(soTienDot3)}
+                      onChange={(e) => {
+                        // Parse giá trị thô (loại bỏ dấu chấm)
+                        const rawValue = e.target.value.replace(/\./g, "");
+                        setSoTienDot3(rawValue);
+                        // Tự động cập nhật bằng chữ
+                        if (rawValue) {
+                          setSoTienDot3BangChu(numberToWords(rawValue));
+                        } else {
+                          setSoTienDot3BangChu("");
+                        }
+                      }}
                       className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-auto focus:outline-none focus:border-blue-500"
                       placeholder=""
                     />
                   </span>
-                  <span className="hidden print:inline">{soTienDot3 || "[---]"}</span>{" "}
+                  <span className="hidden print:inline">
+                    {soTienDot3 ? formatCurrency(soTienDot3) : "[---]"}
+                  </span>{" "}
                   VNĐ (bằng chữ:{" "}
                   <span className="print:hidden">
                     <input
@@ -822,19 +1124,19 @@ const HopDongMuaBanXe = () => {
                       placeholder=""
                     />
                   </span>
-                  <span className="hidden print:inline">{soTienDot3BangChu || "[---]"}</span>
-                  ) vào tài khoản của Bên Bán trong
-                  thời hạn 05 (năm) ngày làm việc kể từ ngày Bên Bán và Khách
-                  Hàng giao cho Ngân hàng phiếu hẹn đăng ký xe.
+                  <span className="hidden print:inline">
+                    {soTienDot3BangChu || "[---]"}
+                  </span>
+                  ) vào tài khoản của Bên Bán trong thời hạn 05 (năm) ngày làm
+                  việc kể từ ngày Bên Bán và Khách Hàng giao cho Ngân hàng phiếu
+                  hẹn đăng ký xe.
                 </p>
               </div>
             </div>
 
             {/* 1.4 */}
             <div className="mb-4">
-              <h3 className="font-semibold">
-                1.4 Phương thức thanh toán
-              </h3>
+              <h3 className="font-semibold">1.4 Phương thức thanh toán</h3>
               <div className="space-y-2 text-justify">
                 <p>
                   Khách Hàng thanh toán cho Bên Bán bằng một trong các phương
@@ -842,10 +1144,13 @@ const HopDongMuaBanXe = () => {
                 </p>
                 <p className="pl-4">
                   <strong>(i)</strong> Chuyển khoản vào tài khoản của Bên Bán
-                  (thông tin tài khoản ghi ở phần đầu Hợp đồng). Nội dung
-                  chuyển khoản theo cú pháp: <strong>Tên Khách Hàng Số điện
-                  thoại Số hợp đồng mua bán Số đơn hàng Model Xe</strong>.
-                  Phí chuyển khoản do Khách Hàng chịu.
+                  (thông tin tài khoản ghi ở phần đầu Hợp đồng). Nội dung chuyển
+                  khoản theo cú pháp:{" "}
+                  <strong>
+                    Tên Khách Hàng Số điện thoại Số hợp đồng mua bán Số đơn hàng
+                    Model Xe
+                  </strong>
+                  . Phí chuyển khoản do Khách Hàng chịu.
                 </p>
                 <p className="pl-4">
                   <strong>(ii)</strong> Thanh toán bằng tiền mặt (không áp dụng
@@ -862,9 +1167,7 @@ const HopDongMuaBanXe = () => {
 
           {/* Điều 2 */}
           <div className="mb-6 text-sm">
-            <h2 className="font-bold">
-              Điều 2. Thời gian và địa điểm giao Xe
-            </h2>
+            <h2 className="font-bold">Điều 2. Thời gian và địa điểm giao Xe</h2>
             <div className="space-y-2 text-justify">
               <p>
                 <strong>2.1 Thời gian giao Xe:</strong>{" "}
@@ -883,9 +1186,11 @@ const HopDongMuaBanXe = () => {
                     className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-auto focus:outline-none focus:border-blue-500"
                   />
                 </span>
-                <span className="hidden print:inline">{thoiGianGiaoXe || "[---/---/---]"}</span>
-                /theo thông báo của Bên Bán trước ít nhất 07 ngày
-                làm việc (đối với mua hàng qua kênh trực tuyến).
+                <span className="hidden print:inline">
+                  {thoiGianGiaoXe || "[---/---/---]"}
+                </span>
+                /theo thông báo của Bên Bán trước ít nhất 07 ngày làm việc (đối
+                với mua hàng qua kênh trực tuyến).
               </p>
               <p>
                 <strong>2.2 Địa điểm giao Xe tại:</strong>{" "}
@@ -898,7 +1203,9 @@ const HopDongMuaBanXe = () => {
                     placeholder=""
                   />
                 </span>
-                <span className="hidden print:inline">{diaDiemGiaoXe || "[---]"}</span>
+                <span className="hidden print:inline">
+                  {diaDiemGiaoXe || "[---]"}
+                </span>
               </p>
               <p>
                 <strong>2.3</strong> Trừ trường hợp quy định tại Điều 3, Bên Bán
@@ -908,10 +1215,10 @@ const HopDongMuaBanXe = () => {
               </p>
             </div>
           </div>
-          
+
           {/* Điều 3 */}
           <div className="mb-2 text-sm">
-              <h2 className="font-bold">
+            <h2 className="font-bold">
               Điều 3. Thủ tục mua xe khi Khách Hàng thanh toán bằng hình thức
               trả góp
             </h2>
@@ -928,8 +1235,8 @@ const HopDongMuaBanXe = () => {
               </p>
               <p>
                 <strong>3.2.</strong> Trong trường hợp vì bất kỳ lý do nào, Ngân
-                hàng phát hành Thông báo giải ngân không giải ngân đầy đủ và đúng
-                hạn số tiền còn lại của Đợt thanh toán 3 cho Bên Bán, thì:
+                hàng phát hành Thông báo giải ngân không giải ngân đầy đủ và
+                đúng hạn số tiền còn lại của Đợt thanh toán 3 cho Bên Bán, thì:
               </p>
               <p className="pl-4">
                 <strong>a)</strong> Trong thời hạn 10 (mười) ngày làm việc kể từ
@@ -941,12 +1248,15 @@ const HopDongMuaBanXe = () => {
                 Bên Bán không nhận được số tiền còn lại của Đợt thanh toán 3,
                 Bên Bán có quyền yêu cầu Khách Hàng thực hiện theo phương án do
                 Bên Bán đề xuất. Khách Hàng đồng ý ủy quyền cho Bên Bán toàn
-                quyền quyết định đối với Xe, bao gồm <strong>thanh lý xe để thu
-                hồi các khoản tiền mà Khách Hàng còn nợ</strong>. Số tiền thu
-                được từ việc thanh lý Xe sẽ được ưu tiên thanh toán các khoản nợ
-                của Khách Hàng đối với Bên Bán. Khách Hàng chịu mọi chi phí và
-                thiệt hại phát sinh từ việc thanh lý Xe và phải trả cho Bên Bán
-                phí ủy quyền bằng 10% giá trị Xe tại thời điểm thanh lý.
+                quyền quyết định đối với Xe, bao gồm{" "}
+                <strong>
+                  thanh lý xe để thu hồi các khoản tiền mà Khách Hàng còn nợ
+                </strong>
+                . Số tiền thu được từ việc thanh lý Xe sẽ được ưu tiên thanh
+                toán các khoản nợ của Khách Hàng đối với Bên Bán. Khách Hàng
+                chịu mọi chi phí và thiệt hại phát sinh từ việc thanh lý Xe và
+                phải trả cho Bên Bán phí ủy quyền bằng 10% giá trị Xe tại thời
+                điểm thanh lý.
               </p>
             </div>
           </div>
@@ -968,9 +1278,7 @@ const HopDongMuaBanXe = () => {
 
           {/* Điều 5 */}
           <div className="mb-2 text-sm">
-            <h2 className="font-bold">
-              Điều 5. Trách nhiệm của Các Bên
-            </h2>
+            <h2 className="font-bold">Điều 5. Trách nhiệm của Các Bên</h2>
             <div className="space-y-2 text-justify">
               <p>
                 <strong>5.1.</strong> Bên Bán có nghĩa vụ cung cấp đầy đủ hóa
@@ -985,18 +1293,18 @@ const HopDongMuaBanXe = () => {
                 nhận Xe theo đúng thời gian đã quy định.
               </p>
               <p>
-                <strong>5.4.</strong> Việc giao nhận Xe và giấy tờ phải do
-                Khách Hàng trực tiếp thực hiện. Nếu Khách Hàng ủy quyền cho
-                người khác thực hiện, phải có giấy ủy quyền hợp lệ và thông báo
-                cho Bên Bán trước ít nhất 03 (ba) ngày làm việc.
+                <strong>5.4.</strong> Việc giao nhận Xe và giấy tờ phải do Khách
+                Hàng trực tiếp thực hiện. Nếu Khách Hàng ủy quyền cho người khác
+                thực hiện, phải có giấy ủy quyền hợp lệ và thông báo cho Bên Bán
+                trước ít nhất 03 (ba) ngày làm việc.
               </p>
               <p>
                 <strong>5.5.</strong> Trong trường hợp Khách Hàng chậm nhận Xe
                 sau khi đã thanh toán 100% giá trị Hợp đồng, Khách Hàng phải trả
-                phí lưu kho cho Bên Bán. Nếu Khách Hàng chậm nhận Xe quá 30
-                (ba mươi) ngày kể từ ngày Bên Bán thông báo Xe sẵn sàng giao,
-                Bên Bán có quyền thanh lý Xe để thu hồi các khoản tiền mà Khách
-                Hàng còn nợ.
+                phí lưu kho cho Bên Bán. Nếu Khách Hàng chậm nhận Xe quá 30 (ba
+                mươi) ngày kể từ ngày Bên Bán thông báo Xe sẵn sàng giao, Bên
+                Bán có quyền thanh lý Xe để thu hồi các khoản tiền mà Khách Hàng
+                còn nợ.
               </p>
               <p>
                 <strong>5.6.</strong> Trong trường hợp Khách Hàng chậm thanh
@@ -1022,9 +1330,7 @@ const HopDongMuaBanXe = () => {
 
           {/* Điều 6 */}
           <div className="mb-2 text-sm">
-            <h2 className="font-bold">
-              Điều 6. Chuyển rủi ro và quyền sở hữu
-            </h2>
+            <h2 className="font-bold">Điều 6. Chuyển rủi ro và quyền sở hữu</h2>
             <div className="space-y-2 text-justify">
               <p>
                 Trừ khi có quy định khác trong Hợp đồng, toàn bộ quyền sở hữu,
@@ -1040,17 +1346,15 @@ const HopDongMuaBanXe = () => {
 
           {/* Điều 7 */}
           <div className="mb-2 text-sm">
-            <h2 className="font-bold">
-              Điều 7. Bảo vệ dữ liệu cá nhân
-            </h2>
+            <h2 className="font-bold">Điều 7. Bảo vệ dữ liệu cá nhân</h2>
             <div className="space-y-2 text-justify">
               <p>
                 <strong>7.1.</strong> VinFast Trading và VinFast có thể xử lý dữ
                 liệu cá nhân của Khách Hàng liên quan đến Hợp đồng này, bao gồm
                 dữ liệu liên quan đến các tính năng dịch vụ thông minh (thông số
                 Xe, lịch sử di chuyển, trạng thái pin, cập nhật phần mềm từ xa,
-                cảnh báo pin yếu, ước tính mức sử dụng pin, tìm kiếm, định vị
-                và điều hướng đến trạm sạc gần nhất, chẩn đoán Xe và các dữ liệu
+                cảnh báo pin yếu, ước tính mức sử dụng pin, tìm kiếm, định vị và
+                điều hướng đến trạm sạc gần nhất, chẩn đoán Xe và các dữ liệu
                 khác được phân loại là dữ liệu cá nhân theo quy định pháp luật
                 hiện hành).
               </p>
@@ -1066,14 +1370,15 @@ const HopDongMuaBanXe = () => {
                 <strong>7.3. Đối với Khách Hàng là tổ chức:</strong>
               </p>
               <p className="pl-4">
-                <strong>(a)</strong> Mỗi Bên chịu trách nhiệm thu thập sự đồng
-                ý cần thiết từ chủ thể dữ liệu cá nhân liên quan đến Hợp đồng
-                này và chịu trách nhiệm về dữ liệu cá nhân mà mình xử lý.
+                <strong>(a)</strong> Mỗi Bên chịu trách nhiệm thu thập sự đồng ý
+                cần thiết từ chủ thể dữ liệu cá nhân liên quan đến Hợp đồng này
+                và chịu trách nhiệm về dữ liệu cá nhân mà mình xử lý.
               </p>
               <p className="pl-4">
-                <strong>(b)</strong> Các Bên cam kết thực hiện: (i) các quy trình
-                bảo mật để bảo vệ dữ liệu cá nhân thu được theo Hợp đồng; và
-                (ii) tuân thủ các quy định pháp luật về bảo vệ dữ liệu cá nhân.
+                <strong>(b)</strong> Các Bên cam kết thực hiện: (i) các quy
+                trình bảo mật để bảo vệ dữ liệu cá nhân thu được theo Hợp đồng;
+                và (ii) tuân thủ các quy định pháp luật về bảo vệ dữ liệu cá
+                nhân.
               </p>
             </div>
           </div>
@@ -1091,9 +1396,7 @@ const HopDongMuaBanXe = () => {
 
           {/* Điều 9 */}
           <div className="mb-2 text-sm">
-            <h2 className="font-bold">
-              Điều 9. Hiệu lực và Chấm dứt Hợp Đồng
-            </h2>
+            <h2 className="font-bold">Điều 9. Hiệu lực và Chấm dứt Hợp Đồng</h2>
             <div className="space-y-2 text-justify">
               <p>
                 Hợp đồng này có hiệu lực kể từ ngày ký tại phần đầu Hợp đồng và
@@ -1109,10 +1412,10 @@ const HopDongMuaBanXe = () => {
                 từ ngày đến hạn hoặc thông báo, và Khách Hàng sẽ không được hoàn
                 lại tiền đặt cọc. Bên Bán, theo quyết định của mình, có quyền
                 đơn phương chấm dứt Hợp đồng mà không phải chịu bất kỳ khoản phí
-                phạt nào, với điều kiện thông báo cho Khách Hàng trước ít nhất 07
-                (bảy) ngày. Để làm rõ, trong trường hợp chấm dứt như vậy, Bên
-                Bán sẽ hoàn lại tiền đặt cọc cho Khách Hàng và sẽ không phải chịu
-                trách nhiệm về bất kỳ khoản thanh toán nào khác.
+                phạt nào, với điều kiện thông báo cho Khách Hàng trước ít nhất
+                07 (bảy) ngày. Để làm rõ, trong trường hợp chấm dứt như vậy, Bên
+                Bán sẽ hoàn lại tiền đặt cọc cho Khách Hàng và sẽ không phải
+                chịu trách nhiệm về bất kỳ khoản thanh toán nào khác.
               </p>
             </div>
           </div>
@@ -1136,8 +1439,8 @@ const HopDongMuaBanXe = () => {
               </p>
               <p>
                 <strong>10.3.</strong> Hợp Đồng được lập thành{" "}
-                <span className="bg-gray-200 px-1">04 (bốn)</span> bản có giá trị
-                như nhau, mỗi Bên giữ{" "}
+                <span className="bg-gray-200 px-1">04 (bốn)</span> bản có giá
+                trị như nhau, mỗi Bên giữ{" "}
                 <span className="bg-gray-200 px-1">02 (hai)</span> bản.
               </p>
             </div>
@@ -1154,7 +1457,6 @@ const HopDongMuaBanXe = () => {
               </div>
             </div>
           </div>
-
         </div>
       </div>
 
@@ -1232,4 +1534,3 @@ const HopDongMuaBanXe = () => {
 };
 
 export default HopDongMuaBanXe;
-

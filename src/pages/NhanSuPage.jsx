@@ -309,9 +309,13 @@ export default function NhanSuPage() {
 
   // Open edit modal
   const openEditModal = (user) => {
+    // Store original password hash separately
+    const originalPasswordHash = user.password || user.pass || '';
     setEditingUser({ 
       ...user,
       birthdate: user.birthdate || user['Sinh Nhật'] || '', // Ensure birthdate is set for modal
+      password: '', // Clear password field to avoid re-hashing existing hash
+      originalPasswordHash: originalPasswordHash, // Store original hash to restore if password not changed
     });
     setIsModalOpen(true);
   };
@@ -572,11 +576,11 @@ export default function NhanSuPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto px-8 py-8 bg-gradient-to-br from-slate-100 to-slate-200 min-h-screen">
-        <div className="flex items-center justify-center py-12">
+      <div className="mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 bg-gradient-to-br from-slate-100 to-slate-200 min-h-screen">
+        <div className="flex items-center justify-center py-8 sm:py-12">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto mb-4"></div>
-            <p className="text-secondary-600">Đang tải dữ liệu nhân sự...</p>
+            <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-primary-500 mx-auto mb-3 sm:mb-4"></div>
+            <p className="text-sm sm:text-base text-secondary-600">Đang tải dữ liệu nhân sự...</p>
           </div>
         </div>
       </div>
@@ -584,26 +588,27 @@ export default function NhanSuPage() {
   }
 
   return (
-    <div className="mx-auto px-8 py-8 bg-gradient-to-br from-slate-100 to-slate-200">
+    <div className="mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 bg-gradient-to-br from-slate-100 to-slate-200 min-h-screen">
       {/* Header with Add Button */}
-      <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 sm:mb-6">
+            <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
               <button
                 onClick={() => navigate("/menu")}
-                className="text-gray-700 hover:text-gray-900 transition-colors flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100"
+                className="text-gray-700 hover:text-gray-900 transition-colors flex items-center gap-2 px-2 sm:px-4 py-2 rounded-lg hover:bg-gray-100"
                 aria-label="Quay lại"
               >
                 <ArrowLeft className="w-5 h-5" />
                 <span className="hidden sm:inline">Quay lại</span>
               </button>
-              <h2 className="text-2xl font-bold text-primary-700">Quản lý Nhân sự</h2>
+              <h2 className="text-xl sm:text-2xl font-bold text-primary-700 truncate">Quản lý Nhân sự</h2>
             </div>
             {userRole === "admin" && (
               <button
                 onClick={openAddModal}
-                className="px-4 py-2 bg-secondary-600 text-white rounded-lg border-2 border-transparent hover:bg-white hover:border-secondary-600 hover:text-secondary-600 transition-all duration-200 flex items-center gap-2 font-medium"
+                className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-secondary-600 text-white rounded-lg border-2 border-transparent hover:bg-white hover:border-secondary-600 hover:text-secondary-600 transition-all duration-200 flex items-center justify-center gap-2 font-medium text-sm sm:text-base"
               >
-                + Thêm mới
+                <span className="text-lg sm:text-xl">+</span>
+                <span>Thêm mới</span>
               </button>
             )}
           </div>
@@ -625,15 +630,15 @@ export default function NhanSuPage() {
       </div>
 
       {/* Statistics */}
-      <div className="mb-4 flex items-center justify-between">
-            <p className="text-secondary-600">
+      <div className="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+            <p className="text-sm sm:text-base text-secondary-600">
               Tổng số:{" "}
               <span className="font-semibold text-primary-600">
                 {filteredUsers.length}
               </span>{" "}
               nhân sự
               {filteredUsers.length > itemsPerPage && (
-                <span className="ml-2">
+                <span className="hidden sm:inline ml-2">
                   | Trang {currentPage}/{totalPages}
                   <span className="ml-2 text-sm">
                     (Hiển thị {startIndex + 1}-
@@ -642,6 +647,11 @@ export default function NhanSuPage() {
                 </span>
               )}
             </p>
+            {filteredUsers.length > itemsPerPage && (
+              <p className="text-xs sm:hidden text-secondary-500">
+                Trang {currentPage}/{totalPages} ({startIndex + 1}-{Math.min(endIndex, filteredUsers.length)})
+              </p>
+            )}
           </div>
 
       {/* User Management Table */}
@@ -650,114 +660,123 @@ export default function NhanSuPage() {
               <p className="text-secondary-600">Không có dữ liệu nhân sự</p>
             </div>
           ) : (
-            <div className="overflow-x-auto shadow-md rounded-lg">
-              <table className="min-w-full divide-y divide-secondary-100">
-                <thead className="bg-primary-400">
-                  <tr>
-                    <th className="px-3 py-2 text-center text-xs font-bold text-black uppercase tracking-wider border border-gray-300">
-                      stt
-                    </th>
-                    <th className="px-3 py-2 text-center text-xs font-bold text-black uppercase tracking-wider border border-gray-300">
-                      TVBH
-                    </th>
-                    <th className="px-3 py-2 text-center text-xs font-bold text-black uppercase tracking-wider border border-gray-300">
-                      Số Điện Thoại
-                    </th>
-                    <th className="px-3 py-2 text-center text-xs font-bold text-black uppercase tracking-wider border border-gray-300">
-                      Mail
-                    </th>
-                    <th className="px-3 py-2 text-center text-xs font-bold text-black uppercase tracking-wider border border-gray-300">
-                      Sinh Nhật
-                    </th>
-                    <th className="px-3 py-2 text-center text-xs font-bold text-black uppercase tracking-wider border border-gray-300">
-                      Ngày vào làm
-                    </th>
-                    <th className="px-3 py-2 text-center text-xs font-bold text-black uppercase tracking-wider border border-gray-300">
-                      Chức Vụ
-                    </th>
-                    <th className="px-3 py-2 text-center text-xs font-bold text-black uppercase tracking-wider border border-gray-300">
-                      Phòng Ban
-                    </th>
-                    <th className="px-3 py-2 text-center text-xs font-bold text-black uppercase tracking-wider border border-gray-300">
-                      Tình trạng
-                    </th>
-                    <th className="px-3 py-2 text-center text-xs font-bold text-black uppercase tracking-wider border border-gray-300">
-                      Quyền
-                    </th>
-                    <th className="px-3 py-2 text-center text-xs font-bold text-black uppercase tracking-wider border border-gray-300">
-                      Mạng xã hội
-                    </th>
-                    <th className="px-3 py-2 text-center text-xs font-bold text-black uppercase tracking-wider border border-gray-300">
-                      Hành động
-                    </th>
-                  </tr>
-                </thead>
+            <div className="overflow-x-auto shadow-md rounded-lg -mx-4 sm:mx-0">
+              <div className="inline-block min-w-full align-middle">
+                <table className="min-w-full divide-y divide-secondary-100">
+                  <thead className="bg-primary-400">
+                    <tr>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-black uppercase tracking-wider border border-gray-300 whitespace-nowrap">
+                        stt
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-black uppercase tracking-wider border border-gray-300 whitespace-nowrap">
+                        TVBH
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-black uppercase tracking-wider border border-gray-300 whitespace-nowrap">
+                        Số Điện Thoại
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-black uppercase tracking-wider border border-gray-300 whitespace-nowrap">
+                        Mail
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-black uppercase tracking-wider border border-gray-300 whitespace-nowrap">
+                        Sinh Nhật
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-black uppercase tracking-wider border border-gray-300 whitespace-nowrap">
+                        Ngày vào làm
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-black uppercase tracking-wider border border-gray-300 whitespace-nowrap">
+                        Chức Vụ
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-black uppercase tracking-wider border border-gray-300 whitespace-nowrap">
+                        Phòng Ban
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-black uppercase tracking-wider border border-gray-300 whitespace-nowrap">
+                        Tình trạng
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-black uppercase tracking-wider border border-gray-300 whitespace-nowrap">
+                        Quyền
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-black uppercase tracking-wider border border-gray-300 whitespace-nowrap">
+                        Mạng xã hội
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-black uppercase tracking-wider border border-gray-300 whitespace-nowrap">
+                        Hành động
+                      </th>
+                    </tr>
+                  </thead>
                 <tbody className="bg-neutral-white divide-y divide-secondary-100">
                   {currentUsers.map((user, index) => (
                     <tr
                       key={user.firebaseKey || user.id}
                       className="hover:bg-secondary-50"
                     >
-                      <td className="px-3 py-2 whitespace-nowrap text-sm font-semibold text-black border border-secondary-400">
+                      <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm font-semibold text-black border border-secondary-400">
                         {startIndex + index + 1}
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
-                        {user["Họ Và Tên"] || user.name || "-"}
+                      <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                        <div className="max-w-[120px] sm:max-w-none truncate" title={user["Họ Và Tên"] || user.name || "-"}>
+                          {user["Họ Và Tên"] || user.name || "-"}
+                        </div>
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
+                      <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
                         {user.phone ||
                           user["Số Điện Thoại"] ||
                           user.phoneNumber ||
                           "-"}
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
-                        {user.email || "-"}
+                      <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                        <div className="max-w-[150px] sm:max-w-none truncate" title={user.email || "-"}>
+                          {user.email || "-"}
+                        </div>
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
+                      <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
                         {user["Sinh Nhật"] || user.birthdate || "-"}
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
+                      <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
                         {user["Ngày vào làm"] || user.createdAt || "-"}
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
-                        {user["Vị trí"] || user.position || "-"}
+                      <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                        <div className="max-w-[100px] sm:max-w-none truncate" title={user["Vị trí"] || user.position || "-"}>
+                          {user["Vị trí"] || user.position || "-"}
+                        </div>
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
-                        {user["Bộ phận"] || user.department || "-"}
+                      <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                        <div className="max-w-[100px] sm:max-w-none truncate" title={user["Bộ phận"] || user.department || "-"}>
+                          {user["Bộ phận"] || user.department || "-"}
+                        </div>
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
+                      <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
                         {user.status || "-"}
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
+                      <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
                         {user.role || "-"}
                       </td>
-                      <td className="px-3 py-2 align-top text-sm text-black border border-secondary-400">
-                        <div className="flex flex-col gap-2">
+                      <td className="px-2 sm:px-3 py-2 align-top text-xs sm:text-sm text-black border border-secondary-400">
+                        <div className="flex flex-col gap-1 sm:gap-2">
                           {user.zalo ? (
-                            <div className="flex items-center gap-2 text-sm text-black">
-                              <img src={zaloIcon} alt="Zalo" className="w-5 h-5" />
-                              <span className="truncate">{user.zalo}</span>
+                            <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-black">
+                              <img src={zaloIcon} alt="Zalo" className="w-4 h-4 sm:w-5 sm:h-5" />
+                              <span className="truncate max-w-[100px]">{user.zalo}</span>
                             </div>
                           ) : null}
 
                           {user.tiktok ? (
-                            <div className="flex items-center gap-2 text-sm text-black">
-                              <img src={tiktokIcon} alt="TikTok" className="w-5 h-5" />
-                              <span className="truncate">{user.tiktok}</span>
+                            <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-black">
+                              <img src={tiktokIcon} alt="TikTok" className="w-4 h-4 sm:w-5 sm:h-5" />
+                              <span className="truncate max-w-[100px]">{user.tiktok}</span>
                             </div>
                           ) : null}
 
                           {user.facebook ? (
-                            <div className="flex items-center gap-2 text-sm text-black">
-                              <img src={facebookIcon} alt="Facebook" className="w-5 h-5" />
-                              <span className="truncate">{user.facebook}</span>
+                            <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-black">
+                              <img src={facebookIcon} alt="Facebook" className="w-4 h-4 sm:w-5 sm:h-5" />
+                              <span className="truncate max-w-[100px]">{user.facebook}</span>
                             </div>
                           ) : null}
 
                           {user.fanpage ? (
-                            <div className="flex items-center gap-2 text-sm text-black">
-                              <img src={fanpageIcon} alt="Fanpage" className="w-5 h-5" />
-                              <span className="truncate">{user.fanpage}</span>
+                            <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-black">
+                              <img src={fanpageIcon} alt="Fanpage" className="w-4 h-4 sm:w-5 sm:h-5" />
+                              <span className="truncate max-w-[100px]">{user.fanpage}</span>
                             </div>
                           ) : null}
 
@@ -766,30 +785,30 @@ export default function NhanSuPage() {
                               href={user.web.startsWith("http") ? user.web : `https://${user.web}`}
                               target="_blank"
                               rel="noreferrer"
-                              className="flex items-center gap-2 text-sm text-black underline"
+                              className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-black underline"
                             >
-                              <Globe className="w-4 h-4" />
-                              <span className="truncate">{user.web}</span>
+                              <Globe className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <span className="truncate max-w-[100px]">{user.web}</span>
                             </a>
                           ) : null}
 
                           {!user.zalo && !user.tiktok && !user.facebook && !user.fanpage && !user.web && (
-                            <span className="text-sm text-black">-</span>
+                            <span className="text-xs sm:text-sm text-black">-</span>
                           )}
                         </div>
                       </td>
 
                       {/* Action column */}
-                      <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400 text-center">
-                        <div className="flex items-center justify-center gap-2">
+                      <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400 text-center">
+                        <div className="flex items-center justify-center gap-1 sm:gap-2">
                           {/* Only admin can edit */}
                           {userRole === 'admin' && (
                             <button
                               onClick={() => openEditModal(user)}
-                              className="inline-flex items-center px-2 py-1 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
+                              className="inline-flex items-center px-1.5 sm:px-2 py-1 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
                               title="Chỉnh sửa"
                             >
-                              <Edit className="w-4 h-4" />
+                              <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
                             </button>
                           )}
 
@@ -797,10 +816,10 @@ export default function NhanSuPage() {
                           {userRole === 'admin' && (
                             <button
                               onClick={() => openDeleteConfirm(user)}
-                              className="inline-flex items-center px-2 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+                              className="inline-flex items-center px-1.5 sm:px-2 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
                               title="Xóa"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
                             </button>
                           )}
                         </div>
@@ -808,7 +827,8 @@ export default function NhanSuPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+              </div>
             </div>
       )}
 
@@ -951,18 +971,18 @@ export default function NhanSuPage() {
 
       {/* Edit Modal */}
       {isModalOpen && editingUser && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[calc(100vh-4rem)] overflow-auto">
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+              <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[calc(100vh-2rem)] overflow-auto">
                 {/* Modal Header */}
-                <div className="bg-gradient-to-r from-primary-600 to-primary-400 px-6 py-4 rounded-t-lg">
-                  <h3 className="text-xl font-bold text-white">
+                <div className="bg-gradient-to-r from-primary-600 to-primary-400 px-4 sm:px-6 py-3 sm:py-4 rounded-t-lg sticky top-0 z-10">
+                  <h3 className="text-lg sm:text-xl font-bold text-white">
                     Chỉnh sửa thông tin nhân sự
                   </h3>
                 </div>
 
                 {/* Modal Body */}
-                <div className="p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 sm:p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                     {/* TVBH */}
                     <div>
                       <label className="block text-sm font-medium text-secondary-900 mb-2">TVBH <span className="text-accent-red">*</span></label>
@@ -1160,10 +1180,10 @@ export default function NhanSuPage() {
                 </div>
 
                 {/* Modal Footer */}
-                <div className="bg-gray-50 px-6 py-4 rounded-b-lg flex justify-end gap-3">
+                <div className="bg-gray-50 px-4 sm:px-6 py-3 sm:py-4 rounded-b-lg flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 sticky bottom-0">
                   <button
                     onClick={closeModal}
-                    className="px-5 py-2.5 bg-gray-500 text-white font-medium rounded-lg hover:bg-gray-600 transition-colors flex items-center gap-2"
+                    className="w-full sm:w-auto px-4 sm:px-5 py-2 sm:py-2.5 bg-gray-500 text-white font-medium rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center gap-2 text-sm sm:text-base"
                   >
                     <X className="w-4 h-4" />
                     <span>Hủy</span>
@@ -1194,13 +1214,31 @@ export default function NhanSuPage() {
                           web: editingUser.web || '',
                         };
 
-                        if (editingUser.password && editingUser.password.length > 0) {
-                          if (editingUser.password.length < 6) {
-                            toast.error('Mật khẩu phải có ít nhất 6 ký tự!');
-                            return;
+                        // Handle password update
+                        if (editingUser.password && editingUser.password.trim().length > 0) {
+                          // Check if password is already hashed (bcrypt hashes start with $2a$, $2b$, or $2y$)
+                          const isAlreadyHashed = editingUser.password.startsWith('$2a$') || 
+                                                   editingUser.password.startsWith('$2b$') || 
+                                                   editingUser.password.startsWith('$2y$');
+                          
+                          if (!isAlreadyHashed) {
+                            // It's a new password, validate and hash it
+                            if (editingUser.password.length < 6) {
+                              toast.error('Mật khẩu phải có ít nhất 6 ký tự!');
+                              return;
+                            }
+                            const hashed = bcrypt.hashSync(editingUser.password, 10);
+                            updatedForDB.pass = hashed;
+                          } else {
+                            // If already hashed, don't update password (keep existing hash)
+                            // Don't set pass field, so it won't be updated
                           }
-                          const hashed = bcrypt.hashSync(editingUser.password, 10);
-                          updatedForDB.pass = hashed;
+                        } else {
+                          // If password is empty, use original password hash to keep it unchanged
+                          if (editingUser.originalPasswordHash) {
+                            updatedForDB.pass = editingUser.originalPasswordHash;
+                          }
+                          // If no original hash, don't update password field in DB
                         }
 
                         await update(ref(database, `employees/${editingUser.firebaseKey}`), updatedForDB);
@@ -1241,7 +1279,7 @@ export default function NhanSuPage() {
                         toast.error('Lỗi khi cập nhật thông tin nhân sự: ' + err.message);
                       }
                     }}
-                    className="px-5 py-2.5 bg-secondary-600 text-white font-medium rounded-lg hover:bg-secondary-700 transition-colors flex items-center gap-2"
+                    className="w-full sm:w-auto px-4 sm:px-5 py-2 sm:py-2.5 bg-secondary-600 text-white font-medium rounded-lg hover:bg-secondary-700 transition-colors flex items-center justify-center gap-2 text-sm sm:text-base"
                   >
                     <Check className="w-4 h-4" />
                     <span>Lưu thay đổi</span>
@@ -1253,14 +1291,14 @@ export default function NhanSuPage() {
 
       {/* Add User Modal */}
       {isAddModalOpen && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[calc(100vh-4rem)] overflow-auto">
-                <div className="bg-gradient-to-r from-primary-600 to-primary-400 px-6 py-4 rounded-t-lg">
-                  <h3 className="text-xl font-bold text-white">Thêm nhân sự mới</h3>
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+              <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[calc(100vh-2rem)] overflow-auto">
+                <div className="bg-gradient-to-r from-primary-600 to-primary-400 px-4 sm:px-6 py-3 sm:py-4 rounded-t-lg sticky top-0 z-10">
+                  <h3 className="text-lg sm:text-xl font-bold text-white">Thêm nhân sự mới</h3>
                 </div>
 
-                <div className="p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 sm:p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                     {/* TVBH */}
                     <div>
                       <label className="block text-sm font-medium text-secondary-900 mb-2">TVBH <span className="text-accent-red">*</span></label>
@@ -1458,17 +1496,17 @@ export default function NhanSuPage() {
                   <p className="text-sm text-secondary-600 mt-4"><span className="text-accent-red">*</span> Các trường bắt buộc: TVBH, user, pass, Mail</p>
                 </div>
 
-                <div className="bg-gray-50 px-6 py-4 rounded-b-lg flex justify-end gap-3">
+                <div className="bg-gray-50 px-4 sm:px-6 py-3 sm:py-4 rounded-b-lg flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 sticky bottom-0">
                   <button
                     onClick={closeAddModal}
-                    className="px-5 py-2.5 bg-gray-500 text-white font-medium rounded-lg hover:bg-gray-600 transition-colors flex items-center gap-2"
+                    className="w-full sm:w-auto px-4 sm:px-5 py-2 sm:py-2.5 bg-gray-500 text-white font-medium rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center gap-2 text-sm sm:text-base"
                   >
                     <X className="w-4 h-4" />
                     <span>Hủy</span>
                   </button>
                   <button
                     onClick={handleAddUser}
-                    className="px-5 py-2.5 bg-secondary-600 text-white font-medium rounded-lg hover:bg-secondary-700 transition-colors flex items-center gap-2"
+                    className="w-full sm:w-auto px-4 sm:px-5 py-2 sm:py-2.5 bg-secondary-600 text-white font-medium rounded-lg hover:bg-secondary-700 transition-colors flex items-center justify-center gap-2 text-sm sm:text-base"
                   >
                     <Check className="w-4 h-4" />
                     <span>Thêm nhân sự</span>
@@ -1480,15 +1518,15 @@ export default function NhanSuPage() {
 
       {/* Delete Confirmation Modal */}
       {deletingUser && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
               <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-                <div className="bg-gradient-to-r from-red-600 to-pink-600 px-6 py-4 rounded-t-lg">
-                  <h3 className="text-xl font-bold text-white">
+                <div className="bg-gradient-to-r from-red-600 to-pink-600 px-4 sm:px-6 py-3 sm:py-4 rounded-t-lg">
+                  <h3 className="text-lg sm:text-xl font-bold text-white">
                     ⚠️ Xác nhận xóa nhân sự
                   </h3>
                 </div>
 
-                <div className="p-6">
+                <div className="p-4 sm:p-6">
                   <p className="text-gray-700 mb-4">
                     Bạn có chắc chắn muốn xóa nhân sự này không?
                   </p>
@@ -1525,17 +1563,17 @@ export default function NhanSuPage() {
                   </p>
                 </div>
 
-                <div className="bg-gray-50 px-6 py-4 rounded-b-lg flex justify-end gap-3">
+                <div className="bg-gray-50 px-4 sm:px-6 py-3 sm:py-4 rounded-b-lg flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
                   <button
                     onClick={closeDeleteConfirm}
-                    className="px-5 py-2.5 bg-gray-500 text-white font-medium rounded-lg hover:bg-gray-600 transition-colors flex items-center gap-2"
+                    className="w-full sm:w-auto px-4 sm:px-5 py-2 sm:py-2.5 bg-gray-500 text-white font-medium rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center gap-2 text-sm sm:text-base"
                   >
                     <X className="w-4 h-4" />
                     <span>Hủy</span>
                   </button>
                   <button
                     onClick={handleDeleteUser}
-                    className="px-5 py-2.5 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+                    className="w-full sm:w-auto px-4 sm:px-5 py-2 sm:py-2.5 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2 text-sm sm:text-base"
                   >
                     <Trash2 className="w-4 h-4" />
                     <span>Xóa nhân sự</span>

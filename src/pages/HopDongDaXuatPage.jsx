@@ -5,8 +5,11 @@ import { ref, get, remove, update } from "firebase/database";
 import { database } from "../firebase/config";
 import { ArrowLeft, X, Trash2, Edit, AlertTriangle, Image } from "lucide-react";
 import { toast } from "react-toastify";
-import { uniqueNgoaiThatColors, uniqueNoiThatColors } from '../data/calculatorData';
-import { uploadImageToCloudinary } from '../config/cloudinary';
+import {
+  uniqueNgoaiThatColors,
+  uniqueNoiThatColors,
+} from "../data/calculatorData";
+import { uploadImageToCloudinary } from "../config/cloudinary";
 
 export default function HopDongDaXuatPage() {
   const navigate = useNavigate();
@@ -15,6 +18,12 @@ export default function HopDongDaXuatPage() {
   const [userTeam, setUserTeam] = useState("");
   const [userRole, setUserRole] = useState("user");
   const [userEmail, setUserEmail] = useState("");
+  const [username, setUsername] = useState("");
+  const [userDepartment, setUserDepartment] = useState("");
+  const [actualEmployeeName, setActualEmployeeName] = useState(""); // Actual name from employees collection
+  const [employeesMap, setEmployeesMap] = useState({}); // Map TVBH -> department
+  const [teamEmployeeNames, setTeamEmployeeNames] = useState([]); // List of employee names in team (for leader)
+  const [employeesLoaded, setEmployeesLoaded] = useState(false); // Flag to know when employees data is loaded
 
   const [filters, setFilters] = useState({
     startDate: "",
@@ -32,7 +41,8 @@ export default function HopDongDaXuatPage() {
   const [quickSelectValue, setQuickSelectValue] = useState("");
 
   // States from HopDongDaXuat component
-  const [contracts, setContracts] = useState([]);
+  const [allContracts, setAllContracts] = useState([]); // Store all contracts before filtering
+  const [contracts, setContracts] = useState([]); // Filtered contracts based on permissions
   const [filteredContracts, setFilteredContracts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deletingContract, setDeletingContract] = useState(null);
@@ -40,7 +50,8 @@ export default function HopDongDaXuatPage() {
   const [printContract, setPrintContract] = useState(null);
   const [bankLoanFile, setBankLoanFile] = useState(null); // File cho vay của NH cho Đề xuất bán hàng
   const [uploadingBankLoanFile, setUploadingBankLoanFile] = useState(false);
-  
+  const [currentContractKey, setCurrentContractKey] = useState(null); // Track which contract's file we're editing
+
   // Image modal states
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [currentImageContract, setCurrentImageContract] = useState(null);
@@ -57,9 +68,14 @@ export default function HopDongDaXuatPage() {
     const team = localStorage.getItem("userTeam") || "";
     const role = localStorage.getItem("userRole") || "user";
     const email = localStorage.getItem("userEmail") || "";
+    const usernameValue = localStorage.getItem("username") || "";
+    const userDepartmentValue = localStorage.getItem("userDepartment") || "";
+    
     setUserTeam(team);
     setUserRole(role);
     setUserEmail(email);
+    setUsername(usernameValue);
+    setUserDepartment(userDepartmentValue);
 
     // populate filters by scanning exported contracts in Firebase
     const fetchFiltersFromDB = async () => {
@@ -122,17 +138,94 @@ export default function HopDongDaXuatPage() {
     fetchFiltersFromDB();
   }, []);
 
+  // Load employees data to get actual employee name and map TVBH -> department
+  useEffect(() => {
+    const loadEmployeesData = async () => {
+      setEmployeesLoaded(false);
+      
+      if (!userEmail && !userRole) {
+        setEmployeesLoaded(true);
+        return;
+      }
+
+      try {
+        const employeesRef = ref(database, "employees");
+        const snapshot = await get(employeesRef);
+        const data = snapshot.exists() ? snapshot.val() : {};
+
+        const employeesMapping = {};
+        const teamNames = [];
+        let foundEmployeeName = "";
+
+        // Find current user's actual name from employees by email
+        if (userEmail) {
+          const userEntry = Object.entries(data).find(([key, employee]) => {
+            const employeeEmail = (employee && (employee.mail || employee.Mail || employee.email || "")).toString().toLowerCase();
+            return employeeEmail === userEmail.toLowerCase();
+          });
+
+          if (userEntry) {
+            const [userId, employeeData] = userEntry;
+            // Get actual name from employee - try multiple fields
+            foundEmployeeName = employeeData.TVBH || employeeData.user || employeeData.username || employeeData.name || "";
+            setActualEmployeeName(foundEmployeeName);
+          }
+        }
+
+        // Build employees mapping and team names
+        Object.entries(data).forEach(([key, employee]) => {
+          const employeeName = employee.TVBH || employee.user || employee.username || employee.name || "";
+          const employeeDept = employee.phongBan || employee["Phòng Ban"] || employee.department || employee["Bộ phận"] || "";
+          const employeeEmail = (employee.mail || employee.Mail || employee.email || "").toString().toLowerCase();
+
+          if (employeeName) {
+            employeesMapping[employeeName] = employeeDept;
+            
+            // For leader: collect all employees in same department
+            if (userRole === "leader" && userDepartment && employeeDept === userDepartment) {
+              teamNames.push(employeeName);
+            }
+          }
+        });
+
+        setEmployeesMap(employeesMapping);
+        
+        if (userRole === "leader") {
+          // Include current user in team if found
+          if (foundEmployeeName && !teamNames.includes(foundEmployeeName)) {
+            teamNames.push(foundEmployeeName);
+          }
+          setTeamEmployeeNames(teamNames);
+        } else if (userRole === "admin") {
+          // Admin can see all employees
+          setTeamEmployeeNames(Object.keys(employeesMapping));
+        }
+        
+        setEmployeesLoaded(true);
+      } catch (err) {
+        toast.error("Lỗi khi tải dữ liệu nhân viên: " + err.message);
+        // Set empty array on error so filter can proceed
+        setTeamEmployeeNames([]);
+        setEmployeesLoaded(true);
+      }
+    };
+
+    loadEmployeesData();
+  }, [userRole, userDepartment, userEmail]);
+
   // Helper function to map color code to name
   const getColorName = (colorCode, isExterior = true) => {
     if (!colorCode) return colorCode || "-";
     const colorList = isExterior ? uniqueNgoaiThatColors : uniqueNoiThatColors;
     const found = colorList.find(
-      (color) => color.code === colorCode || color.name.toLowerCase() === colorCode.toLowerCase()
+      (color) =>
+        color.code === colorCode ||
+        color.name.toLowerCase() === colorCode.toLowerCase()
     );
     return found ? found.name : colorCode; // Return name if found, otherwise return original value
   };
 
-  // Fetch exported contracts from Firebase
+  // Load all exported contracts from Firebase (without permission filter)
   useEffect(() => {
     const mapContract = (c) => ({
       id: c.id || "",
@@ -159,15 +252,37 @@ export default function HopDongDaXuatPage() {
       tinhTrang: c["Tình Trạng"] || "",
       nganHang: c["ngân hàng"] || c.nganHang || c.bank || "",
       // Tiền đặt cọc
-      tienDatCoc: c["Tiền đặt cọc"] || c.tienDatCoc || c["Số tiền cọc"] || c.soTienCoc || c.deposit || c.giaGiam || "",
+      tienDatCoc:
+        c["Tiền đặt cọc"] ||
+        c.tienDatCoc ||
+        c["Số tiền cọc"] ||
+        c.soTienCoc ||
+        c.deposit ||
+        c.giaGiam ||
+        "",
       // Tiền đối ứng
-      tienDoiUng: c["Tiền đối ứng"] || c.tienDoiUng || c.counterpartPayment || c.payment || "",
+      tienDoiUng:
+        c["Tiền đối ứng"] ||
+        c.tienDoiUng ||
+        c.counterpartPayment ||
+        c.payment ||
+        "",
       // Tiền vay ngân hàng
-      tienVayNganHang: c["Tiền vay ngân hàng"] || c.tienVayNganHang || c.loanAmount || c["Tiền vay"] || c.tienVay || "",
+      tienVayNganHang:
+        c["Tiền vay ngân hàng"] ||
+        c.tienVayNganHang ||
+        c.loanAmount ||
+        c["Tiền vay"] ||
+        c.tienVay ||
+        "",
       depositImage: c.depositImage || c["Ảnh chụp hình đặt cọc"] || "",
       counterpartImage: c.counterpartImage || c["Ảnh chụp đối ứng"] || "",
-      "Ảnh chụp hình đặt cọc": c.depositImage || c["Ảnh chụp hình đặt cọc"] || "",
+      "Ảnh chụp hình đặt cọc":
+        c.depositImage || c["Ảnh chụp hình đặt cọc"] || "",
       "Ảnh chụp đối ứng": c.counterpartImage || c["Ảnh chụp đối ứng"] || "",
+      bankLoanFile: c.bankLoanFile || c["File cho vay ngân hàng"] || "",
+      "File cho vay ngân hàng":
+        c.bankLoanFile || c["File cho vay ngân hàng"] || "",
     });
 
     const loadFromFirebase = async () => {
@@ -182,23 +297,75 @@ export default function HopDongDaXuatPage() {
           return { ...base, firebaseKey: key };
         });
 
-        setLoading(false);
-        setContracts(mapped);
-        setFilteredContracts(mapped);
+        setAllContracts(mapped);
       } catch (err) {
         console.error("Error loading exported contracts from Firebase:", err);
         toast.error("Lỗi khi tải dữ liệu hợp đồng đã xuất từ Firebase");
-        setLoading(false);
-        setContracts([]);
-        setFilteredContracts([]);
+        setAllContracts([]);
       }
     };
 
     loadFromFirebase();
-  }, [userRole]);
+  }, []);
 
-  // Apply search and filters
+  // Apply permission filter to contracts
   useEffect(() => {
+    if (allContracts.length === 0 && userRole !== "admin") {
+      // If no contracts loaded yet, wait
+      return;
+    }
+
+    let filtered = [];
+
+    if (userRole === "user") {
+      // User: only see their own contracts (by TVBH matching actual employee name)
+      if (!employeesLoaded) {
+        // Still loading employee data, show empty
+        filtered = [];
+      } else if (actualEmployeeName) {
+        // Filter by actual employee name
+        filtered = allContracts.filter((contract) => {
+          const contractTVBH = contract.tvbh || "";
+          return contractTVBH === actualEmployeeName || 
+                 contractTVBH.toLowerCase() === actualEmployeeName.toLowerCase();
+        });
+      } else {
+        // Employee name not found, show empty
+        filtered = [];
+      }
+      // Set loading false after filtering for user
+      setLoading(false);
+    } else if (userRole === "leader") {
+      // Leader: see contracts of employees in same department
+      if (!employeesLoaded) {
+        // Still loading employee data, show empty
+        filtered = [];
+      } else if (userDepartment && teamEmployeeNames.length > 0) {
+        // Filter by team employee names
+        filtered = allContracts.filter((contract) => {
+          const contractTVBH = contract.tvbh || "";
+          return teamEmployeeNames.includes(contractTVBH);
+        });
+      } else {
+        // No team members found, show empty
+        filtered = [];
+      }
+      // Set loading false after filtering for leader
+      setLoading(false);
+    } else if (userRole === "admin") {
+      // Admin: see all contracts (no filter)
+      filtered = allContracts;
+      setLoading(false);
+    }
+
+    setContracts(filtered);
+    setFilteredContracts(filtered);
+  }, [allContracts, userRole, actualEmployeeName, userDepartment, teamEmployeeNames, employeesLoaded]);
+
+  // Apply search and filters (permission filter already applied in loadFromFirebase)
+  useEffect(() => {
+    // Contracts are already filtered by permission in loadFromFirebase
+    // Now apply user-selected filters (date, product, status, search)
     let filtered = [...contracts];
 
     // Apply product/model filter (Dòng xe)
@@ -260,7 +427,6 @@ export default function HopDongDaXuatPage() {
     setCurrentPage(1); // Reset to page 1 when search changes
   }, [
     contracts,
-    userRole,
     filters.searchText,
     filters.products,
     filters.markets,
@@ -289,8 +455,8 @@ export default function HopDongDaXuatPage() {
     // Helper function to format date as YYYY-MM-DD in local timezone
     const formatLocalDate = (date) => {
       const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
       return `${year}-${month}-${day}`;
     };
 
@@ -429,7 +595,8 @@ export default function HopDongDaXuatPage() {
   // Format currency
   const formatCurrency = (value) => {
     if (!value) return "-";
-    const num = typeof value === "string" ? parseFloat(value.replace(/,/g, "")) : value;
+    const num =
+      typeof value === "string" ? parseFloat(value.replace(/,/g, "")) : value;
     if (isNaN(num)) return value;
     return new Intl.NumberFormat("vi-VN").format(num);
   };
@@ -440,7 +607,7 @@ export default function HopDongDaXuatPage() {
     if (contract.tienVayNganHang) {
       return contract.tienVayNganHang;
     }
-    
+
     // Otherwise calculate: giaHopDong - tienDatCoc
     const parseValue = (val) => {
       if (!val) return 0;
@@ -449,10 +616,10 @@ export default function HopDongDaXuatPage() {
       }
       return typeof val === "number" ? val : 0;
     };
-    
+
     const giaHopDong = parseValue(contract.giaHopDong);
     const tienDatCoc = parseValue(contract.tienDatCoc || contract.giaGiam);
-    
+
     const loanAmount = giaHopDong - tienDatCoc;
     return loanAmount > 0 ? loanAmount : 0;
   };
@@ -463,14 +630,14 @@ export default function HopDongDaXuatPage() {
     try {
       const exportDateObj = new Date(exportDate);
       if (isNaN(exportDateObj.getTime())) return "-";
-      
+
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       exportDateObj.setHours(0, 0, 0, 0);
-      
+
       const diffTime = today - exportDateObj;
       const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-      
+
       return diffDays;
     } catch (e) {
       return "-";
@@ -480,20 +647,25 @@ export default function HopDongDaXuatPage() {
   // Check if contract has missing required fields
   const hasMissingData = (contract) => {
     if (!contract) return true;
-    
+
     // Helper function to check if a value is missing
     const isEmpty = (value) => {
       if (value === null || value === undefined) return true;
-      if (typeof value === 'string') {
+      if (typeof value === "string") {
         const trimmed = value.trim();
-        return trimmed === "" || trimmed === "-" || trimmed === "null" || trimmed === "undefined";
+        return (
+          trimmed === "" ||
+          trimmed === "-" ||
+          trimmed === "null" ||
+          trimmed === "undefined"
+        );
       }
-      if (typeof value === 'number') {
+      if (typeof value === "number") {
         return isNaN(value);
       }
       return false;
     };
-    
+
     // Check required fields (using mapped field names)
     const checks = [
       // Tên KH
@@ -517,8 +689,8 @@ export default function HopDongDaXuatPage() {
       // Số máy
       isEmpty(contract.soMay),
     ];
-    
-    return checks.some(check => check);
+
+    return checks.some((check) => check);
   };
 
   // Open delete confirmation modal
@@ -565,8 +737,12 @@ export default function HopDongDaXuatPage() {
   const openImageModal = (contract) => {
     setCurrentImageContract(contract);
     // Load existing images from contract data (use contract directly as it already has the image data)
-    setDepositImage(contract.depositImage || contract["Ảnh chụp hình đặt cọc"] || "");
-    setCounterpartImage(contract.counterpartImage || contract["Ảnh chụp đối ứng"] || "");
+    setDepositImage(
+      contract.depositImage || contract["Ảnh chụp hình đặt cọc"] || ""
+    );
+    setCounterpartImage(
+      contract.counterpartImage || contract["Ảnh chụp đối ứng"] || ""
+    );
     setIsImageModalOpen(true);
   };
 
@@ -577,14 +753,19 @@ export default function HopDongDaXuatPage() {
 
   // Auto-open image modal when navigated from export with flag
   useEffect(() => {
-    if (location.state?.openImageModal && !loading && !hasOpenedImageModalRef.current && contracts.length > 0) {
+    if (
+      location.state?.openImageModal &&
+      !loading &&
+      !hasOpenedImageModalRef.current &&
+      contracts.length > 0
+    ) {
       const contractKey = location.state.contractKey;
-      
+
       // Find the contract by firebaseKey, or use first contract if not found
-      const contractToOpen = contractKey 
-        ? contracts.find(c => c.firebaseKey === contractKey) 
+      const contractToOpen = contractKey
+        ? contracts.find((c) => c.firebaseKey === contractKey)
         : contracts[0];
-      
+
       if (contractToOpen) {
         hasOpenedImageModalRef.current = true;
         // Small delay to ensure UI is ready
@@ -613,7 +794,7 @@ export default function HopDongDaXuatPage() {
     if (!file) return;
 
     // Check if file is an image
-    if (!file.type.startsWith('image/')) {
+    if (!file.type.startsWith("image/")) {
       toast.error("Vui lòng chọn file ảnh");
       return;
     }
@@ -627,17 +808,17 @@ export default function HopDongDaXuatPage() {
     try {
       setUploadingImage(true);
       setUploadingImageType(imageType);
-      
+
       // Upload to Cloudinary
       const imageUrl = await uploadImageToCloudinary(file);
-      
+
       // Update the corresponding image state
-      if (imageType === 'deposit') {
+      if (imageType === "deposit") {
         setDepositImage(imageUrl);
-      } else if (imageType === 'counterpart') {
+      } else if (imageType === "counterpart") {
         setCounterpartImage(imageUrl);
       }
-      
+
       toast.success("Upload ảnh thành công!");
     } catch (error) {
       console.error("Error uploading image:", error);
@@ -646,7 +827,7 @@ export default function HopDongDaXuatPage() {
       setUploadingImage(false);
       setUploadingImageType(null);
       // Reset file input
-      e.target.value = '';
+      e.target.value = "";
     }
   };
 
@@ -655,7 +836,8 @@ export default function HopDongDaXuatPage() {
     if (!currentImageContract) return;
 
     try {
-      const contractKey = currentImageContract.firebaseKey || currentImageContract.id;
+      const contractKey =
+        currentImageContract.firebaseKey || currentImageContract.id;
       if (!contractKey) {
         toast.error("Không tìm thấy hợp đồng!");
         return;
@@ -710,18 +892,20 @@ export default function HopDongDaXuatPage() {
   };
 
   return (
-    <div className="mx-auto px-8 py-8 bg-gradient-to-br from-slate-100 to-slate-200">
+    <div className="mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 bg-gradient-to-br from-slate-100 to-slate-200 min-h-screen">
       {/* Header with Back Button and Title */}
-      <div className="flex items-center gap-4 mb-6">
-            <button
-              onClick={() => navigate("/menu")}
-              className="text-gray-700 hover:text-gray-900 transition-colors flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100"
-              aria-label="Quay lại"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              <span className="hidden sm:inline">Quay lại</span>
-            </button>
-        <h2 className="text-2xl font-bold text-primary-700">Hợp đồng đã xuất</h2>
+      <div className="flex items-center gap-2 sm:gap-4 mb-4 sm:mb-6">
+        <button
+          onClick={() => navigate("/menu")}
+          className="text-gray-700 hover:text-gray-900 transition-colors flex items-center gap-2 px-2 sm:px-4 py-2 rounded-lg hover:bg-gray-100"
+          aria-label="Quay lại"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          <span className="hidden sm:inline">Quay lại</span>
+        </button>
+        <h2 className="text-xl sm:text-2xl font-bold text-primary-700 truncate">
+          Hợp đồng đã xuất
+        </h2>
       </div>
 
       {/* Filter Panel - Horizontal */}
@@ -740,683 +924,967 @@ export default function HopDongDaXuatPage() {
       </div>
 
       {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto mb-4"></div>
-                <p className="text-secondary-600">Đang tải dữ liệu hợp đồng đã xuất...</p>
-              </div>
-            </div>
+        <div className="flex items-center justify-center py-8 sm:py-12">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-primary-500 mx-auto mb-3 sm:mb-4"></div>
+            <p className="text-sm sm:text-base text-secondary-600">
+              Đang tải dữ liệu hợp đồng đã xuất...
+            </p>
+          </div>
+        </div>
       ) : (
         <div>
           {/* Statistics */}
-          <div className="mb-4 flex items-center justify-between">
-                <p className="text-secondary-600">
-                  Tổng số:{" "}
-                  <span className="font-semibold text-primary-600">
-                    {filteredContracts.length}
-                  </span>{" "}
-                  hợp đồng
-                  {filteredContracts.length > itemsPerPage && (
-                    <span className="ml-2">
-                      | Trang {currentPage}/{totalPages}
-                      <span className="ml-2 text-sm">
-                        (Hiển thị {startIndex + 1}-
-                        {Math.min(endIndex, filteredContracts.length)})
-                      </span>
-                    </span>
-                  )}
-                </p>
+          <div className="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+            <p className="text-sm sm:text-base text-secondary-600">
+              Tổng số:{" "}
+              <span className="font-semibold text-primary-600">
+                {filteredContracts.length}
+              </span>{" "}
+              hợp đồng
+              {filteredContracts.length > itemsPerPage && (
+                <span className="hidden sm:inline ml-2">
+                  | Trang {currentPage}/{totalPages}
+                  <span className="ml-2 text-sm">
+                    (Hiển thị {startIndex + 1}-
+                    {Math.min(endIndex, filteredContracts.length)})
+                  </span>
+                </span>
+              )}
+            </p>
+            {filteredContracts.length > itemsPerPage && (
+              <p className="text-xs sm:hidden text-secondary-500">
+                Trang {currentPage}/{totalPages} ({startIndex + 1}-{Math.min(endIndex, filteredContracts.length)})
+              </p>
+            )}
           </div>
 
           {/* Contracts Table */}
           {filteredContracts.length === 0 ? (
-                <div className="text-center py-8 bg-secondary-50 rounded-lg">
-                  <p className="text-secondary-600">Không có dữ liệu hợp đồng đã xuất</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto shadow-md rounded-lg">
-                  <table className="min-w-full divide-y divide-secondary-100">
-                    <thead className="bg-primary-400">
-                      <tr>
-                        <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
-                          STT
-                        </th>
-                        <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
-                          Ngày XHD
-                        </th>
-                        <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
-                          TVBH
-                        </th>
-                        <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
-                          VSO
-                        </th>
-                        <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
-                          Tên KH
-                        </th>
-                        <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
-                          Số Điện Thoại
-                        </th>
-                        <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
-                          Email
-                        </th>
-                        <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
-                          Địa Chỉ lấy theo VNeid
-                        </th>
-                        <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
-                          CCCD
-                        </th>
-                        <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
-                          Ngày Cấp
-                        </th>
-                        <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
-                          Nơi Cấp
-                        </th>
-                        <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
-                          Dòng xe
-                        </th>
-                        <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
-                          Phiên Bản
-                        </th>
-                        <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
-                          Ngoại Thất
-                        </th>
-                        <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
-                          Nội Thất
-                        </th>
-                        <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
-                          Giá Niêm Yết
-                        </th>
-                        <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
-                          Giá Giảm
-                        </th>
-                        <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
-                          Giá Hợp Đồng
-                        </th>
-                        <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
-                          Số Khung
-                        </th>
-                        <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
-                          Số Máy
-                        </th>
-                        <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
-                          Tình Trạng
-                        </th>
-                        <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
-                          Ngân hàng
-                        </th>
-                        <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
-                          Tiền đặt cọc
-                        </th>
-                        <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
-                          Tiền đối ứng
-                        </th>
-                        <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
-                          Tiền vay ngân hàng
-                        </th>
-                        <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400">
-                          Số Ngày
-                        </th>
-                        <th className="px-3 py-2 text-center text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400 sticky right-0 z-30 bg-primary-400">
-                          Thao tác
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-neutral-white divide-y divide-secondary-100">
-                      {currentContracts.map((contract, index) => {
-                        const isMissingData = hasMissingData(contract);
-                        return (
-                        <tr
-                          key={contract.firebaseKey || contract.id}
-                          className={`hover:bg-secondary-50 ${isMissingData ? 'bg-yellow-50 border-l-4 border-yellow-400' : ''}`}
-                        >
-                          <td className="px-3 py-2 whitespace-nowrap text-sm font-semibold text-black border border-secondary-400">
-                            {startIndex + index + 1}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
-                            {contract.ngayXhd || "-"}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
+            <div className="text-center py-8 bg-secondary-50 rounded-lg">
+              <p className="text-secondary-600">
+                Không có dữ liệu hợp đồng đã xuất
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto shadow-md rounded-lg -mx-4 sm:mx-0">
+              <div className="inline-block min-w-full align-middle">
+                <table className="min-w-full divide-y divide-secondary-100">
+                  <thead className="bg-primary-400">
+                    <tr>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400 whitespace-nowrap">
+                        STT
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400 whitespace-nowrap">
+                        Ngày XHD
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400 whitespace-nowrap">
+                        TVBH
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400 whitespace-nowrap">
+                        VSO
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400 whitespace-nowrap">
+                        Tên KH
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400 whitespace-nowrap">
+                        Số Điện Thoại
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400 whitespace-nowrap">
+                        Email
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400 whitespace-nowrap">
+                        Địa Chỉ lấy theo VNeid
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400 whitespace-nowrap">
+                        CCCD
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400 whitespace-nowrap">
+                        Ngày Cấp
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400 whitespace-nowrap">
+                        Nơi Cấp
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400 whitespace-nowrap">
+                        Dòng xe
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400 whitespace-nowrap">
+                        Phiên Bản
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400 whitespace-nowrap">
+                        Ngoại Thất
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400 whitespace-nowrap">
+                        Nội Thất
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400 whitespace-nowrap">
+                        Giá Niêm Yết
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400 whitespace-nowrap">
+                        Giá Giảm
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400 whitespace-nowrap">
+                        Giá Hợp Đồng
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400 whitespace-nowrap">
+                        Số Khung
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400 whitespace-nowrap">
+                        Số Máy
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400 whitespace-nowrap">
+                        Tình Trạng
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400 whitespace-nowrap">
+                        Ngân hàng
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400 whitespace-nowrap">
+                        Tiền đặt cọc
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400 whitespace-nowrap">
+                        Tiền đối ứng
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400 whitespace-nowrap">
+                        Tiền vay ngân hàng
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400 whitespace-nowrap">
+                        Số Ngày
+                      </th>
+                      <th className="px-2 sm:px-3 py-2 text-center text-[10px] sm:text-xs font-bold text-secondary-900 uppercase tracking-wider border border-secondary-400 sticky right-0 z-30 bg-primary-400 whitespace-nowrap">
+                        Thao tác
+                      </th>
+                    </tr>
+                  </thead>
+                <tbody className="bg-neutral-white divide-y divide-secondary-100">
+                  {currentContracts.map((contract, index) => {
+                    const isMissingData = hasMissingData(contract);
+                    return (
+                      <tr
+                        key={contract.firebaseKey || contract.id}
+                        className={`hover:bg-secondary-50 ${
+                          isMissingData
+                            ? "bg-yellow-50 border-l-4 border-yellow-400"
+                            : ""
+                        }`}
+                      >
+                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm font-semibold text-black border border-secondary-400">
+                          {startIndex + index + 1}
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                          {contract.ngayXhd || "-"}
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                          <div className="max-w-[80px] sm:max-w-none truncate" title={contract.tvbh || "-"}>
                             {contract.tvbh || "-"}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
-                            {contract.vso || "-"}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
+                          </div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                          {contract.vso || "-"}
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                          <div className="max-w-[100px] sm:max-w-none truncate" title={contract.tenKh || "-"}>
                             {contract.tenKh || "-"}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
-                            {contract.soDienThoai || "-"}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
+                          </div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                          {contract.soDienThoai || "-"}
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                          <div className="max-w-[120px] sm:max-w-none truncate" title={contract.email || "-"}>
                             {contract.email || "-"}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
+                          </div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                          <div className="max-w-[120px] sm:max-w-none truncate" title={contract.diaChi || "-"}>
                             {contract.diaChi || "-"}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
-                            {contract.cccd || "-"}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
-                            {contract.ngayCap || "-"}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
+                          </div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                          {contract.cccd || "-"}
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                          {contract.ngayCap || "-"}
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                          <div className="max-w-[100px] sm:max-w-none truncate" title={contract.noiCap || "-"}>
                             {contract.noiCap || "-"}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
-                            {contract.dongXe || "-"}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
+                          </div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                          {contract.dongXe || "-"}
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                          <div className="max-w-[100px] sm:max-w-none truncate" title={contract.phienBan || "-"}>
                             {contract.phienBan || "-"}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
-                            {getColorName(contract.ngoaiThat || contract["Ngoại Thất"] || contract.exterior, true)}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
-                            {getColorName(contract.noiThat || contract["Nội Thất"] || contract.interior, false)}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
-                            {formatCurrency(contract.giaNiemYet)}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
-                            {formatCurrency(contract.giaGiam)}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
-                            {formatCurrency(contract.giaHopDong)}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
-                            {contract.soKhung || "-"}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
-                            {contract.soMay || "-"}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
-                            {contract.tinhTrang || "-"}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
+                          </div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                          <div className="max-w-[100px] sm:max-w-none truncate" title={getColorName(contract.ngoaiThat || contract["Ngoại Thất"] || contract.exterior, true)}>
+                            {getColorName(
+                              contract.ngoaiThat ||
+                                contract["Ngoại Thất"] ||
+                                contract.exterior,
+                              true
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                          <div className="max-w-[100px] sm:max-w-none truncate" title={getColorName(contract.noiThat || contract["Nội Thất"] || contract.interior, false)}>
+                            {getColorName(
+                              contract.noiThat ||
+                                contract["Nội Thất"] ||
+                                contract.interior,
+                              false
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                          {formatCurrency(contract.giaNiemYet)}
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                          {formatCurrency(contract.giaGiam)}
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                          {formatCurrency(contract.giaHopDong)}
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                          {contract.soKhung || "-"}
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                          {contract.soMay || "-"}
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                          {contract.tinhTrang || "-"}
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                          <div className="max-w-[100px] sm:max-w-none truncate" title={contract.nganHang || "-"}>
                             {contract.nganHang || "-"}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
-                            {formatCurrency(contract.tienDatCoc || contract.giaGiam)}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
-                            {formatCurrency(contract.tienDoiUng)}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400">
-                            {formatCurrency(calculateBankLoan(contract))}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400 text-center font-semibold">
-                            {calculateDaysFromExport(contract.ngayXhd)}
-                            {calculateDaysFromExport(contract.ngayXhd) !== "-" && " ngày"}
-                          </td>
-                          {/* Actions column - sticky to right */}
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-black border border-secondary-400 sticky right-0 z-20 bg-primary-200">
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                onClick={() => openImageModal(contract)}
-                                className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm"
-                                aria-label={`Quản lý ảnh ${contract.tenKh || contract.id}`}
-                                title="Quản lý ảnh"
+                          </div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                          {formatCurrency(
+                            contract.tienDatCoc || contract.giaGiam
+                          )}
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                          {formatCurrency(contract.tienDoiUng)}
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                          {formatCurrency(calculateBankLoan(contract))}
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400 text-center font-semibold">
+                          {calculateDaysFromExport(contract.ngayXhd)}
+                          {calculateDaysFromExport(contract.ngayXhd) !== "-" &&
+                            " ngày"}
+                        </td>
+                        {/* Actions column - sticky to right */}
+                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400 sticky right-0 z-20 bg-primary-200">
+                          <div className="flex items-center justify-end gap-1 sm:gap-2">
+                            <button
+                              onClick={() => openImageModal(contract)}
+                              className="px-1.5 sm:px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
+                              aria-label={`Quản lý ảnh ${
+                                contract.tenKh || contract.id
+                              }`}
+                              title="Quản lý ảnh"
+                            >
+                              <Image className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <span className="hidden sm:inline">Ảnh</span>
+                            </button>
+                            <button
+                              onClick={() =>
+                                navigate(
+                                  `/hop-dong-da-xuat/edit/${
+                                    contract.firebaseKey || contract.id
+                                  }`
+                                )
+                              }
+                              className="px-1.5 sm:px-3 py-1 bg-secondary-600 text-white rounded-md hover:bg-secondary-700 transition-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
+                              aria-label={`Sửa hợp đồng ${
+                                contract.tenKh || contract.id
+                              }`}
+                            >
+                              <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <span className="hidden sm:inline">Sửa</span>
+                            </button>
+                            <button
+                              onClick={() => openDeleteConfirm(contract)}
+                              className="px-1.5 sm:px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
+                              aria-label={`Xóa hợp đồng ${
+                                contract.tenKh || contract.id
+                              }`}
+                            >
+                              <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <span className="hidden sm:inline">Xóa</span>
+                            </button>
+                            {/* Print / Giấy xác nhận button */}
+                            <button
+                              onClick={() => {
+                                if (isMissingData) {
+                                  toast.warning(
+                                    "Vui lòng điền đầy đủ thông tin hợp đồng trước khi in!"
+                                  );
+                                  return;
+                                }
+                                const printData = {
+                                  id: contract.id,
+                                  firebaseKey: contract.firebaseKey,
+                                  stt: startIndex + index + 1,
+                                  createdAt: contract.ngayXhd,
+                                  TVBH: contract.tvbh,
+                                  vso: contract.vso,
+                                  customerName: contract.tenKh,
+                                  phone: contract.soDienThoai,
+                                  email: contract.email,
+                                  Email: contract.email,
+                                  address: contract.diaChi,
+                                  cccd: contract.cccd,
+                                  issueDate: contract.ngayCap,
+                                  issuePlace: contract.noiCap,
+                                  model: contract.dongXe,
+                                  variant: contract.phienBan,
+                                  exterior: contract.ngoaiThat,
+                                  interior: contract.noiThat,
+                                  contractPrice: contract.giaHopDong,
+                                  deposit: contract.giaGiam,
+                                  payment: "",
+                                  bank: contract.nganHang || "",
+                                  status: contract.tinhTrang,
+                                  soKhung: contract.soKhung,
+                                  soMay: contract.soMay,
+                                  "Số Khung": contract.soKhung,
+                                  "Số Máy": contract.soMay,
+                                  chassisNumber: contract.soKhung,
+                                  engineNumber: contract.soMay,
+                                  representativeName: contract.tvbh,
+                                };
+                                setPrintContract(printData);
+                                // Load bankLoanFile from contract if exists
+                                const contractKey =
+                                  contract.firebaseKey || contract.id;
+                                setCurrentContractKey(contractKey);
+                                setBankLoanFile(
+                                  contract.bankLoanFile ||
+                                    contract["File cho vay ngân hàng"] ||
+                                    null
+                                );
+                                setIsPrintModalOpen(true);
+                              }}
+                              disabled={isMissingData}
+                              className={`px-1.5 sm:px-3 py-1 rounded-md transition-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-sm ${
+                                isMissingData
+                                  ? "bg-gray-400 text-gray-200 cursor-not-allowed"
+                                  : "bg-green-600 text-white hover:bg-green-700"
+                              }`}
+                              title={
+                                isMissingData
+                                  ? "Vui lòng điền đầy đủ thông tin hợp đồng trước khi in"
+                                  : `Chọn mẫu in ${
+                                      contract.tenKh || contract.id
+                                    }`
+                              }
+                              aria-label={
+                                isMissingData
+                                  ? "Không thể in - thiếu dữ liệu"
+                                  : `Chọn mẫu in ${
+                                      contract.tenKh || contract.id
+                                    }`
+                              }
+                            >
+                              <svg
+                                className="w-3 h-3 sm:w-4 sm:h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                                xmlns="http://www.w3.org/2000/svg"
                               >
-                                <Image className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => navigate(`/hop-dong-da-xuat/edit/${contract.firebaseKey || contract.id}`)}
-                                className="px-3 py-1 bg-secondary-600 text-white rounded-md hover:bg-secondary-700 transition-colors flex items-center gap-2 text-sm"
-                                aria-label={`Sửa hợp đồng ${contract.tenKh || contract.id}`}
-                              >
-                                <Edit className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => openDeleteConfirm(contract)}
-                                className="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors flex items-center gap-2 text-sm"
-                                aria-label={`Xóa hợp đồng ${contract.tenKh || contract.id}`}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                              {/* Print / Giấy xác nhận button */}
-                              <button
-                                onClick={() => {
-                                  if (isMissingData) {
-                                    toast.warning("Vui lòng điền đầy đủ thông tin hợp đồng trước khi in!");
-                                    return;
-                                  }
-                                  const printData = {
-                                    id: contract.id,
-                                    firebaseKey: contract.firebaseKey,
-                                    stt: startIndex + index + 1,
-                                    createdAt: contract.ngayXhd,
-                                    TVBH: contract.tvbh,
-                                    vso: contract.vso,
-                                    customerName: contract.tenKh,
-                                    phone: contract.soDienThoai,
-                                    email: contract.email,
-                                    Email: contract.email,
-                                    address: contract.diaChi,
-                                    cccd: contract.cccd,
-                                    issueDate: contract.ngayCap,
-                                    issuePlace: contract.noiCap,
-                                    model: contract.dongXe,
-                                    variant: contract.phienBan,
-                                    exterior: contract.ngoaiThat,
-                                    interior: contract.noiThat,
-                                    contractPrice: contract.giaHopDong,
-                                    deposit: contract.giaGiam,
-                                    payment: "",
-                                    bank: contract.nganHang || "",
-                                    status: contract.tinhTrang,
-                                    soKhung: contract.soKhung,
-                                    soMay: contract.soMay,
-                                    "Số Khung": contract.soKhung,
-                                    "Số Máy": contract.soMay,
-                                    chassisNumber: contract.soKhung,
-                                    engineNumber: contract.soMay,
-                                    representativeName: contract.tvbh,
-                                  };
-                                  setPrintContract(printData);
-                                  setIsPrintModalOpen(true);
-                                }}
-                                disabled={isMissingData}
-                                className={`px-3 py-1 rounded-md transition-colors flex items-center gap-2 text-sm ${
-                                  isMissingData
-                                    ? "bg-gray-400 text-gray-200 cursor-not-allowed"
-                                    : "bg-green-600 text-white hover:bg-green-700"
-                                }`}
-                                title={isMissingData ? "Vui lòng điền đầy đủ thông tin hợp đồng trước khi in" : `Chọn mẫu in ${contract.tenKh || contract.id}`}
-                                aria-label={isMissingData ? "Không thể in - thiếu dữ liệu" : `Chọn mẫu in ${contract.tenKh || contract.id}`}
-                              >
-                                <svg
-                                  className="w-4 h-4"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                  xmlns="http://www.w3.org/2000/svg"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth="2"
-                                    d="M6 9V2h12v7M6 18h12v4H6v-4zM6 14h12v4H6v-4z"
-                                  ></path>
-                                </svg>
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth="2"
+                                  d="M6 9V2h12v7M6 18h12v4H6v-4zM6 14h12v4H6v-4z"
+                                ></path>
+                              </svg>
+                              <span className="hidden sm:inline">In</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                </table>
+              </div>
+            </div>
           )}
 
           {/* Pagination */}
           {totalPages > 1 && (
-                <div className="mt-6 flex items-center justify-center gap-2">
-                  <button
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={currentPage === 1}
-                    className="px-4 py-2 bg-secondary-600 text-white rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-secondary-700 transition-colors"
-                  >
-                    Trước
-                  </button>
-                  <span className="px-4 py-2 text-secondary-700">
-                    Trang {currentPage} / {totalPages}
-                  </span>
-                  <button
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage === totalPages}
-                    className="px-4 py-2 bg-secondary-600 text-white rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-secondary-700 transition-colors"
-                  >
-                    Sau
-                  </button>
-                </div>
+            <div className="mt-4 sm:mt-6 flex items-center justify-center gap-2 flex-wrap">
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="px-3 sm:px-4 py-2 bg-secondary-600 text-white rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-secondary-700 transition-colors text-sm sm:text-base"
+              >
+                Trước
+              </button>
+              <span className="px-3 sm:px-4 py-2 text-sm sm:text-base text-secondary-700">
+                Trang {currentPage} / {totalPages}
+              </span>
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="px-3 sm:px-4 py-2 bg-secondary-600 text-white rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-secondary-700 transition-colors text-sm sm:text-base"
+              >
+                Sau
+              </button>
+            </div>
           )}
 
           {/* Delete Confirmation Modal */}
           {deletingContract && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                  <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-                    {/* Header */}
-                    <div className="bg-gradient-to-r from-red-600 to-pink-600 px-6 py-4 rounded-t-lg">
-                      <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                        <AlertTriangle className="w-5 h-5" />
-                        <span>Xác nhận xóa hợp đồng</span>
-                      </h3>
-                    </div>
-
-                    {/* Content */}
-                    <div className="p-6">
-                      <p className="text-gray-700 mb-4">
-                        Bạn có chắc chắn muốn xóa hợp đồng này không?
-                      </p>
-
-                      <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-2">
-                        <p className="text-sm">
-                          <span className="font-semibold text-gray-700">Tên KH:</span>{" "}
-                          <span className="text-gray-900">
-                            {deletingContract.tenKh || "-"}
-                          </span>
-                        </p>
-                        <p className="text-sm">
-                          <span className="font-semibold text-gray-700">
-                            Số điện thoại:
-                          </span>{" "}
-                          <span className="text-gray-900">
-                            {deletingContract.soDienThoai || "-"}
-                          </span>
-                        </p>
-                        <p className="text-sm">
-                          <span className="font-semibold text-gray-700">Dòng xe:</span>{" "}
-                          <span className="text-gray-900">
-                            {deletingContract.dongXe || "-"}
-                          </span>
-                        </p>
-                        <p className="text-sm">
-                          <span className="font-semibold text-gray-700">VSO:</span>{" "}
-                          <span className="text-gray-900">
-                            {deletingContract.vso || "-"}
-                          </span>
-                        </p>
-                        <p className="text-sm">
-                          <span className="font-semibold text-gray-700">Ngày XHD:</span>{" "}
-                          <span className="text-gray-900">
-                            {deletingContract.ngayXhd || "-"}
-                          </span>
-                        </p>
-                      </div>
-
-                      <p className="text-red-600 font-medium text-sm mt-4 flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4" />
-                        <span>Hành động này không thể hoàn tác!</span>
-                      </p>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="bg-gray-50 px-6 py-4 rounded-b-lg flex justify-end gap-3">
-                      <button
-                        onClick={closeDeleteConfirm}
-                        className="px-5 py-2.5 bg-gray-500 text-white font-medium rounded-lg hover:bg-gray-600 transition-colors flex items-center gap-2"
-                        aria-label="Hủy"
-                      >
-                        <X className="w-4 h-4" />
-                        <span>Hủy</span>
-                      </button>
-                      <button
-                        onClick={handleDeleteContract}
-                        className="px-5 py-2.5 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
-                        aria-label="Xóa hợp đồng"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        <span>Xóa hợp đồng</span>
-                      </button>
-                    </div>
-                  </div>
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+              <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[calc(100vh-2rem)] overflow-auto">
+                {/* Header */}
+                <div className="bg-gradient-to-r from-red-600 to-pink-600 px-4 sm:px-6 py-3 sm:py-4 rounded-t-lg sticky top-0 z-10">
+                  <h3 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <span>Xác nhận xóa hợp đồng</span>
+                  </h3>
                 </div>
+
+                {/* Content */}
+                <div className="p-4 sm:p-6">
+                  <p className="text-gray-700 mb-4">
+                    Bạn có chắc chắn muốn xóa hợp đồng này không?
+                  </p>
+
+                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-2">
+                    <p className="text-sm">
+                      <span className="font-semibold text-gray-700">
+                        Tên KH:
+                      </span>{" "}
+                      <span className="text-gray-900">
+                        {deletingContract.tenKh || "-"}
+                      </span>
+                    </p>
+                    <p className="text-sm">
+                      <span className="font-semibold text-gray-700">
+                        Số điện thoại:
+                      </span>{" "}
+                      <span className="text-gray-900">
+                        {deletingContract.soDienThoai || "-"}
+                      </span>
+                    </p>
+                    <p className="text-sm">
+                      <span className="font-semibold text-gray-700">
+                        Dòng xe:
+                      </span>{" "}
+                      <span className="text-gray-900">
+                        {deletingContract.dongXe || "-"}
+                      </span>
+                    </p>
+                    <p className="text-sm">
+                      <span className="font-semibold text-gray-700">VSO:</span>{" "}
+                      <span className="text-gray-900">
+                        {deletingContract.vso || "-"}
+                      </span>
+                    </p>
+                    <p className="text-sm">
+                      <span className="font-semibold text-gray-700">
+                        Ngày XHD:
+                      </span>{" "}
+                      <span className="text-gray-900">
+                        {deletingContract.ngayXhd || "-"}
+                      </span>
+                    </p>
+                  </div>
+
+                  <p className="text-red-600 font-medium text-sm mt-4 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4" />
+                    <span>Hành động này không thể hoàn tác!</span>
+                  </p>
+                </div>
+
+                {/* Actions */}
+                <div className="bg-gray-50 px-4 sm:px-6 py-3 sm:py-4 rounded-b-lg flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 sticky bottom-0">
+                  <button
+                    onClick={closeDeleteConfirm}
+                    className="w-full sm:w-auto px-4 sm:px-5 py-2 sm:py-2.5 bg-gray-500 text-white font-medium rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center gap-2 text-sm sm:text-base"
+                    aria-label="Hủy"
+                  >
+                    <X className="w-4 h-4" />
+                    <span>Hủy</span>
+                  </button>
+                  <button
+                    onClick={handleDeleteContract}
+                    className="w-full sm:w-auto px-4 sm:px-5 py-2 sm:py-2.5 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2 text-sm sm:text-base"
+                    aria-label="Xóa hợp đồng"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>Xóa hợp đồng</span>
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
 
-              {/* Print Selection Modal */}
-              {isPrintModalOpen && printContract && (() => {
-                // Helper to parse currency string to number
-                const parseCurrency = (value) => {
-                  if (!value) return 0;
-                  const str = String(value).replace(/[^\d]/g, ''); // Remove all non-digits
-                  return parseFloat(str) || 0;
-                };
+          {/* Print Selection Modal */}
+          {isPrintModalOpen &&
+            printContract &&
+            (() => {
+              // Helper to parse currency string to number
+              const parseCurrency = (value) => {
+                if (!value) return 0;
+                const str = String(value).replace(/[^\d]/g, ""); // Remove all non-digits
+                return parseFloat(str) || 0;
+              };
 
-                // Determine loan amount and bank for conditional display
-                const bank = (printContract.bank || "").toLowerCase();
-                const contractPrice = parseCurrency(printContract.contractPrice || printContract.giaHopDong || 0);
-                const deposit = parseCurrency(printContract.deposit || printContract.giaGiam || 0);
-                const loanAmount = contractPrice - deposit;
-                const loanPercentage = contractPrice > 0 ? (loanAmount / contractPrice) * 100 : 0;
-                const isLoan0 = loanPercentage < 1; // Vay 0 đồng
-                const isLoan90 = loanPercentage >= 85 && loanPercentage <= 95; // Vay khoảng 90%
-                const isVPBank = bank.includes("vpbank") || bank.includes("vp bank") || bank.includes("vietnam prosperity");
-                const isTPBank = bank.includes("tpbank") || bank.includes("tp bank") || bank.includes("tien phong");
-                const isLotte = bank.includes("lotte") || bank.includes("cty tài chính lotte") || bank.includes("công ty tài chính lotte");
+              // Determine loan amount and bank for conditional display
+              const bank = (printContract.bank || "").toLowerCase();
+              const contractPrice = parseCurrency(
+                printContract.contractPrice || printContract.giaHopDong || 0
+              );
+              const deposit = parseCurrency(
+                printContract.deposit || printContract.giaGiam || 0
+              );
+              const loanAmount = contractPrice - deposit;
+              const loanPercentage =
+                contractPrice > 0 ? (loanAmount / contractPrice) * 100 : 0;
+              const isLoan0 = loanPercentage < 1; // Vay 0 đồng
+              const isLoan90 = loanPercentage >= 85 && loanPercentage <= 95; // Vay khoảng 90%
+              const isVPBank =
+                bank.includes("vpbank") ||
+                bank.includes("vp bank") ||
+                bank.includes("vietnam prosperity");
+              const isTPBank =
+                bank.includes("tpbank") ||
+                bank.includes("tp bank") ||
+                bank.includes("tien phong");
+              const isLotte =
+                bank.includes("lotte") ||
+                bank.includes("cty tài chính lotte") ||
+                bank.includes("công ty tài chính lotte");
 
-                // Handle bank loan file upload
-                const handleBankLoanFileUpload = async (e) => {
-                  const file = e.target.files[0];
-                  if (!file) return;
+              // Handle bank loan file upload
+              const handleBankLoanFileUpload = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
 
-                  if (!file.type.startsWith('image/') && !file.type.includes('pdf')) {
-                    toast.error("Vui lòng chọn file ảnh hoặc PDF");
-                    return;
+                if (
+                  !file.type.startsWith("image/") &&
+                  !file.type.includes("pdf")
+                ) {
+                  toast.error("Vui lòng chọn file ảnh hoặc PDF");
+                  return;
+                }
+
+                if (file.size > 10 * 1024 * 1024) {
+                  toast.error("Kích thước file không được vượt quá 10MB");
+                  return;
+                }
+
+                try {
+                  setUploadingBankLoanFile(true);
+                  // Upload to Cloudinary
+                  const fileUrl = await uploadImageToCloudinary(file);
+                  setBankLoanFile(fileUrl);
+
+                  // Save to Firebase if contract key exists
+                  if (currentContractKey || printContract?.firebaseKey) {
+                    const contractKey =
+                      currentContractKey || printContract.firebaseKey;
+                    const contractRef = ref(
+                      database,
+                      `exportedContracts/${contractKey}`
+                    );
+                    await update(contractRef, {
+                      bankLoanFile: fileUrl,
+                      "File cho vay ngân hàng": fileUrl,
+                    });
+
+                    // Update local state
+                    setContracts((prev) =>
+                      prev.map((contract) => {
+                        const key = contract.firebaseKey || contract.id;
+                        if (key === contractKey) {
+                          return {
+                            ...contract,
+                            bankLoanFile: fileUrl,
+                            "File cho vay ngân hàng": fileUrl,
+                          };
+                        }
+                        return contract;
+                      })
+                    );
+                    setFilteredContracts((prev) =>
+                      prev.map((contract) => {
+                        const key = contract.firebaseKey || contract.id;
+                        if (key === contractKey) {
+                          return {
+                            ...contract,
+                            bankLoanFile: fileUrl,
+                            "File cho vay ngân hàng": fileUrl,
+                          };
+                        }
+                        return contract;
+                      })
+                    );
                   }
 
-                  if (file.size > 10 * 1024 * 1024) {
-                    toast.error("Kích thước file không được vượt quá 10MB");
-                    return;
-                  }
+                  toast.success("Upload file thành công!");
+                } catch (error) {
+                  console.error("Error uploading file:", error);
+                  toast.error(
+                    error.message || "Lỗi khi upload file. Vui lòng thử lại."
+                  );
+                } finally {
+                  setUploadingBankLoanFile(false);
+                  e.target.value = "";
+                }
+              };
 
-                  try {
-                    setUploadingBankLoanFile(true);
-                    // Upload to Cloudinary
-                    const fileUrl = await uploadImageToCloudinary(file);
-                    setBankLoanFile(fileUrl);
-                    toast.success("Upload file thành công!");
-                  } catch (error) {
-                    console.error("Error uploading file:", error);
-                    toast.error(error.message || "Lỗi khi upload file. Vui lòng thử lại.");
-                  } finally {
-                    setUploadingBankLoanFile(false);
-                    e.target.value = '';
-                  }
+              // Handle print navigation with file
+              const handlePrintNavigate = (route, includeFile = false) => {
+                const printData = {
+                  ...printContract,
+                  ...(includeFile && bankLoanFile ? { bankLoanFile } : {}),
                 };
+                setIsPrintModalOpen(false);
+                navigate(route, { state: printData });
+                setPrintContract(null);
+                setCurrentContractKey(null);
+                // Don't reset bankLoanFile here - keep it for next time modal opens
+                // setBankLoanFile(null);
+              };
 
-                // Handle print navigation with file
-                const handlePrintNavigate = (route, includeFile = false) => {
-                  const printData = {
-                    ...printContract,
-                    ...(includeFile && bankLoanFile ? { bankLoanFile } : {})
-                  };
-                  setIsPrintModalOpen(false);
-                  navigate(route, { state: printData });
-                  setPrintContract(null);
-                  setBankLoanFile(null);
-                };
+              // Handle print file directly
+              const handlePrintFile = () => {
+                if (!bankLoanFile) {
+                  toast.warning("Vui lòng upload file trước khi in!");
+                  return;
+                }
+                window.open(bankLoanFile, "_blank");
+              };
 
-                // Handle print file directly
-                const handlePrintFile = () => {
-                  if (!bankLoanFile) {
-                    toast.warning("Vui lòng upload file trước khi in!");
-                    return;
-                  }
-                  window.open(bankLoanFile, '_blank');
-                };
-
-                return (
-                  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-                    <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full my-8">
-                      <div className="px-6 py-4 border-b bg-gradient-to-r from-primary-600 to-primary-400">
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-lg font-bold text-white">Chọn mẫu in</h3>
-                          <button
-                            onClick={() => {
-                              setIsPrintModalOpen(false);
-                              setPrintContract(null);
-                              setBankLoanFile(null);
-                            }}
-                            className="text-white hover:text-gray-200 transition-colors"
-                            aria-label="Đóng"
-                          >
-                            <X className="w-6 h-6" />
-                          </button>
-                        </div>
-                        <p className="text-sm text-white/90 mt-1">
-                          Hợp đồng: <span className="font-semibold">{printContract.customerName || printContract.id}</span>
-                        </p>
+              return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+                  <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full my-4 sm:my-8 max-h-[calc(100vh-2rem)] overflow-auto">
+                    <div className="px-4 sm:px-6 py-3 sm:py-4 border-b bg-gradient-to-r from-primary-600 to-primary-400 sticky top-0 z-10">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-base sm:text-lg font-bold text-white">
+                          Chọn mẫu in
+                        </h3>
+                        <button
+                          onClick={() => {
+                            setIsPrintModalOpen(false);
+                            setPrintContract(null);
+                            setCurrentContractKey(null);
+                            // Don't reset bankLoanFile here - keep it for next time modal opens
+                            // setBankLoanFile(null);
+                          }}
+                          className="text-white hover:text-gray-200 transition-colors"
+                          aria-label="Đóng"
+                        >
+                          <X className="w-5 h-5 sm:w-6 sm:h-6" />
+                        </button>
                       </div>
+                      <p className="text-xs sm:text-sm text-white/90 mt-1">
+                        Hợp đồng:{" "}
+                        <span className="font-semibold">
+                          {printContract.customerName || printContract.id}
+                        </span>
+                      </p>
+                    </div>
 
-                      <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
-                        {/* Group 1: XUẤT HÓA ĐƠN */}
-                        <div className="space-y-3">
-                          <h4 className="text-base font-bold text-primary-700 border-b-2 border-primary-300 pb-2">
-                            1. XUẤT HÓA ĐƠN
-                          </h4>
-                          
-                          {/* Đề xuất bán hàng */}
-                          <div className="space-y-2">
-                            <button
-                              onClick={() => handlePrintNavigate("/de-xuat-ban-hang", true)}
-                              className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-left flex items-center justify-between"
-                            >
-                              <span>Đề xuất bán hàng</span>
-                              <span className="text-xs opacity-75">(Có upload file cho vay của NH)</span>
-                            </button>
-                            
-                            {/* File upload section for Đề xuất bán hàng */}
-                            <div className="bg-gray-50 p-3 rounded-md border border-gray-200">
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Upload file cho vay của Ngân hàng:
+                    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 max-h-[calc(70vh-100px)] overflow-y-auto">
+                      {/* Group 1: XUẤT HÓA ĐƠN */}
+                      <div className="space-y-3">
+                        <h4 className="text-sm sm:text-base font-bold text-primary-700 border-b-2 border-primary-300 pb-2">
+                          1. XUẤT HÓA ĐƠN
+                        </h4>
+
+                        {/* Đề xuất bán hàng */}
+                        <div className="space-y-2">
+                          <button
+                            onClick={() =>
+                              handlePrintNavigate("/de-xuat-gia-ban", true)
+                            }
+                            className="w-full px-3 sm:px-4 py-2 sm:py-2.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-center text-sm sm:text-base"
+                          >
+                            Đề xuất bán hàng
+                          </button>
+
+                          {/* File upload section for Đề xuất bán hàng */}
+                          <div className="bg-gray-50 p-2 sm:p-3 rounded-md border border-gray-200">
+                            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
+                              Upload file cho vay của Ngân hàng:
+                            </label>
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                              <label
+                                className={`flex-1 px-3 sm:px-4 py-2 border border-gray-300 rounded-md transition-colors text-xs sm:text-sm text-center ${
+                                  uploadingBankLoanFile
+                                    ? "bg-gray-200 cursor-not-allowed opacity-50"
+                                    : "cursor-pointer hover:bg-gray-50"
+                                }`}
+                              >
+                                <span className="text-gray-700">
+                                  {uploadingBankLoanFile
+                                    ? "Đang upload..."
+                                    : bankLoanFile
+                                    ? "Đã upload file"
+                                    : "Chọn file (Ảnh)"}
+                                </span>
+                                <input
+                                  type="file"
+                                  accept="image/*,.pdf"
+                                  onChange={handleBankLoanFileUpload}
+                                  className="hidden"
+                                  disabled={uploadingBankLoanFile}
+                                />
                               </label>
-                              <div className="flex items-center gap-2">
-                                <label className={`flex-1 px-4 py-2 border border-gray-300 rounded-md transition-colors text-sm text-center ${
-                                  uploadingBankLoanFile 
-                                    ? 'bg-gray-200 cursor-not-allowed opacity-50' 
-                                    : 'cursor-pointer hover:bg-gray-50'
-                                }`}>
-                                  <span className="text-gray-700">
-                                    {uploadingBankLoanFile ? 'Đang upload...' : bankLoanFile ? 'Đã upload file' : 'Chọn file (ảnh/PDF)'}
-                                  </span>
-                                  <input
-                                    type="file"
-                                    accept="image/*,.pdf"
-                                    onChange={handleBankLoanFileUpload}
-                                    className="hidden"
-                                    disabled={uploadingBankLoanFile}
-                                  />
-                                </label>
-                                {bankLoanFile && (
-                                  <>
-                                    <button
-                                      onClick={handlePrintFile}
-                                      className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm"
-                                    >
-                                      In file
-                                    </button>
-                                    <button
-                                      onClick={() => setBankLoanFile(null)}
-                                      className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors text-sm"
-                                    >
-                                      Xóa
-                                    </button>
-                                  </>
-                                )}
-                              </div>
+                              {bankLoanFile && (
+                                <>
+                                  <button
+                                    onClick={handlePrintFile}
+                                    className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-xs sm:text-sm"
+                                  >
+                                    In file
+                                  </button>
+                                  <button
+                                    onClick={async () => {
+                                      const confirmDelete = window.confirm(
+                                        "Bạn có chắc chắn muốn xóa file này?"
+                                      );
+                                      if (!confirmDelete) return;
+
+                                      try {
+                                        // Remove from Firebase if contract key exists
+                                        if (
+                                          currentContractKey ||
+                                          printContract?.firebaseKey
+                                        ) {
+                                          const contractKey =
+                                            currentContractKey ||
+                                            printContract.firebaseKey;
+                                          const contractRef = ref(
+                                            database,
+                                            `exportedContracts/${contractKey}`
+                                          );
+                                          await update(contractRef, {
+                                            bankLoanFile: "",
+                                            "File cho vay ngân hàng": "",
+                                          });
+
+                                          // Update local state
+                                          setContracts((prev) =>
+                                            prev.map((contract) => {
+                                              const key =
+                                                contract.firebaseKey ||
+                                                contract.id;
+                                              if (key === contractKey) {
+                                                return {
+                                                  ...contract,
+                                                  bankLoanFile: "",
+                                                  "File cho vay ngân hàng": "",
+                                                };
+                                              }
+                                              return contract;
+                                            })
+                                          );
+                                          setFilteredContracts((prev) =>
+                                            prev.map((contract) => {
+                                              const key =
+                                                contract.firebaseKey ||
+                                                contract.id;
+                                              if (key === contractKey) {
+                                                return {
+                                                  ...contract,
+                                                  bankLoanFile: "",
+                                                  "File cho vay ngân hàng": "",
+                                                };
+                                              }
+                                              return contract;
+                                            })
+                                          );
+                                        }
+
+                                        setBankLoanFile(null);
+                                        toast.success("Xóa file thành công!");
+                                      } catch (error) {
+                                        console.error(
+                                          "Error deleting file:",
+                                          error
+                                        );
+                                        toast.error(
+                                          "Lỗi khi xóa file. Vui lòng thử lại."
+                                        );
+                                      }
+                                    }}
+                                    className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors text-xs sm:text-sm"
+                                  >
+                                    Xóa
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </div>
-
-                          <button
-                            onClick={() => handlePrintNavigate("/de-nghi-xuat-hoa-don")}
-                            className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                          >
-                            Đề nghị xuất hóa đơn
-                          </button>
-
-                          <button
-                            onClick={() => handlePrintNavigate("/phu-luc-hop-dong")}
-                            className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                          >
-                            Phụ lục hợp đồng
-                            <span className="block text-xs opacity-75 mt-1">(Đi kèm thông tin CCCD trên VNeid, tiền đặt cọc, tiền đối ứng)</span>
-                          </button>
                         </div>
 
-                        {/* Group 2: BỘ GIẢI NGÂN CỦA NGÂN HÀNG */}
-                        <div className="space-y-3">
-                          <h4 className="text-base font-bold text-primary-700 border-b-2 border-primary-300 pb-2">
-                            2. BỘ GIẢI NGÂN CỦA NGÂN HÀNG
-                          </h4>
+                        <button
+                          onClick={() =>
+                            handlePrintNavigate("/de-nghi-xuat-hoa-don")
+                          }
+                          className="w-full px-3 sm:px-4 py-2 sm:py-2.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm sm:text-base"
+                        >
+                          Đề nghị xuất hóa đơn
+                        </button>
 
-                          <button
-                            onClick={() => handlePrintNavigate("/giay-de-nghi-thanh-toan")}
-                            className="w-full px-4 py-2.5 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
-                          >
-                            Đề nghị thanh toán
-                          </button>
+                        <button
+                          onClick={() =>
+                            handlePrintNavigate("/phu-luc-hop-dong")
+                          }
+                          className="w-full px-3 sm:px-4 py-2 sm:py-2.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm sm:text-base"
+                        >
+                          Phụ lục hợp đồng
+                        </button>
+                      </div>
 
-                          <button
-                            onClick={() => handlePrintNavigate("/xac-nhan-so-khung-so-may")}
-                            className="w-full px-4 py-2.5 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
-                          >
-                            Xác nhận Số khung số máy
-                          </button>
+                      {/* Group 2: BỘ GIẢI NGÂN CỦA NGÂN HÀNG */}
+                      <div className="space-y-3">
+                        <h4 className="text-sm sm:text-base font-bold text-primary-700 border-b-2 border-primary-300 pb-2">
+                          2. BỘ GIẢI NGÂN CỦA NGÂN HÀNG
+                        </h4>
 
-                          <button
-                            onClick={() => handlePrintNavigate("/xac-nhan-kieu-loai")}
-                            className="w-full px-4 py-2.5 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
-                          >
-                            Xác nhận kiểu loại
-                          </button>
+                        <button
+                          onClick={() =>
+                            handlePrintNavigate("/giay-de-nghi-thanh-toan")
+                          }
+                          className="w-full px-3 sm:px-4 py-2 sm:py-2.5 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm sm:text-base"
+                        >
+                          Đề nghị thanh toán
+                        </button>
 
-                          <button
-                            onClick={() => handlePrintNavigate("/giay-xac-nhan-tang-bao-hiem")}
-                            className="w-full px-4 py-2.5 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
-                          >
-                            Xác nhận bảo hiểm
-                          </button>
+                        <button
+                          onClick={() =>
+                            handlePrintNavigate("/giay-xac-nhan-sksm")
+                          }
+                          className="w-full px-3 sm:px-4 py-2 sm:py-2.5 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm sm:text-base"
+                        >
+                          Xác nhận Số khung số máy
+                        </button>
 
-                          {/* Conditional options based on loan amount */}
-                          {isLoan0 && (
-                            <div className="space-y-2 mt-3 pl-4 border-l-4 border-yellow-400 bg-yellow-50 p-3 rounded">
-                              <p className="text-sm font-semibold text-yellow-800 mb-2">
-                                KH vay 0 đồng - Các biểu mẫu bổ sung:
+                        <button
+                          onClick={() =>
+                            handlePrintNavigate("/giay-xac-nhan-thong-tin")
+                          }
+                          className="w-full px-3 sm:px-4 py-2 sm:py-2.5 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm sm:text-base"
+                        >
+                          Xác nhận kiểu loại
+                        </button>
+
+                        <button
+                          onClick={() =>
+                            handlePrintNavigate("/giay-xac-nhan-tang-bao-hiem")
+                          }
+                          className="w-full px-3 sm:px-4 py-2 sm:py-2.5 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm sm:text-base"
+                        >
+                          Xác nhận bảo hiểm
+                        </button>
+
+                        <button
+                          onClick={() =>
+                            handlePrintNavigate("/giay-xac-nhan")
+                          }
+                          className="w-full px-3 sm:px-4 py-2 sm:py-2.5 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm sm:text-base"
+                        >
+                          Xác nhận thanh toán
+                        </button>
+
+                        {/* Conditional options based on loan amount */}
+                        {isLoan0 && (
+                          <div className="space-y-2 mt-3 pl-2 sm:pl-4 border-l-4 border-yellow-400 bg-yellow-50 p-2 sm:p-3 rounded">
+                            <p className="text-xs sm:text-sm font-semibold text-yellow-800 mb-2">
+                              KH vay 0 đồng - Các biểu mẫu bổ sung:
+                            </p>
+                            <button
+                              onClick={() =>
+                                handlePrintNavigate("/giay-thoa-thuan-tra-thay")
+                              }
+                              className="w-full px-3 sm:px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors text-xs sm:text-sm"
+                            >
+                              Thỏa thuận hỗ trợ trả thay
+                            </button>
+                            <button
+                              onClick={() =>
+                                handlePrintNavigate("/giay-thoa-thuan-tra-cham")
+                              }
+                              className="w-full px-3 sm:px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors text-xs sm:text-sm"
+                            >
+                              Thỏa thuận hỗ trợ trả chậm
+                            </button>
+                            <button
+                              onClick={() =>
+                                handlePrintNavigate("/xac-nhan-cong-no")
+                              }
+                              className="w-full px-3 sm:px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors text-xs sm:text-sm"
+                            >
+                              Xác nhận công nợ
+                            </button>
+                            <button
+                              onClick={() =>
+                                handlePrintNavigate("/giay-xac-nhan")
+                              }
+                              className="w-full px-3 sm:px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors text-xs sm:text-sm"
+                            >
+                              Xác nhận thanh toán
+                            </button>
+                          </div>
+                        )}
+
+                        {isLoan90 && (
+                          <div className="space-y-2 mt-3 pl-2 sm:pl-4 border-l-4 border-blue-400 bg-blue-50 p-2 sm:p-3 rounded">
+                            <p className="text-xs sm:text-sm font-semibold text-blue-800 mb-2">
+                              KH vay 90% - Biểu mẫu theo ngân hàng:
+                            </p>
+                            {isVPBank && (
+                              <button
+                                onClick={() =>
+                                  handlePrintNavigate(
+                                    "/giay-thoa-thuan-htls-vpbank"
+                                  )
+                                }
+                                className="w-full px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-xs sm:text-sm"
+                              >
+                                Thỏa thuận hỗ trợ lãi suất ngân hàng VPBank
+                              </button>
+                            )}
+                            {(isTPBank || isLotte) && (
+                              <button
+                                onClick={() =>
+                                  handlePrintNavigate(
+                                    `/bieu-mau-${isTPBank ? "tpbank" : "lotte"}`
+                                  )
+                                }
+                                className="w-full px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-xs sm:text-sm"
+                              >
+                                {isTPBank
+                                  ? "Biểu mẫu TPBank"
+                                  : "Biểu mẫu CTY tài chính Lotte"}
+                              </button>
+                            )}
+                            {!isVPBank && !isTPBank && !isLotte && bank && (
+                              <p className="text-xs sm:text-sm text-gray-600 italic">
+                                Ngân hàng: {printContract.bank} - Vui lòng chọn
+                                biểu mẫu phù hợp
                               </p>
-                              <button
-                                onClick={() => handlePrintNavigate("/thoa-thuan-ho-tro-tra-thay-tra-cham")}
-                                className="w-full px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors text-sm"
-                              >
-                                Thỏa thuận hỗ trợ trả thay, trả chậm
-                              </button>
-                              <button
-                                onClick={() => handlePrintNavigate("/xac-nhan-cong-no")}
-                                className="w-full px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors text-sm"
-                              >
-                                Xác nhận công nợ
-                              </button>
-                              <button
-                                onClick={() => handlePrintNavigate("/xac-nhan-thanh-toan-loan0")}
-                                className="w-full px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors text-sm"
-                              >
-                                Xác nhận thanh toán
-                              </button>
-                            </div>
-                          )}
+                            )}
+                          </div>
+                        )}
+                      </div>
 
-                          {isLoan90 && (
-                            <div className="space-y-2 mt-3 pl-4 border-l-4 border-blue-400 bg-blue-50 p-3 rounded">
-                              <p className="text-sm font-semibold text-blue-800 mb-2">
-                                KH vay 90% - Biểu mẫu theo ngân hàng:
-                              </p>
-                              {isVPBank && (
-                                <button
-                                  onClick={() => handlePrintNavigate("/thoa-thuan-ho-tro-lai-suat-vpbank")}
-                                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
-                                >
-                                  Thỏa thuận hỗ trợ lãi suất ngân hàng VPBank
-                                </button>
-                              )}
-                              {(isTPBank || isLotte) && (
-                                <button
-                                  onClick={() => handlePrintNavigate(`/bieu-mau-${isTPBank ? 'tpbank' : 'lotte'}`)}
-                                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
-                                >
-                                  {isTPBank ? 'Biểu mẫu TPBank' : 'Biểu mẫu CTY tài chính Lotte'}
-                                </button>
-                              )}
-                              {!isVPBank && !isTPBank && !isLotte && bank && (
-                                <p className="text-sm text-gray-600 italic">
-                                  Ngân hàng: {printContract.bank} - Vui lòng chọn biểu mẫu phù hợp
-                                </p>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Legacy options (keep for backward compatibility) */}
-                        <div className="space-y-3 pt-4 border-t border-gray-200">
+                      {/* Legacy options (keep for backward compatibility) */}
+                      {/* <div className="space-y-3 pt-4 border-t border-gray-200">
                           <h4 className="text-sm font-semibold text-gray-600">Các mẫu in khác:</h4>
                           <div className="grid grid-cols-2 gap-2">
                             <button
@@ -1432,185 +1900,214 @@ export default function HopDongDaXuatPage() {
                               Giấy xác nhận thông tin
                             </button>
                           </div>
-                        </div>
-                      </div>
-
-                      <div className="px-6 py-4 bg-gray-50 border-t flex justify-end">
-                        <button
-                          onClick={() => {
-                            setIsPrintModalOpen(false);
-                            setPrintContract(null);
-                            setBankLoanFile(null);
-                          }}
-                          className="px-6 py-2 border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
-                        >
-                          Hủy
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* Image Management Modal */}
-              {isImageModalOpen && currentImageContract && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                  <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-auto">
-                    {/* Modal Header */}
-                    <div className="bg-gradient-to-r from-primary-600 to-primary-400 px-6 py-4 rounded-t-lg sticky top-0 z-10">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-xl font-bold text-white">
-                          Quản lý ảnh - {currentImageContract.tenKh || currentImageContract.customerName || currentImageContract.id}
-                        </h3>
-                        <button
-                          onClick={closeImageModal}
-                          className="text-white hover:text-gray-200 transition-colors"
-                          aria-label="Đóng"
-                        >
-                          <X className="w-6 h-6" />
-                        </button>
-                      </div>
+                        </div> */}
                     </div>
 
-                    {/* Modal Body */}
-                    <div className="p-6 space-y-6">
-                      {/* Deposit Image */}
-                      <div className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-700">
-                          Ảnh chụp hình đặt cọc
-                        </label>
-                        <div className="space-y-2">
-                          <input
-                            type="text"
-                            value={depositImage}
-                            onChange={(e) => setDepositImage(e.target.value)}
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm"
-                            placeholder="Nhập URL ảnh hoặc upload file"
-                          />
-                          <div className="flex items-center gap-2">
-                            <label className={`flex-1 px-4 py-2.5 border border-gray-300 rounded-lg transition-colors text-sm text-center ${
-                              uploadingImage && uploadingImageType === 'deposit' 
-                                ? 'bg-gray-200 cursor-not-allowed opacity-50' 
-                                : 'cursor-pointer hover:bg-gray-50'
-                            }`}>
-                              <span className="text-gray-700">
-                                {uploadingImage && uploadingImageType === 'deposit' 
-                                  ? 'Đang upload...' 
-                                  : 'Chọn file ảnh'}
-                              </span>
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={(e) => handleImageUpload(e, 'deposit')}
-                                className="hidden"
-                                disabled={uploadingImage && uploadingImageType === 'deposit'}
-                              />
-                            </label>
-                            {depositImage && !(uploadingImage && uploadingImageType === 'deposit') && (
-                              <button
-                                onClick={() => setDepositImage("")}
-                                className="px-4 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm"
-                              >
-                                Xóa
-                              </button>
-                            )}
-                          </div>
-                          {depositImage && (
-                            <div className="mt-2">
-                              <img
-                                src={depositImage}
-                                alt="Ảnh chụp hình đặt cọc"
-                                className="max-w-full h-auto max-h-64 rounded-lg border border-gray-300"
-                                onError={(e) => {
-                                  e.target.style.display = 'none';
-                                  toast.error("Không thể tải ảnh. Vui lòng kiểm tra lại URL hoặc file.");
-                                }}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Counterpart Image */}
-                      <div className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-700">
-                          Ảnh chụp đối ứng
-                        </label>
-                        <div className="space-y-2">
-                          <input
-                            type="text"
-                            value={counterpartImage}
-                            onChange={(e) => setCounterpartImage(e.target.value)}
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm"
-                            placeholder="Nhập URL ảnh hoặc upload file"
-                          />
-                          <div className="flex items-center gap-2">
-                            <label className={`flex-1 px-4 py-2.5 border border-gray-300 rounded-lg transition-colors text-sm text-center ${
-                              uploadingImage && uploadingImageType === 'counterpart' 
-                                ? 'bg-gray-200 cursor-not-allowed opacity-50' 
-                                : 'cursor-pointer hover:bg-gray-50'
-                            }`}>
-                              <span className="text-gray-700">
-                                {uploadingImage && uploadingImageType === 'counterpart' 
-                                  ? 'Đang upload...' 
-                                  : 'Chọn file ảnh'}
-                              </span>
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={(e) => handleImageUpload(e, 'counterpart')}
-                                className="hidden"
-                                disabled={uploadingImage && uploadingImageType === 'counterpart'}
-                              />
-                            </label>
-                            {counterpartImage && !(uploadingImage && uploadingImageType === 'counterpart') && (
-                              <button
-                                onClick={() => setCounterpartImage("")}
-                                className="px-4 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm"
-                              >
-                                Xóa
-                              </button>
-                            )}
-                          </div>
-                          {counterpartImage && (
-                            <div className="mt-2">
-                              <img
-                                src={counterpartImage}
-                                alt="Ảnh chụp đối ứng"
-                                className="max-w-full h-auto max-h-64 rounded-lg border border-gray-300"
-                                onError={(e) => {
-                                  e.target.style.display = 'none';
-                                  toast.error("Không thể tải ảnh. Vui lòng kiểm tra lại URL hoặc file.");
-                                }}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Modal Footer */}
-                    <div className="bg-gray-50 px-6 py-4 flex flex-col sm:flex-row justify-end items-center gap-4 border-t border-gray-200 rounded-b-lg">
+                    <div className="px-4 sm:px-6 py-3 sm:py-4 bg-gray-50 border-t flex justify-end sticky bottom-0">
                       <button
-                        onClick={closeImageModal}
-                        className="w-full sm:w-auto px-6 py-3 bg-gray-500 text-white font-medium rounded-lg hover:bg-gray-600 transition-all duration-200 flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
-                        aria-label="Hủy"
+                        onClick={() => {
+                          setIsPrintModalOpen(false);
+                          setPrintContract(null);
+                          setCurrentContractKey(null);
+                          // Don't reset bankLoanFile here - keep it for next time modal opens
+                          // setBankLoanFile(null);
+                        }}
+                        className="w-full sm:w-auto px-4 sm:px-6 py-2 border border-gray-300 rounded-md hover:bg-gray-100 transition-colors text-sm sm:text-base"
                       >
-                        <X className="w-4 h-4" />
-                        <span>Hủy</span>
-                      </button>
-                      <button
-                        onClick={handleSaveImages}
-                        className="w-full sm:w-auto px-8 py-3 bg-secondary-600 text-white font-medium rounded-lg hover:bg-secondary-700 transition-all duration-200 flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
-                        aria-label="Lưu ảnh"
-                      >
-                        <Edit className="w-5 h-5" />
-                        <span>Lưu ảnh</span>
+                        Hủy
                       </button>
                     </div>
                   </div>
                 </div>
-              )}
+              );
+            })()}
+
+          {/* Image Management Modal */}
+          {isImageModalOpen && currentImageContract && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+              <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[calc(100vh-2rem)] overflow-auto">
+                {/* Modal Header */}
+                <div className="bg-gradient-to-r from-primary-600 to-primary-400 px-4 sm:px-6 py-3 sm:py-4 rounded-t-lg sticky top-0 z-10">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-base sm:text-xl font-bold text-white truncate">
+                      Quản lý ảnh -{" "}
+                      {currentImageContract.tenKh ||
+                        currentImageContract.customerName ||
+                        currentImageContract.id}
+                    </h3>
+                    <button
+                      onClick={closeImageModal}
+                      className="text-white hover:text-gray-200 transition-colors flex-shrink-0"
+                      aria-label="Đóng"
+                    >
+                      <X className="w-5 h-5 sm:w-6 sm:h-6" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Modal Body */}
+                <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+                  {/* Deposit Image */}
+                  <div className="space-y-2">
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700">
+                      Ảnh chụp hình đặt cọc
+                    </label>
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={depositImage}
+                        onChange={(e) => setDepositImage(e.target.value)}
+                        className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm"
+                        placeholder="Nhập URL ảnh hoặc upload file"
+                      />
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                        <label
+                          className={`flex-1 px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg transition-colors text-xs sm:text-sm text-center ${
+                            uploadingImage && uploadingImageType === "deposit"
+                              ? "bg-gray-200 cursor-not-allowed opacity-50"
+                              : "cursor-pointer hover:bg-gray-50"
+                          }`}
+                        >
+                          <span className="text-gray-700">
+                            {uploadingImage && uploadingImageType === "deposit"
+                              ? "Đang upload..."
+                              : "Chọn file ảnh"}
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handleImageUpload(e, "deposit")}
+                            className="hidden"
+                            disabled={
+                              uploadingImage && uploadingImageType === "deposit"
+                            }
+                          />
+                        </label>
+                        {depositImage &&
+                          !(
+                            uploadingImage && uploadingImageType === "deposit"
+                          ) && (
+                            <button
+                              onClick={() => setDepositImage("")}
+                              className="w-full sm:w-auto px-3 sm:px-4 py-2 sm:py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-xs sm:text-sm"
+                            >
+                              Xóa
+                            </button>
+                          )}
+                      </div>
+                      {depositImage && (
+                        <div className="mt-2">
+                          <img
+                            src={depositImage}
+                            alt="Ảnh chụp hình đặt cọc"
+                            className="max-w-full h-auto max-h-48 sm:max-h-64 rounded-lg border border-gray-300"
+                            onError={(e) => {
+                              e.target.style.display = "none";
+                              toast.error(
+                                "Không thể tải ảnh. Vui lòng kiểm tra lại URL hoặc file."
+                              );
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Counterpart Image */}
+                  <div className="space-y-2">
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700">
+                      Ảnh chụp đối ứng
+                    </label>
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={counterpartImage}
+                        onChange={(e) => setCounterpartImage(e.target.value)}
+                        className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm"
+                        placeholder="Nhập URL ảnh hoặc upload file"
+                      />
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                        <label
+                          className={`flex-1 px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg transition-colors text-xs sm:text-sm text-center ${
+                            uploadingImage &&
+                            uploadingImageType === "counterpart"
+                              ? "bg-gray-200 cursor-not-allowed opacity-50"
+                              : "cursor-pointer hover:bg-gray-50"
+                          }`}
+                        >
+                          <span className="text-gray-700">
+                            {uploadingImage &&
+                            uploadingImageType === "counterpart"
+                              ? "Đang upload..."
+                              : "Chọn file ảnh"}
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) =>
+                              handleImageUpload(e, "counterpart")
+                            }
+                            className="hidden"
+                            disabled={
+                              uploadingImage &&
+                              uploadingImageType === "counterpart"
+                            }
+                          />
+                        </label>
+                        {counterpartImage &&
+                          !(
+                            uploadingImage &&
+                            uploadingImageType === "counterpart"
+                          ) && (
+                            <button
+                              onClick={() => setCounterpartImage("")}
+                              className="w-full sm:w-auto px-3 sm:px-4 py-2 sm:py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-xs sm:text-sm"
+                            >
+                              Xóa
+                            </button>
+                          )}
+                      </div>
+                      {counterpartImage && (
+                        <div className="mt-2">
+                          <img
+                            src={counterpartImage}
+                            alt="Ảnh chụp đối ứng"
+                            className="max-w-full h-auto max-h-48 sm:max-h-64 rounded-lg border border-gray-300"
+                            onError={(e) => {
+                              e.target.style.display = "none";
+                              toast.error(
+                                "Không thể tải ảnh. Vui lòng kiểm tra lại URL hoặc file."
+                              );
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Modal Footer */}
+                <div className="bg-gray-50 px-4 sm:px-6 py-3 sm:py-4 flex flex-col sm:flex-row justify-end items-stretch sm:items-center gap-3 sm:gap-4 border-t border-gray-200 rounded-b-lg sticky bottom-0">
+                  <button
+                    onClick={closeImageModal}
+                    className="w-full sm:w-auto px-5 sm:px-6 py-2.5 sm:py-3 bg-gray-500 text-white font-medium rounded-lg hover:bg-gray-600 transition-all duration-200 flex items-center justify-center gap-2 shadow-sm hover:shadow-md text-sm sm:text-base"
+                    aria-label="Hủy"
+                  >
+                    <X className="w-4 h-4" />
+                    <span>Hủy</span>
+                  </button>
+                  <button
+                    onClick={handleSaveImages}
+                    className="w-full sm:w-auto px-6 sm:px-8 py-2.5 sm:py-3 bg-secondary-600 text-white font-medium rounded-lg hover:bg-secondary-700 transition-all duration-200 flex items-center justify-center gap-2 shadow-sm hover:shadow-md text-sm sm:text-base"
+                    aria-label="Lưu ảnh"
+                  >
+                    <Edit className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <span>Lưu ảnh</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

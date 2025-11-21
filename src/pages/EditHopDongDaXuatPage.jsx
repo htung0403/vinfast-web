@@ -5,7 +5,6 @@ import { database } from "../firebase/config";
 import { X, Edit, ArrowLeft, Image } from "lucide-react";
 import { toast } from "react-toastify";
 import { carPriceData, uniqueNgoaiThatColors, uniqueNoiThatColors } from '../data/calculatorData';
-import { provinces } from '../data/provincesData';
 import { uploadImageToCloudinary } from '../config/cloudinary';
 
 export default function EditHopDongDaXuatPage() {
@@ -17,6 +16,12 @@ export default function EditHopDongDaXuatPage() {
   
   // State for employees list
   const [employees, setEmployees] = useState([]);
+
+  // List of issue places (nơi cấp)
+  const issuePlaces = [
+    "Bộ Công An",
+    "Cục trưởng cục cảnh sát quản lý hành chính về trật tự xã hội"
+  ];
 
   // State for image modal
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
@@ -411,68 +416,68 @@ export default function EditHopDongDaXuatPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-100 to-slate-200">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto mb-4"></div>
-          <p className="text-secondary-600">Đang tải dữ liệu hợp đồng...</p>
+          <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-primary-500 mx-auto mb-4"></div>
+          <p className="text-sm sm:text-base text-secondary-600">Đang tải dữ liệu hợp đồng...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 bg-gradient-to-br from-slate-100 to-slate-200 min-h-screen">
+    <div className="mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8 bg-gradient-to-br from-slate-100 to-slate-200 min-h-screen">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="bg-gradient-to-r from-primary-600 to-primary-400 px-6 py-5 rounded-t-2xl shadow-lg">
+        <div className="bg-gradient-to-r from-primary-600 to-primary-400 px-4 sm:px-6 py-4 sm:py-5 rounded-t-2xl shadow-lg">
           <div className="flex items-center justify-between relative">
             <button
               onClick={() => navigate("/hop-dong-da-xuat")}
-              className="text-white hover:text-gray-200 transition-colors flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-white/10"
+              className="text-white hover:text-gray-200 transition-colors flex items-center gap-2 px-2 sm:px-4 py-2 rounded-lg hover:bg-white/10 z-10"
               aria-label="Quay lại"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
               <span className="hidden sm:inline">Quay lại</span>
             </button>
-            <h2 className="text-2xl lg:text-3xl font-bold text-white absolute left-1/2 transform -translate-x-1/2">
+            <h2 className="text-base sm:text-xl lg:text-2xl xl:text-3xl font-bold text-white absolute left-1/2 transform -translate-x-1/2 text-center px-2 truncate max-w-[calc(100%-8rem)] sm:max-w-none">
               Chỉnh sửa hợp đồng đã xuất
             </h2>
-            <div className="w-24 sm:w-32"></div>
+            <div className="w-16 sm:w-24 md:w-32"></div>
           </div>
         </div>
 
         {/* Form Container */}
         <div className="bg-white rounded-b-2xl shadow-xl overflow-hidden">
           {/* Form Sections */}
-          <div className="p-6 lg:p-8 space-y-8">
+          <div className="p-4 sm:p-6 lg:p-8 space-y-6 sm:space-y-8">
             {/* Section 1: Thông tin cơ bản */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2 mb-4">
+            <div className="space-y-3 sm:space-y-4">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2 mb-3 sm:mb-4">
                 Thông tin cơ bản
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
                 {/* Export Date */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Ngày XHD
                   </label>
                   <input
                     type="date"
                     value={(contract.ngayXhd || "").slice(0, 10)}
                     onChange={(e) => handleChange("ngayXhd", e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm"
                   />
                 </div>
 
                 {/* TVBH */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     TVBH
                   </label>
                   <select
                     value={contract.tvbh || ""}
                     onChange={(e) => handleChange("tvbh", e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm bg-white"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm bg-white"
                   >
                     <option value="">Chọn TVBH</option>
                     {employees.map((emp) => (
@@ -491,14 +496,14 @@ export default function EditHopDongDaXuatPage() {
 
                 {/* VSO */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     VSO
                   </label>
                   <input
                     type="text"
                     value={contract.vso || ""}
                     onChange={(e) => handleChange("vso", e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm"
                     placeholder="VSO"
                   />
                 </div>
@@ -506,112 +511,112 @@ export default function EditHopDongDaXuatPage() {
             </div>
 
             {/* Section 2: Thông tin khách hàng */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2 mb-4">
+            <div className="space-y-3 sm:space-y-4">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2 mb-3 sm:mb-4">
                 Thông tin khách hàng
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
                     {/* Customer Name */}
-                <div className="md:col-span-2 lg:col-span-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="sm:col-span-2 lg:col-span-1">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Tên khách hàng <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={contract.tenKh || ""}
                     onChange={(e) => handleChange("tenKh", e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm"
                     placeholder="Tên khách hàng"
                   />
                 </div>
 
                 {/* Phone */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Số điện thoại <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="tel"
                     value={contract.soDienThoai || ""}
                     onChange={(e) => handleChange("soDienThoai", e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm"
                     placeholder="Số điện thoại"
                   />
                 </div>
 
                 {/* Email */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Email
                   </label>
                   <input
                     type="email"
                     value={contract.email || ""}
                     onChange={(e) => handleChange("email", e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm"
                     placeholder="Email"
                   />
                 </div>
 
                 {/* Address */}
-                <div className="md:col-span-2 lg:col-span-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="sm:col-span-2 lg:col-span-3">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Địa chỉ lấy theo VNeid
                   </label>
                   <input
                     type="text"
                     value={contract.diaChi || ""}
                     onChange={(e) => handleChange("diaChi", e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm"
                     placeholder="Địa chỉ lấy theo VNeid"
                   />
                 </div>
 
                 {/* CCCD */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Số CCCD
                   </label>
                   <input
                     type="text"
                     value={contract.cccd || ""}
                     onChange={(e) => handleChange("cccd", e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm"
                     placeholder="CCCD"
                   />
                 </div>
 
                 {/* Issue Date */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Ngày cấp
                   </label>
                   <input
                     type="date"
                     value={(contract.ngayCap || "").slice(0, 10)}
                     onChange={(e) => handleChange("ngayCap", e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm"
                   />
                 </div>
 
                 {/* Issue Place */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Nơi cấp
                   </label>
                   <select
                     value={contract.noiCap || ""}
                     onChange={(e) => handleChange("noiCap", e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm bg-white"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm bg-white"
                   >
                     <option value="">Chọn nơi cấp</option>
-                    {provinces.map((province) => (
-                      <option key={province} value={province}>
-                        {province}
+                    {issuePlaces.map((place) => (
+                      <option key={place} value={place}>
+                        {place}
                       </option>
                     ))}
                     {/* Show current value if it doesn't match any option (for editing existing contracts) */}
-                    {contract.noiCap && !provinces.includes(contract.noiCap) && (
+                    {contract.noiCap && !issuePlaces.includes(contract.noiCap) && (
                       <option value={contract.noiCap}>
                         {contract.noiCap} (giá trị hiện tại)
                       </option>
@@ -622,20 +627,20 @@ export default function EditHopDongDaXuatPage() {
             </div>
 
             {/* Section 3: Thông tin xe */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2 mb-4">
+            <div className="space-y-3 sm:space-y-4">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2 mb-3 sm:mb-4">
                 Thông tin xe
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
                     {/* Model (Dòng xe) */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Dòng xe
                   </label>
                   <select
                     value={contract.dongXe || ""}
                     onChange={(e) => handleChange("dongXe", e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm bg-white"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm bg-white"
                   >
                     <option value="">Chọn dòng xe</option>
                     {carModels.map((model) => (
@@ -654,14 +659,14 @@ export default function EditHopDongDaXuatPage() {
 
                 {/* Variant */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Phiên Bản
                   </label>
                   <select
                     value={contract.phienBan || ""}
                     onChange={(e) => handleChange("phienBan", e.target.value)}
                     disabled={!contract.dongXe}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="">Chọn phiên bản</option>
                     {availableTrims.map((trim) => (
@@ -680,14 +685,14 @@ export default function EditHopDongDaXuatPage() {
 
                 {/* Exterior */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Ngoại Thất
                   </label>
                   <select
                     value={contract.ngoaiThat || ""}
                     onChange={(e) => handleChange("ngoaiThat", e.target.value)}
                     disabled={!contract.dongXe || !contract.phienBan}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="">Chọn màu ngoại thất</option>
                     {availableExteriorColors.map((color) => (
@@ -706,14 +711,14 @@ export default function EditHopDongDaXuatPage() {
 
                 {/* Interior */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Nội Thất
                   </label>
                   <select
                     value={contract.noiThat || ""}
                     onChange={(e) => handleChange("noiThat", e.target.value)}
                     disabled={!contract.dongXe || !contract.phienBan}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="">Chọn màu nội thất</option>
                     {availableInteriorColors.map((color) => (
@@ -732,28 +737,28 @@ export default function EditHopDongDaXuatPage() {
 
                 {/* Chassis Number */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Số Khung
                   </label>
                   <input
                     type="text"
                     value={contract.soKhung || ""}
                     onChange={(e) => handleChange("soKhung", e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm"
                     placeholder="Số khung"
                   />
                 </div>
 
                 {/* Engine Number */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Số Máy
                   </label>
                   <input
                     type="text"
                     value={contract.soMay || ""}
                     onChange={(e) => handleChange("soMay", e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm"
                     placeholder="Số máy"
                   />
                 </div>
@@ -761,77 +766,77 @@ export default function EditHopDongDaXuatPage() {
             </div>
 
             {/* Section 4: Thông tin thanh toán */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2 mb-4">
+            <div className="space-y-3 sm:space-y-4">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2 mb-3 sm:mb-4">
                 Thông tin thanh toán
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
                     {/* List Price */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Giá Niêm Yết
                   </label>
                   <input
                     type="text"
                     value={formatCurrency(contract.giaNiemYet)}
                     onChange={(e) => handleCurrencyChange("giaNiemYet", e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm"
                     placeholder="Nhập giá niêm yết"
                   />
                 </div>
 
                 {/* Discount Price */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Giá Giảm
                   </label>
                   <input
                     type="text"
                     value={formatCurrency(contract.giaGiam)}
                     onChange={(e) => handleCurrencyChange("giaGiam", e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm"
                     placeholder="Nhập giá giảm"
                   />
                 </div>
 
                 {/* Contract Price */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Giá Hợp Đồng
                   </label>
                   <input
                     type="text"
                     value={formatCurrency(contract.giaHopDong)}
                     onChange={(e) => handleCurrencyChange("giaHopDong", e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm"
                     placeholder="Nhập giá hợp đồng"
                   />
                 </div>
 
                 {/* Status */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Tình Trạng
                   </label>
                   <input
                     type="text"
                     value={contract.tinhTrang || ""}
                     onChange={(e) => handleChange("tinhTrang", e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm"
                     placeholder="Tình trạng"
                   />
                 </div>
 
                 {/* Bank */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Ngân hàng
                   </label>
                   <input
                     type="text"
                     value={contract.nganHang || ""}
                     onChange={(e) => handleChange("nganHang", e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm"
                     placeholder="Ngân hàng"
                   />
                 </div>
@@ -840,17 +845,17 @@ export default function EditHopDongDaXuatPage() {
           </div>
 
           {/* Required fields note */}
-          <div className="px-6 lg:px-8 pt-4 pb-4 border-t border-gray-200">
-            <p className="text-sm text-gray-500">
+          <div className="px-4 sm:px-6 lg:px-8 pt-3 sm:pt-4 pb-3 sm:pb-4 border-t border-gray-200">
+            <p className="text-xs sm:text-sm text-gray-500">
               <span className="text-red-500 font-semibold">*</span> Các trường bắt buộc
             </p>
           </div>
 
           {/* Footer Actions */}
-          <div className="bg-gray-50 px-6 lg:px-8 py-5 flex flex-col sm:flex-row justify-end items-center gap-4 border-t border-gray-200">
+          <div className="bg-gray-50 px-4 sm:px-6 lg:px-8 py-4 sm:py-5 flex flex-col sm:flex-row justify-end items-stretch sm:items-center gap-3 sm:gap-4 border-t border-gray-200">
             <button
               onClick={() => navigate("/hop-dong-da-xuat")}
-              className="w-full sm:w-auto px-6 py-3 bg-gray-500 text-white font-medium rounded-lg hover:bg-gray-600 transition-all duration-200 flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
+              className="w-full sm:w-auto px-5 sm:px-6 py-2.5 sm:py-3 bg-gray-500 text-white font-medium rounded-lg hover:bg-gray-600 transition-all duration-200 flex items-center justify-center gap-2 shadow-sm hover:shadow-md text-sm sm:text-base"
               aria-label="Hủy"
             >
               <X className="w-4 h-4" />
@@ -859,10 +864,10 @@ export default function EditHopDongDaXuatPage() {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="w-full sm:w-auto px-8 py-3 bg-secondary-600 text-white font-medium rounded-lg hover:bg-secondary-700 transition-all duration-200 flex items-center justify-center gap-2 shadow-sm hover:shadow-md disabled:bg-gray-400 disabled:cursor-not-allowed"
+              className="w-full sm:w-auto px-6 sm:px-8 py-2.5 sm:py-3 bg-secondary-600 text-white font-medium rounded-lg hover:bg-secondary-700 transition-all duration-200 flex items-center justify-center gap-2 shadow-sm hover:shadow-md disabled:bg-gray-400 disabled:cursor-not-allowed text-sm sm:text-base"
               aria-label="Lưu thay đổi"
             >
-              <Edit className="w-5 h-5" />
+              <Edit className="w-4 h-4 sm:w-5 sm:h-5" />
               <span>{saving ? "Đang lưu..." : "Lưu thay đổi"}</span>
             </button>
           </div>
@@ -871,29 +876,29 @@ export default function EditHopDongDaXuatPage() {
 
       {/* Image Modal */}
       {isImageModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[calc(100vh-2rem)] overflow-auto">
             {/* Modal Header */}
-            <div className="bg-gradient-to-r from-primary-600 to-primary-400 px-6 py-4 rounded-t-lg sticky top-0 z-10">
+            <div className="bg-gradient-to-r from-primary-600 to-primary-400 px-4 sm:px-6 py-3 sm:py-4 rounded-t-lg sticky top-0 z-10">
               <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold text-white">
+                <h3 className="text-base sm:text-lg lg:text-xl font-bold text-white truncate">
                   Quản lý ảnh
                 </h3>
                 <button
                   onClick={closeImageModal}
-                  className="text-white hover:text-gray-200 transition-colors"
+                  className="text-white hover:text-gray-200 transition-colors flex-shrink-0"
                   aria-label="Đóng"
                 >
-                  <X className="w-6 h-6" />
+                  <X className="w-5 h-5 sm:w-6 sm:h-6" />
                 </button>
               </div>
             </div>
 
             {/* Modal Body */}
-            <div className="p-6 space-y-6">
+            <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
               {/* Deposit Image */}
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700">
                   Ảnh chụp hình đặt cọc
                 </label>
                 <div className="space-y-2">
@@ -901,11 +906,11 @@ export default function EditHopDongDaXuatPage() {
                     type="text"
                     value={depositImage}
                     onChange={(e) => setDepositImage(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm"
                     placeholder="Nhập URL ảnh hoặc upload file"
                   />
-                  <div className="flex items-center gap-2">
-                    <label className={`flex-1 px-4 py-2.5 border border-gray-300 rounded-lg transition-colors text-sm text-center ${
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    <label className={`flex-1 px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg transition-colors text-xs sm:text-sm text-center ${
                       uploadingImage && uploadingImageType === 'deposit' 
                         ? 'bg-gray-200 cursor-not-allowed opacity-50' 
                         : 'cursor-pointer hover:bg-gray-50'
@@ -926,7 +931,7 @@ export default function EditHopDongDaXuatPage() {
                     {depositImage && !(uploadingImage && uploadingImageType === 'deposit') && (
                       <button
                         onClick={() => setDepositImage("")}
-                        className="px-4 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm"
+                        className="px-3 sm:px-4 py-2 sm:py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-xs sm:text-sm"
                       >
                         Xóa
                       </button>
@@ -937,7 +942,7 @@ export default function EditHopDongDaXuatPage() {
                       <img
                         src={depositImage}
                         alt="Ảnh chụp hình đặt cọc"
-                        className="max-w-full h-auto max-h-64 rounded-lg border border-gray-300"
+                        className="max-w-full h-auto max-h-48 sm:max-h-64 rounded-lg border border-gray-300"
                         onError={(e) => {
                           e.target.style.display = 'none';
                           toast.error("Không thể tải ảnh. Vui lòng kiểm tra lại URL hoặc file.");
@@ -950,7 +955,7 @@ export default function EditHopDongDaXuatPage() {
 
               {/* Counterpart Image */}
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700">
                   Ảnh chụp đối ứng
                 </label>
                 <div className="space-y-2">
@@ -958,11 +963,11 @@ export default function EditHopDongDaXuatPage() {
                     type="text"
                     value={counterpartImage}
                     onChange={(e) => setCounterpartImage(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm"
                     placeholder="Nhập URL ảnh hoặc upload file"
                   />
-                  <div className="flex items-center gap-2">
-                    <label className={`flex-1 px-4 py-2.5 border border-gray-300 rounded-lg transition-colors text-sm text-center ${
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    <label className={`flex-1 px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg transition-colors text-xs sm:text-sm text-center ${
                       uploadingImage && uploadingImageType === 'counterpart' 
                         ? 'bg-gray-200 cursor-not-allowed opacity-50' 
                         : 'cursor-pointer hover:bg-gray-50'
@@ -983,7 +988,7 @@ export default function EditHopDongDaXuatPage() {
                     {counterpartImage && !(uploadingImage && uploadingImageType === 'counterpart') && (
                       <button
                         onClick={() => setCounterpartImage("")}
-                        className="px-4 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm"
+                        className="px-3 sm:px-4 py-2 sm:py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-xs sm:text-sm"
                       >
                         Xóa
                       </button>
@@ -994,7 +999,7 @@ export default function EditHopDongDaXuatPage() {
                       <img
                         src={counterpartImage}
                         alt="Ảnh chụp đối ứng"
-                        className="max-w-full h-auto max-h-64 rounded-lg border border-gray-300"
+                        className="max-w-full h-auto max-h-48 sm:max-h-64 rounded-lg border border-gray-300"
                         onError={(e) => {
                           e.target.style.display = 'none';
                           toast.error("Không thể tải ảnh. Vui lòng kiểm tra lại URL hoặc file.");
@@ -1007,10 +1012,10 @@ export default function EditHopDongDaXuatPage() {
             </div>
 
             {/* Modal Footer */}
-            <div className="bg-gray-50 px-6 py-4 flex flex-col sm:flex-row justify-end items-center gap-4 border-t border-gray-200 rounded-b-lg">
+            <div className="bg-gray-50 px-4 sm:px-6 py-3 sm:py-4 flex flex-col sm:flex-row justify-end items-stretch sm:items-center gap-2 sm:gap-4 border-t border-gray-200 rounded-b-lg">
               <button
                 onClick={closeImageModal}
-                className="w-full sm:w-auto px-6 py-3 bg-gray-500 text-white font-medium rounded-lg hover:bg-gray-600 transition-all duration-200 flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
+                className="w-full sm:w-auto px-5 sm:px-6 py-2.5 sm:py-3 bg-gray-500 text-white font-medium rounded-lg hover:bg-gray-600 transition-all duration-200 flex items-center justify-center gap-2 shadow-sm hover:shadow-md text-sm sm:text-base"
                 aria-label="Hủy"
               >
                 <X className="w-4 h-4" />
@@ -1018,10 +1023,10 @@ export default function EditHopDongDaXuatPage() {
               </button>
               <button
                 onClick={handleSaveImages}
-                className="w-full sm:w-auto px-8 py-3 bg-secondary-600 text-white font-medium rounded-lg hover:bg-secondary-700 transition-all duration-200 flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
+                className="w-full sm:w-auto px-6 sm:px-8 py-2.5 sm:py-3 bg-secondary-600 text-white font-medium rounded-lg hover:bg-secondary-700 transition-all duration-200 flex items-center justify-center gap-2 shadow-sm hover:shadow-md text-sm sm:text-base"
                 aria-label="Lưu ảnh"
               >
-                <Edit className="w-5 h-5" />
+                <Edit className="w-4 h-4 sm:w-5 sm:h-5" />
                 <span>Lưu ảnh</span>
               </button>
             </div>

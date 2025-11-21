@@ -1,12 +1,11 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ref, update, push, get } from 'firebase/database';
 import { database } from '../firebase/config';
-import { X, Check, ArrowLeft } from 'lucide-react';
+import { X, Check, ArrowLeft, ChevronDown } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { carPriceData, uniqueNgoaiThatColors, uniqueNoiThatColors } from '../data/calculatorData';
 import { getAllBranches, getBranchByShowroomName } from '../data/branchData';
-import { provinces } from '../data/provincesData';
 
 export default function ContractFormPage() {
   const navigate = useNavigate();
@@ -19,6 +18,12 @@ export default function ContractFormPage() {
 
   // Get all branches for showroom dropdown
   const branches = getAllBranches();
+
+  // List of issue places (nơi cấp)
+  const issuePlaces = [
+    "Bộ Công An",
+    "Cục trưởng cục cảnh sát quản lý hành chính về trật tự xã hội"
+  ];
 
   // State for employees list
   const [employees, setEmployees] = useState([]);
@@ -50,6 +55,14 @@ export default function ContractFormPage() {
     loadEmployees();
   }, []);
 
+  // List of available promotions
+  const availablePromotions = [
+    "Chính sách MLTTVN 3: Giảm 4% Tiền mặt",
+    "Miễn phí sạc tới 30/06/2027",
+    "Chính Sách Sài Gòn Xanh: Ví VinClub 35.000.000 vnđ",
+    "Thu cũ đổi mới xe xăng VinFast: 50.000.000 vnđ"
+  ];
+
   const [contract, setContract] = useState({
     id: null,
     createdAt: new Date().toISOString().split("T")[0],
@@ -71,8 +84,12 @@ export default function ContractFormPage() {
     deposit: "",
     payment: "",
     bank: "",
+    uuDai: [],
     status: "mới",
   });
+
+  // State for dropdown visibility
+  const [isUuDaiDropdownOpen, setIsUuDaiDropdownOpen] = useState(false);
 
   useEffect(() => {
     if (contractData) {
@@ -118,6 +135,29 @@ export default function ContractFormPage() {
         return exactMatch ? exactMatch.name : showroomValue; // Return original if no match
       };
 
+      // Helper to parse uuDai (can be array, string, or comma-separated string)
+      const parseUuDai = (value) => {
+        if (!value) return [];
+        if (Array.isArray(value)) return value;
+        if (typeof value === 'string') {
+          // Try to parse as JSON array first
+          try {
+            const parsed = JSON.parse(value);
+            if (Array.isArray(parsed)) return parsed;
+          } catch (e) {
+            // Not JSON, treat as comma-separated string or single value
+            if (value.includes(',')) {
+              return value.split(',').map(v => v.trim()).filter(Boolean);
+            }
+            // Check if it matches any of the available promotions
+            if (availablePromotions.includes(value)) {
+              return [value];
+            }
+          }
+        }
+        return [];
+      };
+
       // Map contract data for editing
       setContract({
         id: contractData.id || null,
@@ -140,10 +180,29 @@ export default function ContractFormPage() {
         deposit: contractData.deposit || contractData.soTienCoc || "",
         payment: contractData.payment || contractData.thanhToan || "",
         bank: contractData.bank || contractData.nganHang || "",
+        uuDai: parseUuDai(contractData.uuDai || contractData["Ưu đãi"] || contractData["ưu đãi"] || ""),
         status: contractData.status || contractData.trangThai || "mới",
       });
     }
   }, [contractData]);
+
+  // Close dropdown when clicking outside
+  const dropdownRef = useRef(null);
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsUuDaiDropdownOpen(false);
+      }
+    };
+
+    if (isUuDaiDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isUuDaiDropdownOpen]);
 
   // Get unique car models from carPriceData
   const carModels = useMemo(() => {
@@ -264,10 +323,25 @@ export default function ContractFormPage() {
     handleInputChange(field, rawValue);
   };
 
+  // Handle promotion checkbox toggle
+  const handlePromotionToggle = (promotion) => {
+    setContract((prev) => {
+      const currentPromotions = prev.uuDai || [];
+      const isSelected = currentPromotions.includes(promotion);
+      const updatedPromotions = isSelected
+        ? currentPromotions.filter((p) => p !== promotion)
+        : [...currentPromotions, promotion];
+      return {
+        ...prev,
+        uuDai: updatedPromotions,
+      };
+    });
+  };
+
   const handleSubmit = async () => {
     // Validation
-    if (!contract.customerName || !contract.phone) {
-      toast.error("Vui lòng điền tên khách hàng và số điện thoại!");
+    if (!contract.customerName || !contract.phone || !contract.email) {
+      toast.error("Vui lòng điền tên khách hàng, số điện thoại và email!");
       return;
     }
 
@@ -298,6 +372,7 @@ export default function ContractFormPage() {
           soTienCoc: safeValue(contract.deposit),
           thanhToan: safeValue(contract.payment),
           nganHang: safeValue(contract.bank),
+          uuDai: Array.isArray(contract.uuDai) ? contract.uuDai : [],
           trangThai: safeValue(contract.status) || "mới",
         });
         toast.success("Cập nhật hợp đồng thành công!");
@@ -326,6 +401,7 @@ export default function ContractFormPage() {
           soTienCoc: safeValue(contract.deposit),
           thanhToan: safeValue(contract.payment),
           nganHang: safeValue(contract.bank),
+          uuDai: Array.isArray(contract.uuDai) ? contract.uuDai : [],
           trangThai: safeValue(contract.status) || "mới",
         });
         toast.success("Thêm hợp đồng thành công!");
@@ -342,20 +418,20 @@ export default function ContractFormPage() {
   };
 
   return (
-    <div className="mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 bg-gradient-to-br from-slate-100 to-slate-200 min-h-screen">
+    <div className="mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8 bg-gradient-to-br from-slate-100 to-slate-200 min-h-screen">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="bg-gradient-to-r from-primary-600 to-primary-400 px-6 py-5 rounded-t-2xl shadow-lg">
+        <div className="bg-gradient-to-r from-primary-600 to-primary-400 px-4 sm:px-6 py-4 sm:py-5 rounded-t-2xl shadow-lg">
           <div className="flex items-center justify-between relative">
           <button
               onClick={() => navigate(isDetailsMode ? "/dashboard" : "/hop-dong")}
-              className="text-white hover:text-gray-200 transition-colors flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-white/10"
+              className="text-white hover:text-gray-200 transition-colors flex items-center gap-2 px-2 sm:px-4 py-2 rounded-lg hover:bg-white/10 z-10"
               aria-label="Quay lại"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
               <span className="hidden sm:inline">Quay lại</span>
             </button>
-            <h2 className="text-2xl lg:text-3xl font-bold text-white absolute left-1/2 transform -translate-x-1/2">
+            <h2 className="text-base sm:text-xl lg:text-2xl xl:text-3xl font-bold text-white absolute left-1/2 transform -translate-x-1/2 px-2 text-center">
               {isDetailsMode 
                 ? "Chi tiết hợp đồng" 
                 : isEditMode 
@@ -368,16 +444,16 @@ export default function ContractFormPage() {
         {/* Form Container */}
         <div className="bg-white rounded-b-2xl shadow-xl overflow-hidden">
           {/* Form Sections */}
-          <div className="p-6 lg:p-8 space-y-8">
+          <div className="p-4 sm:p-6 lg:p-8 space-y-6 sm:space-y-8">
             {/* Section 1: Thông tin cơ bản */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2 mb-4">
+            <div className="space-y-3 sm:space-y-4">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2 mb-3 sm:mb-4">
                 Thông tin cơ bản
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
                 {/* Created Date */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Ngày tạo
                   </label>
                   <input
@@ -385,20 +461,20 @@ export default function ContractFormPage() {
                     value={(contract.createdAt || "").slice(0, 10)}
                     onChange={(e) => handleInputChange("createdAt", e.target.value)}
                     disabled={isDetailsMode}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                 </div>
 
                 {/* TVBH */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     TVBH
                   </label>
                   <select
                     value={contract.tvbh || ""}
                     onChange={(e) => handleInputChange("tvbh", e.target.value)}
                     disabled={isDetailsMode}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="">Chọn TVBH</option>
                     {employees.map((emp) => (
@@ -417,14 +493,14 @@ export default function ContractFormPage() {
 
                 {/* Showroom */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Showroom
                   </label>
                   <select
                     value={contract.showroom || ""}
                     onChange={(e) => handleInputChange("showroom", e.target.value)}
                     disabled={isDetailsMode}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="">Chọn showroom</option>
                     {branches.map((branch) => (
@@ -443,7 +519,7 @@ export default function ContractFormPage() {
 
                 {/* VSO */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     VSO
                   </label>
                   <input
@@ -451,7 +527,7 @@ export default function ContractFormPage() {
                     value={contract.vso || ""}
                     onChange={(e) => handleInputChange("vso", e.target.value)}
                     disabled={isDetailsMode}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                     placeholder="VSO"
                   />
                 </div>
@@ -459,15 +535,15 @@ export default function ContractFormPage() {
             </div>
 
             {/* Section 2: Thông tin khách hàng */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2 mb-4">
+            <div className="space-y-3 sm:space-y-4">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2 mb-3 sm:mb-4">
                 Thông tin khách hàng
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
 
                 {/* Customer Name */}
-                <div className="md:col-span-2 lg:col-span-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="sm:col-span-2 lg:col-span-1">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Tên khách hàng <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -475,14 +551,14 @@ export default function ContractFormPage() {
                     value={contract.customerName || ""}
                     onChange={(e) => handleInputChange("customerName", e.target.value)}
                     disabled={isDetailsMode}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                     placeholder="Tên khách hàng"
                   />
                 </div>
 
                 {/* Phone */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Số điện thoại <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -490,29 +566,29 @@ export default function ContractFormPage() {
                     value={contract.phone || ""}
                     onChange={(e) => handleInputChange("phone", e.target.value)}
                     disabled={isDetailsMode}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                     placeholder="Số điện thoại"
                   />
                 </div>
 
                 {/* Email */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Email
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
+                    Email <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="email"
                     value={contract.email || ""}
                     onChange={(e) => handleInputChange("email", e.target.value)}
                     disabled={isDetailsMode}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                     placeholder="Email"
                   />
                 </div>
 
                 {/* Address */}
-                <div className="md:col-span-2 lg:col-span-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="sm:col-span-2 lg:col-span-3">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Địa chỉ
                   </label>
                   <input
@@ -520,14 +596,14 @@ export default function ContractFormPage() {
                     value={contract.address || ""}
                     onChange={(e) => handleInputChange("address", e.target.value)}
                     disabled={isDetailsMode}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                     placeholder="Địa chỉ"
                   />
                 </div>
 
                 {/* CCCD */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Số CCCD
                   </label>
                   <input
@@ -535,14 +611,14 @@ export default function ContractFormPage() {
                     value={contract.cccd || ""}
                     onChange={(e) => handleInputChange("cccd", e.target.value)}
                     disabled={isDetailsMode}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                     placeholder="CCCD"
                   />
                 </div>
 
                 {/* Issue Date */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Ngày cấp
                   </label>
                   <input
@@ -550,29 +626,29 @@ export default function ContractFormPage() {
                     value={(contract.issueDate || "").slice(0, 10)}
                     onChange={(e) => handleInputChange("issueDate", e.target.value)}
                     disabled={isDetailsMode}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                 </div>
 
                 {/* Issue Place */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Nơi cấp
                   </label>
                   <select
                     value={contract.issuePlace || ""}
                     onChange={(e) => handleInputChange("issuePlace", e.target.value)}
                     disabled={isDetailsMode}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="">Chọn nơi cấp</option>
-                    {provinces.map((province) => (
-                      <option key={province} value={province}>
-                        {province}
+                    {issuePlaces.map((place) => (
+                      <option key={place} value={place}>
+                        {place}
                       </option>
                     ))}
                     {/* Show current value if it doesn't match any option (for editing existing contracts) */}
-                    {contract.issuePlace && !provinces.includes(contract.issuePlace) && (
+                    {contract.issuePlace && !issuePlaces.includes(contract.issuePlace) && (
                       <option value={contract.issuePlace}>
                         {contract.issuePlace} (giá trị hiện tại)
                       </option>
@@ -583,22 +659,22 @@ export default function ContractFormPage() {
             </div>
 
             {/* Section 3: Thông tin xe */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2 mb-4">
+            <div className="space-y-3 sm:space-y-4">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2 mb-3 sm:mb-4">
                 Thông tin xe
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
 
                 {/* Model (Dòng xe) */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Dòng xe
                   </label>
                   <select
                     value={contract.model || ""}
                     onChange={(e) => handleInputChange("model", e.target.value)}
                     disabled={isDetailsMode}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="">Chọn dòng xe</option>
                     {carModels.map((model) => (
@@ -617,14 +693,14 @@ export default function ContractFormPage() {
 
                 {/* Variant */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Phiên Bản
                   </label>
                   <select
                     value={contract.variant || ""}
                     onChange={(e) => handleInputChange("variant", e.target.value)}
                     disabled={isDetailsMode || !contract.model}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="">Chọn phiên bản</option>
                     {availableTrims.map((trim) => (
@@ -643,14 +719,14 @@ export default function ContractFormPage() {
 
                 {/* Exterior */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Ngoại Thất
                   </label>
                   <select
                     value={contract.exterior || ""}
                     onChange={(e) => handleInputChange("exterior", e.target.value)}
                     disabled={isDetailsMode || !contract.model || !contract.variant}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="">Chọn màu ngoại thất</option>
                     {availableExteriorColors.map((color) => (
@@ -669,14 +745,14 @@ export default function ContractFormPage() {
 
                 {/* Interior */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Nội Thất
                   </label>
                   <select
                     value={contract.interior || ""}
                     onChange={(e) => handleInputChange("interior", e.target.value)}
                     disabled={isDetailsMode || !contract.model || !contract.variant}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="">Chọn màu nội thất</option>
                     {availableInteriorColors.map((color) => (
@@ -696,15 +772,15 @@ export default function ContractFormPage() {
             </div>
 
             {/* Section 4: Thông tin thanh toán */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2 mb-4">
+            <div className="space-y-3 sm:space-y-4">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2 mb-3 sm:mb-4">
                 Thông tin thanh toán
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
 
                 {/* Contract Price */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Giá hợp đồng
                   </label>
                   <input
@@ -712,14 +788,14 @@ export default function ContractFormPage() {
                     value={formatCurrency(contract.contractPrice)}
                     onChange={(e) => handleCurrencyChange("contractPrice", e.target.value)}
                     disabled={isDetailsMode}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                     placeholder="Nhập giá hợp đồng"
                   />
                 </div>
 
                 {/* Deposit */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Số tiền cọc
                   </label>
                   <input
@@ -727,14 +803,14 @@ export default function ContractFormPage() {
                     value={formatCurrency(contract.deposit)}
                     onChange={(e) => handleCurrencyChange("deposit", e.target.value)}
                     disabled={isDetailsMode}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                     placeholder="Nhập số tiền cọc"
                   />
                 </div>
 
                 {/* Payment Method */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Phương thức thanh toán
                   </label>
                   <input
@@ -742,46 +818,98 @@ export default function ContractFormPage() {
                     value={contract.payment || ""}
                     onChange={(e) => handleInputChange("payment", e.target.value)}
                     disabled={isDetailsMode}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                     placeholder="Phương thức thanh toán"
                   />
                 </div>
 
                 {/* Bank */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Ngân hàng
                   </label>
-                  <select
+                  <input
+                    type="text"
                     value={contract.bank || ""}
                     onChange={(e) => handleInputChange("bank", e.target.value)}
                     disabled={isDetailsMode}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  >
-                    <option value="">Chọn ngân hàng</option>
-                    <option value="VPbank">VPbank</option>
-                    <option value="TPbank">TPbank</option>
-                    <option value="CTY Tài chính Lotte">CTY Tài chính Lotte</option>
-                    {/* Show current value if it doesn't match any option (for editing existing contracts) */}
-                    {contract.bank && 
-                     !["VPbank", "TPbank", "CTY Tài chính Lotte"].includes(contract.bank) && (
-                      <option value={contract.bank}>
-                        {contract.bank} (giá trị hiện tại)
-                      </option>
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    placeholder="Nhập tên ngân hàng"
+                  />
+                </div>
+
+                {/* Uu Dai - Dropdown with checkboxes */}
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
+                    Ưu đãi
+                  </label>
+                  <div className="relative" ref={dropdownRef}>
+                    <button
+                      type="button"
+                      onClick={() => !isDetailsMode && setIsUuDaiDropdownOpen(!isUuDaiDropdownOpen)}
+                      disabled={isDetailsMode}
+                      className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm bg-white disabled:bg-gray-100 disabled:cursor-not-allowed flex items-center justify-between"
+                    >
+                      <span className="text-left flex-1 truncate">
+                        {contract.uuDai && contract.uuDai.length > 0
+                          ? `${contract.uuDai.length} ưu đãi đã chọn`
+                          : "Chọn ưu đãi"}
+                      </span>
+                      <ChevronDown
+                        className={`w-4 h-4 sm:w-5 sm:h-5 text-gray-400 transition-transform flex-shrink-0 ml-2 ${
+                          isUuDaiDropdownOpen ? "transform rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+                    {isUuDaiDropdownOpen && !isDetailsMode && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        {availablePromotions.map((promotion) => {
+                          const isSelected = contract.uuDai && contract.uuDai.includes(promotion);
+                          return (
+                            <label
+                              key={promotion}
+                              className="flex items-start px-3 sm:px-4 py-2 sm:py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => handlePromotionToggle(promotion)}
+                                className="mt-1 w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                              />
+                              <span className="ml-2 sm:ml-3 text-xs sm:text-sm text-gray-700 flex-1 break-words">
+                                {promotion}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
                     )}
-                  </select>
+                  </div>
+                  {/* Display selected promotions */}
+                  {contract.uuDai && contract.uuDai.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {contract.uuDai.map((promotion) => (
+                        <div
+                          key={promotion}
+                          className="text-xs text-gray-600 bg-gray-50 px-2 sm:px-3 py-1 sm:py-1.5 rounded border border-gray-200 break-words"
+                        >
+                          {promotion}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Status */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Trạng thái
                   </label>
                   <select
                     value={contract.status || ""}
                     onChange={(e) => handleInputChange("status", e.target.value)}
                     disabled={isDetailsMode}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value="mới">mới</option>
                     <option value="hoàn">hoàn</option>
@@ -795,17 +923,17 @@ export default function ContractFormPage() {
           </div>
 
           {/* Required fields note */}
-          <div className="px-6 lg:px-8 pt-4 pb-4 border-t border-gray-200">
-            <p className="text-sm text-gray-500">
+          <div className="px-4 sm:px-6 lg:px-8 pt-3 sm:pt-4 pb-3 sm:pb-4 border-t border-gray-200">
+            <p className="text-xs sm:text-sm text-gray-500">
               <span className="text-red-500 font-semibold">*</span> Các trường bắt buộc
             </p>
           </div>
 
           {/* Footer Actions */}
-          <div className="bg-gray-50 px-6 lg:px-8 py-5 flex flex-col sm:flex-row justify-end items-center gap-4 border-t border-gray-200">
+          <div className="bg-gray-50 px-4 sm:px-6 lg:px-8 py-4 sm:py-5 flex flex-col sm:flex-row justify-end items-stretch sm:items-center gap-3 sm:gap-4 border-t border-gray-200">
             <button
               onClick={() => navigate(isDetailsMode ? "/dashboard" : "/hop-dong")}
-              className="w-full sm:w-auto px-6 py-3 bg-gray-500 text-white font-medium rounded-lg hover:bg-gray-600 transition-all duration-200 flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
+              className="w-full sm:w-auto px-5 sm:px-6 py-2.5 sm:py-3 bg-gray-500 text-white font-medium rounded-lg hover:bg-gray-600 transition-all duration-200 flex items-center justify-center gap-2 shadow-sm hover:shadow-md text-sm sm:text-base"
               aria-label={isDetailsMode ? "Quay lại" : "Hủy"}
             >
               <X className="w-4 h-4" />
@@ -814,10 +942,10 @@ export default function ContractFormPage() {
             {!isDetailsMode && (
               <button
                 onClick={handleSubmit}
-                className="w-full sm:w-auto px-8 py-3 bg-secondary-600 text-white font-medium rounded-lg hover:bg-secondary-700 transition-all duration-200 flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
+                className="w-full sm:w-auto px-6 sm:px-8 py-2.5 sm:py-3 bg-secondary-600 text-white font-medium rounded-lg hover:bg-secondary-700 transition-all duration-200 flex items-center justify-center gap-2 shadow-sm hover:shadow-md text-sm sm:text-base"
                 aria-label={isEditMode ? "Lưu thay đổi" : "Thêm hợp đồng"}
               >
-                <Check className="w-5 h-5" />
+                <Check className="w-4 h-4 sm:w-5 sm:h-5" />
                 <span>{isEditMode ? "Lưu thay đổi" : "Thêm hợp đồng"}</span>
               </button>
             )}

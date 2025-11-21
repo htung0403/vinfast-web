@@ -28,42 +28,42 @@ export default function Menu() {
   });
 
   return (
-    <div className="max-w mx-auto px-4 sm:px-6 lg:px-8 py-12 bg-gradient-to-br from-slate-50 to-slate-300 min-h-screen">
+    <div className="max-w mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12 bg-gradient-to-br from-slate-50 to-slate-300 min-h-screen">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-center gap-4 mb-12 text-center sm:text-left">
+      <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 mb-8 sm:mb-10 lg:mb-12 text-center sm:text-left">
         <div className="relative flex-shrink-0">
           <img
             src={VinfastLogo}
             alt="Vinfast Logo"
-            className="h-12 w-12 drop-shadow-md"
+            className="h-10 w-10 sm:h-12 sm:w-12 drop-shadow-md"
           />
           <div className="absolute inset-0 bg-slate-200/20 rounded-full blur-md scale-110 -z-10"></div>
         </div>
         <div className="flex-grow">
-          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Bảng Điều Khiển</h1>
-          <p className="text-gray-600 mt-1">Truy cập nhanh các chức năng quản lý</p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 tracking-tight">Bảng Điều Khiển</h1>
+          <p className="text-sm sm:text-base text-gray-600 mt-1">Truy cập nhanh các chức năng quản lý</p>
         </div>
       </div>
 
       {/* Grid Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 lg:gap-6">
         {cards.map((card) => {
           const Icon = card.icon;
           const CardContent = (
             <div
-              className="group relative overflow-hidden rounded-xl p-6 bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105"
+              className="group relative overflow-hidden rounded-xl p-4 sm:p-5 lg:p-6 bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105"
             >
               {/* Subtle Overlay */}
               <div className="absolute inset-0 bg-gradient-to-br from-transparent to-slate-50/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
 
               {/* Content */}
-              <div className="relative flex items-center gap-4">
-                <div className="p-2 rounded-lg bg-slate-100 group-hover:bg-slate-200 transition-colors">
-                  <Icon className="h-5 w-5 text-gray-700" strokeWidth={2} />
+              <div className="relative flex items-center gap-3 sm:gap-4">
+                <div className="p-1.5 sm:p-2 rounded-lg bg-slate-100 group-hover:bg-slate-200 transition-colors flex-shrink-0">
+                  <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-gray-700" strokeWidth={2} />
                 </div>
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900">{card.label}</h3>
-                  <p className="text-sm text-gray-500 mt-0.5">Quản lý và theo dõi {card.label.toLowerCase()}</p>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base sm:text-lg font-medium text-gray-900 truncate">{card.label}</h3>
+                  <p className="text-xs sm:text-sm text-gray-500 mt-0.5 line-clamp-2">Quản lý và theo dõi {card.label.toLowerCase()}</p>
                 </div>
               </div>
             </div>

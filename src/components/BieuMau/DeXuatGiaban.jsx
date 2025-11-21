@@ -1,0 +1,1238 @@
+import React, { useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { ref, get } from "firebase/database";
+import { database } from "../../firebase/config";
+import {
+  getBranchByShowroomName,
+  getDefaultBranch,
+} from "../../data/branchData";
+import {
+  uniqueNgoaiThatColors,
+  uniqueNoiThatColors,
+} from "../../data/calculatorData";
+import VinfastLogo from "../../assets/images/logo.jpg";
+
+const DeXuatGiaban = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [branch, setBranch] = useState(null);
+
+  // Editable fields
+  const [ngay, setNgay] = useState("18");
+  const [thang, setThang] = useState("11");
+  const [nam, setNam] = useState("2025");
+  const [tuVanBanHang, setTuVanBanHang] = useState("Tạ Công Trí");
+  const [khachHang, setKhachHang] = useState("NGÔ NGUYÊN HOÀI NAM");
+  const [soHopDong, setSoHopDong] = useState("S00901-VSO-25-09-0039");
+  const [ngayHopDong, setNgayHopDong] = useState("29/09/2025");
+  const [cccd, setCccd] = useState("079 099 014 151");
+  const [maSoThue, setMaSoThue] = useState("");
+  const [dienThoai, setDienThoai] = useState("093 412 2178");
+  const [diaChi, setDiaChi] = useState(
+    "Số 72/14 Đường tỉnh lộ 7, Ấp Bình Hạ, Xã Thái Mỹ, Tp Hồ Chí Minh"
+  );
+  const [loaiXe, setLoaiXe] = useState("LIMO GREEN");
+  const [mauXe, setMauXe] = useState("TRẮNG/ĐEN");
+  const [namSanXuat, setNamSanXuat] = useState("2025");
+  const [soKhung, setSoKhung] = useState("RLLVFPNT9SH858285");
+
+  // Đối tượng khách hàng
+  const [thong, setThong] = useState("FALSE");
+  const [corporate, setCorporate] = useState("FALSE");
+  const [vinClub, setVinClub] = useState("FALSE");
+  const [banBuon, setBanBuon] = useState("FALSE");
+  const [xang, setXang] = useState("FALSE");
+
+  const [chinhSachKhuyenMai, setChinhSachKhuyenMai] = useState(
+    
+  );
+
+  // Giá bán
+  const [giaNiemYet, setGiaNiemYet] = useState("749.000.000");
+  const [giamGia, setGiamGia] = useState("29.960.000");
+  const [giaBanHopDong, setGiaBanHopDong] = useState("719.040.000");
+
+  // Quà tặng
+  const [quaTangTheoXe, setQuaTangTheoXe] = useState(
+    "bao da tay lái, bình chữa lửa, áo trùm xe, nước hoa xe."
+  );
+  const [quaTangKhac, setQuaTangKhac] = useState(
+    "Bảo Hiểm Vật Chất Kinh Doanh, Cam, Film, Sàn"
+  );
+
+  // Thanh toán
+  const [traThang, setTraThang] = useState("");
+  const [traGop, setTraGop] = useState("647.000.000");
+  const [nganHang, setNganHang] = useState("VP Bank");
+  const [soTienDatCoc, setSoTienDatCoc] = useState("Full tiền");
+  const [ngayDuKienNhanXe, setNgayDuKienNhanXe] = useState("");
+
+  // Đề xuất lương TVBH
+  const [theoChinhSachKhung, setTheoChinhSachKhung] = useState("");
+  const [deXuat, setDeXuat] = useState("");
+  const [lyDo, setLyDo] = useState(
+    "(Lưu ý: Mức lương TVBH phụ thuộc vào chính sách của VINFAST, trường hợp tại thời điểm XHĐ chính sách VINFAST thay đổi, Cty sẽ xem xét điều chỉnh phù hợp)"
+  );
+
+  const formatCurrency = (amount) => {
+    if (!amount) return "";
+    const numericAmount =
+      typeof amount === "string" ? amount.replace(/\D/g, "") : String(amount);
+    if (!numericAmount) return "";
+    return `${numericAmount.replace(/\B(?=(\d{3})+(?!\d))/g, ".")}`;
+  };
+
+  const formatDate = (dateValue) => {
+    if (!dateValue) return "";
+    try {
+      const date = new Date(dateValue);
+      if (isNaN(date.getTime())) return dateValue; // Return original if invalid date
+      const day = String(date.getDate()).padStart(2, "0");
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    } catch (error) {
+      return dateValue; // Return original if error
+    }
+  };
+
+  // Helper function to get color name from color code
+  const getColorName = (colorCode, isExterior = true) => {
+    if (!colorCode) return colorCode || "";
+    const colorList = isExterior ? uniqueNgoaiThatColors : uniqueNoiThatColors;
+    // Check if it's already a name (contains Vietnamese characters or is lowercase)
+    const foundByCode = colorList.find(
+      (color) =>
+        color.code === colorCode ||
+        color.code.toLowerCase() === colorCode.toLowerCase()
+    );
+    if (foundByCode) {
+      return foundByCode.name;
+    }
+    // Check if it's a name
+    const foundByName = colorList.find(
+      (color) => color.name.toLowerCase() === colorCode.toLowerCase()
+    );
+    return foundByName ? foundByName.name : colorCode; // Return name if found, otherwise return original value
+  };
+
+  useEffect(() => {
+    const loadData = async () => {
+      let showroomName = location.state?.showroom || "Chi Nhánh Trường Chinh";
+
+      // Thử load showroom từ contracts trước
+      let showroomLoadedFromContracts = false;
+      if (location.state?.firebaseKey) {
+        try {
+          const contractId = location.state.firebaseKey;
+          const contractsRef = ref(database, `contracts/${contractId}`);
+          const snapshot = await get(contractsRef);
+          if (snapshot.exists()) {
+            const contractData = snapshot.val();
+            if (contractData.showroom) {
+              showroomName = contractData.showroom;
+              showroomLoadedFromContracts = true;
+            }
+          }
+        } catch (error) {
+          console.error("Error loading showroom from contracts:", error);
+        }
+      }
+
+      // Load dữ liệu từ exportedContracts
+      if (location.state?.firebaseKey) {
+        try {
+          const contractRef = ref(
+            database,
+            `exportedContracts/${location.state.firebaseKey}`
+          );
+          const snapshot = await get(contractRef);
+          if (snapshot.exists()) {
+            const contractData = snapshot.val();
+            console.log("Loaded from exportedContracts:", contractData);
+
+            // Load showroom nếu chưa có từ contracts
+            if (contractData.showroom && !showroomLoadedFromContracts) {
+              showroomName = contractData.showroom;
+            }
+
+            // Tư vấn bán hàng
+            if (contractData.tvbh || contractData.TVBH) {
+              setTuVanBanHang(contractData.tvbh || contractData.TVBH || "");
+            }
+
+            // Khách hàng
+            if (
+              contractData.customerName ||
+              contractData["Tên KH"] ||
+              contractData["Tên Kh"]
+            ) {
+              setKhachHang(
+                contractData.customerName ||
+                  contractData["Tên KH"] ||
+                  contractData["Tên Kh"] ||
+                  ""
+              );
+            }
+
+            // Số hợp đồng (VSO)
+            if (
+              contractData.vso ||
+              contractData.VSO ||
+              contractData.contractNumber
+            ) {
+              setSoHopDong(
+                contractData.vso ||
+                  contractData.VSO ||
+                  contractData.contractNumber ||
+                  ""
+              );
+            }
+
+            // Ngày hợp đồng
+            if (
+              contractData["ngày xhd"] ||
+              contractData.ngayXhd ||
+              contractData.createdDate ||
+              contractData.contractDate
+            ) {
+              const ngayHD =
+                contractData["ngày xhd"] ||
+                contractData.ngayXhd ||
+                contractData.createdDate ||
+                contractData.contractDate ||
+                "";
+              if (ngayHD) {
+                // Format date nếu cần
+                if (ngayHD.includes("-")) {
+                  const date = new Date(ngayHD);
+                  if (!isNaN(date.getTime())) {
+                    const day = String(date.getDate()).padStart(2, "0");
+                    const month = String(date.getMonth() + 1).padStart(2, "0");
+                    const year = date.getFullYear();
+                    setNgayHopDong(`${day}/${month}/${year}`);
+                  } else {
+                    setNgayHopDong(ngayHD);
+                  }
+                } else {
+                  setNgayHopDong(ngayHD);
+                }
+              }
+            }
+
+            // CCCD
+            if (
+              contractData.cccd ||
+              contractData.CCCD ||
+              contractData.customerCCCD
+            ) {
+              setCccd(
+                contractData.cccd ||
+                  contractData.CCCD ||
+                  contractData.customerCCCD ||
+                  ""
+              );
+            }
+
+            // Mã số thuế
+            if (
+              contractData.maSoThue ||
+              contractData["Mã số thuế"] ||
+              contractData["Mã Số Thuế"]
+            ) {
+              setMaSoThue(
+                contractData.maSoThue ||
+                  contractData["Mã số thuế"] ||
+                  contractData["Mã Số Thuế"] ||
+                  ""
+              );
+            }
+
+            // Điện thoại
+            if (
+              contractData.phone ||
+              contractData["Số Điện Thoại"] ||
+              contractData["Số điện thoại"]
+            ) {
+              setDienThoai(
+                contractData.phone ||
+                  contractData["Số Điện Thoại"] ||
+                  contractData["Số điện thoại"] ||
+                  ""
+              );
+            }
+
+            // Địa chỉ
+            if (
+              contractData.address ||
+              contractData["Địa Chỉ"] ||
+              contractData["Địa chỉ"]
+            ) {
+              setDiaChi(
+                contractData.address ||
+                  contractData["Địa Chỉ"] ||
+                  contractData["Địa chỉ"] ||
+                  ""
+              );
+            }
+
+            // Loại xe
+            if (
+              contractData.dongXe ||
+              contractData.model ||
+              contractData["Dòng xe"]
+            ) {
+              setLoaiXe(
+                contractData.dongXe ||
+                  contractData.model ||
+                  contractData["Dòng xe"] ||
+                  ""
+              );
+            }
+
+            // Màu xe (ngoại thất/nội thất) - chuyển từ mã sang tên
+            if (
+              contractData.ngoaiThat ||
+              contractData["Ngoại Thất"] ||
+              contractData.exterior
+            ) {
+              const ngoaiThatCode =
+                contractData.ngoaiThat ||
+                contractData["Ngoại Thất"] ||
+                contractData.exterior ||
+                "";
+              const noiThatCode =
+                contractData.noiThat ||
+                contractData["Nội Thất"] ||
+                contractData.interior ||
+                "";
+
+              const ngoaiThatName = getColorName(ngoaiThatCode, true);
+              const noiThatName = getColorName(noiThatCode, false);
+
+              if (noiThatName && noiThatName !== noiThatCode) {
+                setMauXe(
+                  `${ngoaiThatName.toUpperCase()}/${noiThatName.toUpperCase()}`
+                );
+              } else if (noiThatCode) {
+                // Nếu có nội thất nhưng không tìm thấy tên, giữ nguyên
+                setMauXe(
+                  `${ngoaiThatName.toUpperCase()}/${noiThatCode.toUpperCase()}`
+                );
+              } else {
+                setMauXe(ngoaiThatName.toUpperCase());
+              }
+            }
+
+            // Số khung
+            if (
+              contractData.soKhung ||
+              contractData["Số Khung"] ||
+              contractData.chassisNumber
+            ) {
+              setSoKhung(
+                contractData.soKhung ||
+                  contractData["Số Khung"] ||
+                  contractData.chassisNumber ||
+                  ""
+              );
+            }
+
+            // Giá niêm yết
+            if (contractData.giaNiemYet || contractData["Giá Niêm Yết"]) {
+              const gia =
+                contractData.giaNiemYet || contractData["Giá Niêm Yết"] || "";
+              if (gia) {
+                setGiaNiemYet(formatCurrency(gia.toString()));
+              }
+            }
+
+            // Giảm giá
+            if (contractData.giaGiam || contractData["Giá Giảm"]) {
+              const giam =
+                contractData.giaGiam || contractData["Giá Giảm"] || "";
+              if (giam) {
+                setGiamGia(formatCurrency(giam.toString()));
+              }
+            }
+
+            // Giá bán hợp đồng
+            if (
+              contractData.giaHopDong ||
+              contractData["Giá Hợp Đồng"] ||
+              contractData.contractPrice ||
+              contractData.giaHD
+            ) {
+              const giaHD =
+                contractData.giaHopDong ||
+                contractData["Giá Hợp Đồng"] ||
+                contractData.contractPrice ||
+                contractData.giaHD ||
+                "";
+              if (giaHD) {
+                setGiaBanHopDong(formatCurrency(giaHD.toString()));
+              }
+            }
+
+            // Ngân hàng
+            if (
+              contractData.nganHang ||
+              contractData.bank ||
+              contractData["ngân hàng"]
+            ) {
+              setNganHang(
+                contractData.nganHang ||
+                  contractData.bank ||
+                  contractData["ngân hàng"] ||
+                  ""
+              );
+            }
+
+            // Ưu đãi / Chính sách khuyến mãi
+            const uuDaiValue =
+              contractData.uuDai ||
+              contractData["Ưu đãi"] ||
+              contractData["ưu đãi"] ||
+              "";
+            if (uuDaiValue) {
+              // Handle array, comma-separated string, or plain string
+              let formattedUuDai = "";
+              if (Array.isArray(uuDaiValue)) {
+                // If it's an array, join with newlines and prefix each with "-CTKM: "
+                formattedUuDai = uuDaiValue
+                  .filter((item) => item && item.trim())
+                  .map((item) => `-CTKM: ${item.trim()}`)
+                  .join("\n");
+              } else if (typeof uuDaiValue === "string") {
+                // If it's a string, check if it contains commas
+                if (uuDaiValue.includes(",")) {
+                  // Split by comma and format each item
+                  formattedUuDai = uuDaiValue
+                    .split(",")
+                    .map((item) => item.trim())
+                    .filter((item) => item)
+                    .map((item) => `-CTKM: ${item}`)
+                    .join("\n");
+                } else {
+                  // Single string value, format it
+                  formattedUuDai = `-CTKM: ${uuDaiValue.trim()}`;
+                }
+              }
+              if (formattedUuDai) {
+                setChinhSachKhuyenMai(formattedUuDai);
+              }
+            }
+
+            // Số tiền đặt cọc
+            if (
+              contractData.tienDatCoc ||
+              contractData["Tiền đặt cọc"] ||
+              contractData.soTienCoc ||
+              contractData.deposit
+            ) {
+              const tienCoc =
+                contractData.tienDatCoc ||
+                contractData["Tiền đặt cọc"] ||
+                contractData.soTienCoc ||
+                contractData.deposit ||
+                "";
+              setSoTienDatCoc(tienCoc.toString());
+            }
+
+            // Trả góp (tiền vay ngân hàng)
+            if (
+              contractData.tienVayNganHang ||
+              contractData["Tiền vay ngân hàng"] ||
+              contractData.loanAmount ||
+              contractData["Tiền vay"]
+            ) {
+              const tienVay =
+                contractData.tienVayNganHang ||
+                contractData["Tiền vay ngân hàng"] ||
+                contractData.loanAmount ||
+                contractData["Tiền vay"] ||
+                "";
+              if (tienVay) {
+                setTraGop(formatCurrency(tienVay.toString()));
+              }
+            }
+          }
+        } catch (error) {
+          console.error(
+            "Error loading contract data from exportedContracts:",
+            error
+          );
+        }
+      }
+
+      const branchInfo =
+        getBranchByShowroomName(showroomName) || getDefaultBranch();
+      setBranch(branchInfo);
+
+      const today = new Date();
+      const pad = (n) => String(n).padStart(2, "0");
+      setNgay(pad(today.getDate()));
+      setThang(pad(today.getMonth() + 1));
+      setNam(today.getFullYear().toString());
+
+      if (location.state) {
+        const stateData = location.state;
+        setData(stateData);
+
+        if (stateData.customerName) setKhachHang(stateData.customerName);
+        if (stateData.contractNumber) setSoHopDong(stateData.contractNumber);
+        if (stateData.contractDate) setNgayHopDong(stateData.contractDate);
+        if (stateData.customerAddress) setDiaChi(stateData.customerAddress);
+        if (stateData.customerPhone) setDienThoai(stateData.customerPhone);
+        if (stateData.customerCCCD) setCccd(stateData.customerCCCD);
+        if (stateData.hieuxe) setLoaiXe(stateData.hieuxe);
+        if (stateData.soKhung) setSoKhung(stateData.soKhung);
+        if (stateData.contractPrice)
+          setGiaBanHopDong(formatCurrency(stateData.contractPrice));
+
+        // Ưu đãi / Chính sách khuyến mãi từ location.state
+        const stateUuDai =
+          stateData.uuDai || stateData["Ưu đãi"] || stateData["ưu đãi"] || "";
+        if (stateUuDai) {
+          let formattedUuDai = "";
+          if (Array.isArray(stateUuDai)) {
+            formattedUuDai = stateUuDai
+              .filter((item) => item && item.trim())
+              .map((item) => `-CTKM: ${item.trim()}`)
+              .join("\n");
+          } else if (typeof stateUuDai === "string") {
+            if (stateUuDai.includes(",")) {
+              formattedUuDai = stateUuDai
+                .split(",")
+                .map((item) => item.trim())
+                .filter((item) => item)
+                .map((item) => `-CTKM: ${item}`)
+                .join("\n");
+            } else {
+              formattedUuDai = `-CTKM: ${stateUuDai.trim()}`;
+            }
+          }
+          if (formattedUuDai) {
+            setChinhSachKhuyenMai(formattedUuDai);
+          }
+        }
+      } else {
+        setData({
+          contractNumber: "",
+          contractDate: "",
+          customerName: "",
+          customerAddress: "",
+          customerPhone: "",
+          customerCCCD: "",
+          hieuxe: "",
+          soKhung: "",
+          contractPrice: "",
+        });
+      }
+      setLoading(false);
+    };
+
+    loadData();
+  }, [location.state]);
+
+  const handleBack = () => {
+    navigate(-1);
+  };
+
+  if (loading) {
+    return (
+      <div
+        className="min-h-screen bg-gray-50 flex items-center justify-center"
+        style={{ fontFamily: "Times New Roman" }}
+      >
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Đang tải dữ liệu...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="min-h-screen bg-gray-50 p-8"
+      style={{ fontFamily: "Times New Roman" }}
+    >
+      <div className="max-w-5xl mx-auto print:max-w-5xl print:mx-auto">
+        <div
+          className="flex-1 bg-white p-6 print:pt-0 flex flex-col min-h-screen print:min-h-[calc(100vh-40mm)]"
+          id="printable-content"
+        >
+          {/* Header */}
+          <div className="flex items-start justify-between mb-4">
+            {/* Logo */}
+            <div className="w-24">
+              <img src={VinfastLogo} alt="VinFast Logo" className="w-full" />
+            </div>
+
+            {/* Company Info */}
+            <div className="flex-1 text-center">
+              <p className="font-bold text-sm">
+                CN TRƯỜNG CHINH-CÔNG TY CPĐT VÀ TMDV Ô TÔ ĐÔNG SÀI GÒN
+              </p>
+              <h1 className="font-bold text-lg mt-2">ĐỀ XUẤT GIÁ BÁN XE</h1>
+            </div>
+
+            {/* Date */}
+            <div className="w-48 text-right text-sm italic">
+              <p>
+                Ngày{" "}
+                <span className="print:hidden">
+                  <input
+                    type="text"
+                    value={ngay}
+                    onChange={(e) => setNgay(e.target.value)}
+                    className="border-b border-gray-400 px-1 w-6 text-center focus:outline-none focus:border-blue-500"
+                  />
+                </span>
+                <span className="hidden print:inline">{ngay}</span> tháng{" "}
+                <span className="print:hidden">
+                  <input
+                    type="text"
+                    value={thang}
+                    onChange={(e) => setThang(e.target.value)}
+                    className="border-b border-gray-400 px-1 w-6 text-center focus:outline-none focus:border-blue-500"
+                  />
+                </span>
+                <span className="hidden print:inline">{thang}</span> Năm{" "}
+                <span className="print:hidden">
+                  <input
+                    type="text"
+                    value={nam}
+                    onChange={(e) => setNam(e.target.value)}
+                    className="border-b border-gray-400 px-1 w-12 text-center focus:outline-none focus:border-blue-500"
+                  />
+                </span>
+                <span className="hidden print:inline">{nam}</span>
+              </p>
+            </div>
+          </div>
+
+          {/* Bảng 1: Thông tin khách hàng và hợp đồng */}
+          <div className="text-xs">
+            <table className="w-full border border-black">
+              <tbody>
+                {/* Hàng 1: Tư vấn bán hàng và Số hợp đồng, Ngày hợp đồng */}
+                <tr className="border-b border-black">
+                  <td className="border-r border-black p-1 font-bold w-1/2">
+                    TƯ VẤN BÁN HÀNG:{" "}
+                    <span className="print:hidden">
+                      <input
+                        type="text"
+                        value={tuVanBanHang}
+                        onChange={(e) => setTuVanBanHang(e.target.value)}
+                        className="border-b border-gray-400 px-1 w-48 focus:outline-none focus:border-blue-500"
+                      />
+                    </span>
+                    <span className="hidden print:inline">{tuVanBanHang}</span>
+                  </td>
+                  <td className="p-1 w-1/2">
+                    <div className="space-y-1">
+                      <div>
+                        <strong>Số Hợp đồng:</strong>{" "}
+                        <span className="print:hidden font-bold">
+                          <input
+                            type="text"
+                            value={soHopDong}
+                            onChange={(e) => setSoHopDong(e.target.value)}
+                            className="border-b border-gray-400 px-1 w-40 font-bold focus:outline-none focus:border-blue-500"
+                          />
+                        </span>
+                        <span className="hidden print:inline font-bold">{soHopDong}</span>
+                      </div>
+                      <div>
+                        <strong>Ngày Hợp đồng:</strong>{" "}
+                        <span className="print:hidden font-bold">
+                          <input
+                            type="text"
+                            value={ngayHopDong}
+                            onChange={(e) => setNgayHopDong(e.target.value)}
+                            className="border-b border-gray-400 px-1 w-32 focus:outline-none focus:border-blue-500"
+                          />
+                        </span>
+                        <span className="hidden print:inline font-bold">
+                          {ngayHopDong}
+                        </span>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+
+                {/* Hàng 2: Khách hàng và CCCD, Mã số thuế, Điện thoại */}
+                <tr className="border-b border-black">
+                  <td className="border-r border-black p-1 font-bold w-1/2">
+                    KHÁCH HÀNG (Cá nhân/ Cty):{" "}
+                    <span className="print:hidden">
+                      <input
+                        type="text"
+                        value={khachHang}
+                        onChange={(e) => setKhachHang(e.target.value)}
+                        className="border-b border-gray-400 px-1 w-48 focus:outline-none focus:border-blue-500"
+                      />
+                    </span>
+                    <span className="hidden print:inline">{khachHang}</span>
+                  </td>
+                  <td className="p-1 w-1/2">
+                    <div className="space-y-1">
+                      <div>
+                        <strong>CCCD (Cá nhân):</strong>{" "}
+                        <span className="print:hidden font-bold">
+                          <input
+                            type="text"
+                            value={cccd}
+                            onChange={(e) => setCccd(e.target.value)}
+                            className="border-b border-gray-400 px-1 w-40 focus:outline-none focus:border-blue-500"
+                          />
+                        </span>
+                        <span className="hidden print:inline font-bold">{cccd}</span>
+                      </div>
+                      <div>
+                        <strong>Mã số thuế (Cty):</strong>{" "}
+                        <span className="print:hidden font-bold">
+                          <input
+                            type="text"
+                            value={maSoThue}
+                            onChange={(e) => setMaSoThue(e.target.value)}
+                            className="border-b border-gray-400 px-1 w-32 focus:outline-none focus:border-blue-500"
+                          />
+                        </span>
+                        <span className="hidden print:inline font-bold">{maSoThue}</span>
+                      </div>
+                      <div>
+                        <strong>Điện thoại:</strong>{" "}
+                        <span className="print:hidden font-bold">
+                          <input
+                            type="text"
+                            value={dienThoai}
+                            onChange={(e) => setDienThoai(e.target.value)}
+                            className="border-b border-gray-400 px-1 w-40 focus:outline-none focus:border-blue-500"
+                          />
+                        </span>
+                        <span className="hidden print:inline font-bold">{dienThoai}</span>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+
+                {/* Hàng 3: Địa chỉ */}
+                <tr className="border-b border-black">
+                  <td
+                    className="border-r border-black p-1 font-bold"
+                    colSpan={2}
+                  >
+                    ĐỊA CHỈ (địa chỉ khớp với thông tin Xuất hoá đơn):{" "}
+                    <span className="print:hidden">
+                      <input
+                        type="text"
+                        value={diaChi}
+                        onChange={(e) => setDiaChi(e.target.value)}
+                        className="border-b border-gray-400 px-1 w-[70%] focus:outline-none focus:border-blue-500"
+                      />
+                    </span>
+                    <span className="hidden print:inline">{diaChi}</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Bảng 2: Thông tin xe, đối tượng khách hàng, giá bán, quà tặng, thanh toán */}
+          <div className="text-xs">
+            <table className="w-full border-x border-black">
+              <tbody>
+                {/* Thông tin xe */}
+                <tr className="border-b border-black">
+                  <td
+                    className="border-r border-black p-1 font-bold align-middle text-center"
+                    rowSpan={4}
+                  >
+                    THÔNG TIN XE:
+                  </td>
+                  <td className="border-r border-black p-1 font-bold" colSpan={3}>
+                    <strong>Loại xe:</strong>{" "}
+                    <span className="print:hidden">
+                      <input
+                        type="text"
+                        value={loaiXe}
+                        onChange={(e) => setLoaiXe(e.target.value)}
+                        className="border-b border-gray-400 px-1 w-64 focus:outline-none focus:border-blue-500"
+                      />
+                    </span>
+                    <span className="hidden print:inline">{loaiXe}</span>
+                  </td>
+                </tr>
+                <tr className="border-b border-black">
+                  <td className="border-r border-black p-1 font-bold" colSpan={3}>
+                    <strong>Màu xe (màu ngoại thất/ nội thất):</strong>{" "}
+                    <span className="print:hidden">
+                      <input
+                        type="text"
+                        value={mauXe}
+                        onChange={(e) => setMauXe(e.target.value)}
+                        className="border-b border-gray-400 px-1 w-48 focus:outline-none focus:border-blue-500"
+                      />
+                    </span>
+                    <span className="hidden print:inline">{mauXe}</span>
+                  </td>
+                </tr>
+                <tr className="border-b border-black">
+                  <td className="border-r border-black p-1" colSpan={3}>
+                    <strong>Năm sản xuất:</strong>{" "}
+                    <span className="print:hidden">
+                      <input
+                        type="text"
+                        value={namSanXuat}
+                        onChange={(e) => setNamSanXuat(e.target.value)}
+                        className="border-b border-gray-400 font-bold px-1 w-24 focus:outline-none focus:border-blue-500"
+                      />
+                    </span>
+                    <span className="hidden print:inline font-bold">{namSanXuat}</span>
+                  </td>
+                </tr>
+                <tr className="border-b border-black">
+                  <td className="border-r border-black p-1" colSpan={3}>
+                    <strong>Số khung (VIN):</strong>{" "}
+                    <span className="print:hidden">
+                      <input
+                        type="text"
+                        value={soKhung}
+                        onChange={(e) => setSoKhung(e.target.value)}
+                        className="border-b border-gray-400 font-bold px-1 w-64 focus:outline-none focus:border-blue-500"
+                      />
+                    </span>
+                    <span className="hidden print:inline font-bold">{soKhung}</span>
+                  </td>
+                </tr>
+
+                {/* Đối tượng khách hàng */}
+                <tr className="border-b border-black">
+                  <td
+                    className="border-r border-black p-1 font-bold align-middle text-center"
+                    rowSpan={5}
+                  >
+                    ĐỐI TƯỢNG
+                    <br />
+                    KHÁCH HÀNG
+                  </td>
+                  <td className="border-r border-black font-bold p-1 w-32 ">
+                    1. Thông thường
+                  </td>
+                  <td className="border-r border-black p-1 text-center w-20 font-bold">
+                    <span className="print:hidden">
+                      <input
+                        type="text"
+                        value={thong}
+                        onChange={(e) => setThong(e.target.value)}
+                        className="border-b border-gray-400 px-1 w-16 text-center focus:outline-none focus:border-blue-500"
+                      />
+                    </span>
+                    <span className="hidden print:inline font-bold">{thong}</span>
+                  </td>
+                  <td className="p-1" rowSpan={5}>
+                    <strong className="ml-4">Chính sách ưu đãi theo đối tượng:</strong>
+                    <br />
+                    <span className="print:hidden ml-4">
+                      <textarea
+                        value={chinhSachKhuyenMai}
+                        onChange={(e) => setChinhSachKhuyenMai(e.target.value)}
+                        className="border border-gray-400 px-1 w-[95%] h-20 font-bold focus:outline-none focus:border-blue-500"
+                      />
+                    </span>
+                    <span className="hidden print:inline whitespace-pre-line font-bold ml-4">
+                      {chinhSachKhuyenMai}
+                    </span>
+                  </td>
+                </tr>
+                <tr className="border-b border-black font-bold">
+                  <td className="border-r border-black p-1">2. Corporate</td>
+                  <td className="border-r border-black p-1 text-center">
+                    <span className="print:hidden">
+                      <input
+                        type="text"
+                        value={corporate}
+                        onChange={(e) => setCorporate(e.target.value)}
+                        className="border-b border-gray-400 px-1 w-16 text-center focus:outline-none focus:border-blue-500"
+                      />
+                    </span>
+                    <span className="hidden print:inline">{corporate}</span>
+                  </td>
+                </tr>
+                <tr className="border-b border-black font-bold">
+                  <td className="border-r border-black p-1">3. VinClub</td>
+                  <td className="border-r border-black p-1 text-center">
+                    <span className="print:hidden">
+                      <input
+                        type="text"
+                        value={vinClub}
+                        onChange={(e) => setVinClub(e.target.value)}
+                        className="border-b border-gray-400 px-1 w-16 text-center focus:outline-none focus:border-blue-500"
+                      />
+                    </span>
+                    <span className="hidden print:inline">{vinClub}</span>
+                  </td>
+                </tr>
+                <tr className="border-b border-black font-bold">
+                  <td className="border-r border-black p-1">4. Bán buôn</td>
+                  <td className="border-r border-black p-1 text-center">
+                    <span className="print:hidden">
+                      <input
+                        type="text"
+                        value={banBuon}
+                        onChange={(e) => setBanBuon(e.target.value)}
+                        className="border-b border-gray-400 px-1 w-16 text-center focus:outline-none focus:border-blue-500"
+                      />
+                    </span>
+                    <span className="hidden print:inline">{banBuon}</span>
+                  </td>
+                </tr>
+                <tr className="border-b border-black font-bold">
+                  <td className="border-r border-black p-1">5. Xăng -</td>
+                  <td className="border-r border-black p-1 text-center">
+                    <span className="print:hidden">
+                      <input
+                        type="text"
+                        value={xang}
+                        onChange={(e) => setXang(e.target.value)}
+                        className="border-b border-gray-400 px-1 w-16 text-center focus:outline-none focus:border-blue-500"
+                      />
+                    </span>
+                    <span className="hidden print:inline">{xang}</span>
+                  </td>
+                </tr>
+
+                {/* Giá bán */}
+                <tr className="border-b border-black font-bold">
+                  <td
+                    className="border-r border-black p-1 font-bold align-middle w-32 text-center"
+                    rowSpan={3}
+                  >
+                    GIÁ BÁN:
+                  </td>
+                  <td className="border-r border-black p-1" colSpan={3}>
+                    <strong>Giá niêm yết (VNĐ)</strong>{" "}
+                    <span className="print:hidden ml-20">
+                      <input
+                        type="text"
+                        value={giaNiemYet}
+                        onChange={(e) =>
+                          setGiaNiemYet(e.target.value.replace(/\D/g, ""))
+                        }
+                        className="border-b border-gray-400 px-1 w-32 focus:outline-none focus:border-blue-500"
+                      />
+                    </span>
+                    <span className="hidden print:inline ml-20">
+                      {formatCurrency(giaNiemYet)}VNĐ
+                    </span>
+                  </td>
+                </tr>
+                <tr className="border-b border-black font-bold">
+                  <td className="border-r border-black p-1" colSpan={3}>
+                    <strong>Giảm giá (VNĐ)</strong>{" "}
+                    <span className="print:hidden ml-28">
+                      <input
+                        type="text"
+                        value={giamGia}
+                        onChange={(e) =>
+                          setGiamGia(e.target.value.replace(/\D/g, ""))
+                        }
+                        className="border-b border-gray-400 px-1 w-32 focus:outline-none focus:border-blue-500"
+                      />
+                    </span>
+                    <span className="hidden print:inline ml-28">
+                      {formatCurrency(giamGia)} VNĐ
+                    </span>
+                  </td>
+                </tr>
+                <tr className="border-b border-black font-bold">
+                  <td className="border-r border-black p-1" colSpan={3}>
+                    <strong>Giá bán hợp đồng (VNĐ)</strong>{" "}
+                    <span className="print:hidden ml-14">
+                      <input
+                        type="text"
+                        value={giaBanHopDong}
+                        onChange={(e) =>
+                          setGiaBanHopDong(e.target.value.replace(/\D/g, ""))
+                        }
+                        className="border-b border-gray-400 px-1 w-32 focus:outline-none focus:border-blue-500"
+                      />
+                    </span>
+                    <span className="hidden print:inline ml-14">
+                      {formatCurrency(giaBanHopDong)}VNĐ
+                    </span>
+                  </td>
+                </tr>
+
+                {/* Diễn giải mức giảm */}
+                <tr className="border-b border-black">
+                  <td className="p-1 italic text-xs" colSpan={4}>
+                    Diễn giải mức giảm (nếu nằm ngoài khung quy định):
+                  </td>
+                </tr>
+
+                {/* Quà tặng */}
+                <tr className="border-b border-black">
+                  <td
+                    className="border-r border-black p-1 font-bold align-middle text-center"
+                    rowSpan={2}
+                  >
+                    QUÀ TẶNG
+                  </td>
+                  <td className="border-r border-black p-1" colSpan={3}>
+                    <strong>Quà tặng theo xe:</strong>{" "}
+                    <span className="print:hidden">
+                      <input
+                        type="text"
+                        value={quaTangTheoXe}
+                        onChange={(e) => setQuaTangTheoXe(e.target.value)}
+                        className="border-b border-gray-400 px-1 w-[80%] focus:outline-none focus:border-blue-500"
+                      />
+                    </span>
+                    <span className="hidden print:inline">{quaTangTheoXe}</span>
+                  </td>
+                </tr>
+                <tr className="border-b border-black">
+                  <td className="border-r border-black p-1 font-bold" colSpan={3}>
+                    <strong>Quà tặng khác:</strong>{" "}
+                    <span className="print:hidden">
+                      <input
+                        type="text"
+                        value={quaTangKhac}
+                        onChange={(e) => setQuaTangKhac(e.target.value)}
+                        className="border-b border-gray-400 px-1 w-[80%] focus:outline-none focus:border-blue-500"
+                      />
+                    </span>
+                    <span className="hidden print:inline">{quaTangKhac}</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Bảng 3: Thanh toán */}
+          <div className="text-xs">
+            <table className="w-full border-x border-b border-black">
+              <tbody>
+                {/* Thanh toán */}
+                <tr className="border-b border-black">
+                  <td className="border-r border-black p-1 font-bold w-32">
+                    THANH TOÁN
+                  </td>
+                  <td className="border-r border-black p-1 font-bold">
+                    <strong>Trả thẳng:</strong>{" "}
+                    <span className="print:hidden">
+                      <input
+                        type="text"
+                        value={formatCurrency(traThang)}
+                        onChange={(e) => setTraThang(e.target.value)}
+                        className="border-b border-gray-400 px-1 w-24 focus:outline-none focus:border-blue-500"
+                      />
+                    </span>
+                    <span className="hidden print:inline">
+                      {traThang ? `${formatCurrency(traThang)} vnđ` : ""}
+                    </span>
+                  </td>
+                  <td className="border-r border-black p-1 font-bold">
+                    <strong>Trả góp:</strong>{" "}
+                    <span className="print:hidden">
+                      <input
+                        type="text"
+                        value={formatCurrency(traGop)}
+                        onChange={(e) => setTraGop(e.target.value)}
+                        className="border-b border-gray-400 px-1 w-32 focus:outline-none focus:border-blue-500"
+                      />
+                    </span>
+                    <span className="hidden print:inline">
+                      {traGop ? `${formatCurrency(traGop)} vnđ` : ""}
+                    </span>
+                  </td>
+                  <td className="p-1 font-bold">
+                    <strong>Bank:</strong>{" "}
+                    <span className="print:hidden">
+                      <input
+                        type="text"
+                        value={nganHang}
+                        onChange={(e) => setNganHang(e.target.value)}
+                        className="border-b border-gray-400 px-1 w-24 focus:outline-none focus:border-blue-500"
+                      />
+                    </span>
+                    <span className="hidden print:inline">{nganHang}</span>
+                  </td>
+                </tr>
+
+                {/* Số tiền đặt cọc */}
+                <tr className="border-b border-black">
+                  <td
+                    className="border-r border-black p-1 font-bold"
+                    colSpan={2}
+                  >
+                    Số tiền Đặt cọc:{" "}
+                    <span className="print:hidden">
+                      <input
+                        type="text"
+                        value={soTienDatCoc}
+                        onChange={(e) => setSoTienDatCoc(e.target.value)}
+                        className="border-b border-gray-400 px-1 w-[80%] focus:outline-none focus:border-blue-500"
+                      />
+                    </span>
+                    <span className="hidden print:inline">{soTienDatCoc}</span>
+                  </td>
+                  <td className="border-r border-black p-1" colSpan={2}>
+                    <strong>Ngày dự kiến nhận xe:</strong>{" "}
+                    <span className="print:hidden">
+                      <input
+                        type="date"
+                        value={ngayDuKienNhanXe}
+                        onChange={(e) => setNgayDuKienNhanXe(e.target.value)}
+                        className="border-b border-gray-400 px-1 w-32 focus:outline-none focus:border-blue-500"
+                      />
+                    </span>
+                    <span className="hidden print:inline">
+                      {formatDate(ngayDuKienNhanXe)}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Bảng 4: Đề xuất lương TVBH và chữ ký */}
+          <div className="text-xs">
+            <table className="w-full border-x border-b border-black">
+              <tbody>
+                {/* Đề xuất lương TVBH */}
+                <tr className="border-b border-black">
+                  <td
+                    className="border-r border-black p-1 font-bold"
+                    rowSpan={2}
+                  >
+                    Đề xuất Lương TVBH:
+                  </td>
+                  <td className="border-r border-black p-1" colSpan={3}>
+                    <strong>Theo chính sách khung:</strong>{" "}
+                    <span className="print:hidden">
+                      <input
+                        type="text"
+                        value={theoChinhSachKhung}
+                        onChange={(e) => setTheoChinhSachKhung(e.target.value)}
+                        className="border-b border-gray-400 px-1 w-[80%] focus:outline-none focus:border-blue-500"
+                      />
+                    </span>
+                    <span className="hidden print:inline">
+                      {theoChinhSachKhung}
+                    </span>
+                  </td>
+                </tr>
+                <tr className="border-b border-black">
+                  <td className="border-r border-black p-1" colSpan={3}>
+                    <strong>Đề xuất:</strong>{" "}
+                    <span className="print:hidden">
+                      <input
+                        type="text"
+                        value={deXuat}
+                        onChange={(e) => setDeXuat(e.target.value)}
+                        className="border-b border-gray-400 px-1 w-[91%] focus:outline-none focus:border-blue-500"
+                      />
+                    </span>
+                    <span className="hidden print:inline">{deXuat}</span>
+                  </td>
+                </tr>
+
+                {/* Lưu ý */}
+                <tr className="border-b border-black">
+                  <td
+                    className="p-1 italic text-xs print:font-bold"
+                    colSpan={4}
+                  >
+                    {lyDo}
+                  </td>
+                </tr>
+
+                {/* Signature row */}
+                <tr className="">
+                  <td className="border-r border-black p-2 text-center font-bold">
+                    TƯ VẤN BÁN HÀNG
+                  </td>
+                  <td className="border-r border-black p-2 text-center font-bold">
+                    TP KINH DOANH
+                  </td>
+                  <td className="border-r border-black p-2 text-center font-bold">
+                    GĐ KINH DOANH
+                  </td>
+                  <td className="p-2 text-center font-bold">PHÊ DUYỆT</td>
+                </tr>
+                <tr>
+                  <td className="border-r border-black p-12"></td>
+                  <td className="border-r border-black p-12"></td>
+                  <td className="border-r border-black p-12"></td>
+                  <td className="p-12"></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="text-center mt-8 print:hidden space-x-4">
+        <button
+          onClick={handleBack}
+          className="bg-gray-600 text-white px-6 py-2 rounded hover:bg-gray-700 transition"
+        >
+          Quay lại
+        </button>
+        <button
+          onClick={() => window.print()}
+          className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition"
+        >
+          In Đề Xuất
+        </button>
+      </div>
+
+      <style>{`
+        @media print {
+          @page {
+            margin: 5mm 10mm 5mm 10mm;
+            size: A4 portrait;
+          }
+
+          body * {
+            visibility: hidden;
+          }
+
+          #printable-content,
+          #printable-content * {
+            visibility: visible;
+          }
+
+          #printable-content {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            padding: 0 !important;
+            font-family: 'Times New Roman', Times, serif !important;
+          }
+
+          .print\\:hidden {
+            display: none !important;
+          }
+
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            font-family: 'Times New Roman', Times, serif !important;
+          }
+        }
+      `}</style>
+    </div>
+  );
+};
+
+export default DeXuatGiaban;

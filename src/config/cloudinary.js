@@ -74,6 +74,79 @@ export const uploadImageToCloudinary = async (file) => {
   }
 };
 
+// Helper function to upload file (image or PDF) to Cloudinary
+// For PDF files, use /raw/upload/ endpoint as per Cloudinary documentation:
+// https://support.cloudinary.com/hc/en-us/articles/360016480179
+export const uploadFileToCloudinary = async (file) => {
+  if (!file) {
+    throw new Error('No file provided');
+  }
+
+  // Check if Cloudinary is configured
+  if (!isCloudinaryConfigured()) {
+    throw new Error('Cloudinary chưa được cấu hình. Vui lòng kiểm tra file .env và tham khảo CLOUDINARY_SETUP.md');
+  }
+
+  // Validate file type (image or PDF)
+  const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+  const isImage = file.type.startsWith('image/');
+  
+  if (!isImage && !isPDF) {
+    throw new Error('File phải là ảnh hoặc PDF');
+  }
+
+  // Validate file size (max 10MB for Cloudinary free tier)
+  const maxSize = 10 * 1024 * 1024; // 10MB
+  if (file.size > maxSize) {
+    throw new Error('Kích thước file không được vượt quá 10MB');
+  }
+
+  // Use /raw/upload/ endpoint for PDF files, /image/upload/ for images
+  // This is important for PDF delivery as per Cloudinary documentation
+  const uploadUrl = cloudinaryConfig.cloudName 
+    ? (isPDF 
+        ? `https://api.cloudinary.com/v1_1/${cloudinaryConfig.cloudName}/raw/upload`
+        : `https://api.cloudinary.com/v1_1/${cloudinaryConfig.cloudName}/image/upload`)
+    : null;
+
+  if (!uploadUrl) {
+    throw new Error('Cloudinary chưa được cấu hình');
+  }
+
+  // Create form data
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', cloudinaryConfig.uploadPreset);
+  
+  // Optional: Add folder to organize files
+  formData.append('folder', 'vinfast/contracts');
+
+  try {
+    const response = await fetch(uploadUrl, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || `Upload failed with status ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (!data.secure_url) {
+      throw new Error('Upload thành công nhưng không nhận được URL file');
+    }
+    
+    return data.secure_url; // Return the secure URL of the uploaded file
+  } catch (error) {
+    console.error('Cloudinary upload error:', error);
+    if (error.message) {
+      throw error;
+    }
+    throw new Error('Lỗi khi upload file lên Cloudinary. Vui lòng thử lại.');
+  }
+};
+
 // Helper function to delete image from Cloudinary (requires server-side implementation)
 // Note: This requires API secret, so it should be done server-side
 export const deleteImageFromCloudinary = async (imageUrl) => {
