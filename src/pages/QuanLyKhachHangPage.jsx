@@ -50,7 +50,7 @@ export default function QuanLyKhachHangPage() {
   const [isWorkHistoryModalOpen, setIsWorkHistoryModalOpen] = useState(false);
   const [workHistoryCustomer, setWorkHistoryCustomer] = useState(null);
   const [workHistoryEntries, setWorkHistoryEntries] = useState([]);
-  const [openDropdown, setOpenDropdown] = useState(null); // Format: 'mucDo-{firebaseKey}' or 'tinhTrang-{firebaseKey}'
+  const [openDropdown, setOpenDropdown] = useState(null); // Format: 'mucDo-{firebaseKey}' or 'tinhTrang-{firebaseKey}' or 'tvbh-{firebaseKey}'
   const [dropdownPosition, setDropdownPosition] = useState({}); // Store position for each dropdown: { 'mucDo-key': { side: 'bottom' | 'top', left: number, top: number } }
   const [employees, setEmployees] = useState([]);
   
@@ -349,8 +349,24 @@ export default function QuanLyKhachHangPage() {
 
   // Apply permission filter to customers
   useEffect(() => {
-    if (allCustomers.length === 0 && userRole !== "admin") {
-      // If no customers loaded yet, wait
+    // If no customers loaded yet and not admin, wait for customers to load
+    if (allCustomers.length === 0) {
+      // If admin, can set loading false immediately (no customers to show)
+      if (userRole === "admin") {
+        setCustomers([]);
+        setFilteredCustomers([]);
+        setLoading(false);
+        return;
+      }
+      // For user/leader, wait for customers to load first
+      // But if employees are already loaded, we know there are no customers
+      if (employeesLoaded) {
+        setCustomers([]);
+        setFilteredCustomers([]);
+        setLoading(false);
+        return;
+      }
+      // Still waiting for either customers or employees to load
       return;
     }
 
@@ -359,7 +375,7 @@ export default function QuanLyKhachHangPage() {
     if (userRole === "user") {
       // User: only see their own customers (by TVBH matching actual employee name)
       if (!employeesLoaded) {
-        // Still loading employee data, show empty
+        // Still loading employee data, show empty but keep loading
         filtered = [];
       } else if (actualEmployeeName) {
         // Filter by actual employee name
@@ -372,25 +388,29 @@ export default function QuanLyKhachHangPage() {
         // Employee name not found, show empty
         filtered = [];
       }
-      // Set loading false after filtering for user
-      setLoading(false);
+      // Set loading false after filtering for user (whether employees loaded or not)
+      if (employeesLoaded) {
+        setLoading(false);
+      }
     } else if (userRole === "leader") {
       // Leader: see customers of employees in same department
       if (!employeesLoaded) {
-        // Still loading employee data, show empty
+        // Still loading employee data, show empty but keep loading
         filtered = [];
-      } else if (userDepartment && teamEmployeeNames.length > 0) {
-        // Filter by team employee names
-        filtered = allCustomers.filter((customer) => {
-          const customerTVBH = customer.tvbh || "";
-          return teamEmployeeNames.includes(customerTVBH);
-        });
       } else {
-        // No team members found, show empty
-        filtered = [];
+        if (userDepartment && teamEmployeeNames.length > 0) {
+          // Filter by team employee names
+          filtered = allCustomers.filter((customer) => {
+            const customerTVBH = customer.tvbh || "";
+            return teamEmployeeNames.includes(customerTVBH);
+          });
+        } else {
+          // No team members found, show empty
+          filtered = [];
+        }
+        // Set loading false after filtering for leader
+        setLoading(false);
       }
-      // Set loading false after filtering for leader
-      setLoading(false);
     } else if (userRole === "admin") {
       // Admin: see all customers (no filter)
       filtered = allCustomers;
@@ -954,6 +974,93 @@ export default function QuanLyKhachHangPage() {
     }
   };
 
+  // Send notification to employee
+  const sendNotificationToEmployee = async (employeeEmail, customerName, customerPhone, tvbh) => {
+    if (!employeeEmail) return;
+    
+    try {
+      // Normalize email for Firebase key (replace . and @ with safe characters)
+      const normalizedEmail = employeeEmail.replace(/\./g, '_').replace(/@/g, '_at_');
+      const notificationsRef = ref(database, `notifications/${normalizedEmail}`);
+      
+      const notification = {
+        title: "Khách hàng mới được phân chia",
+        message: `Bạn đã được phân chia khách hàng: ${customerName}${customerPhone ? ` (${customerPhone})` : ''}`,
+        type: "info",
+        read: false,
+        createdAt: new Date().toISOString(),
+        customerName: customerName,
+        customerPhone: customerPhone,
+        tvbh: tvbh,
+      };
+      
+      await push(notificationsRef, notification);
+    } catch (error) {
+      console.error("Error sending notification:", error);
+      // Don't show error to user, just log it
+    }
+  };
+
+  // Get employee email from TVBH
+  const getEmployeeEmailByTVBH = async (tvbh) => {
+    if (!tvbh) return null;
+    
+    try {
+      const employeesRef = ref(database, 'employees');
+      const snapshot = await get(employeesRef);
+      
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        const employee = Object.values(data).find(
+          (emp) => (emp.TVBH || emp['TVBH'] || '').trim() === tvbh.trim()
+        );
+        
+        if (employee) {
+          return employee.mail || employee.Mail || employee.email || null;
+        }
+      }
+    } catch (error) {
+      console.error("Error getting employee email:", error);
+    }
+    
+    return null;
+  };
+
+  // Update TVBH (assign customer to employee) - for admin only
+  const updateCustomerTVBH = async (customer, tvbh) => {
+    try {
+      const customerRef = ref(database, `customers/${customer.firebaseKey}`);
+      await update(customerRef, { tvbh: tvbh });
+
+      // Update allCustomers (permission filter will be applied in separate useEffect)
+      const updatedAllCustomers = allCustomers.map(c => 
+        c.firebaseKey === customer.firebaseKey 
+          ? { ...c, tvbh: tvbh }
+          : c
+      );
+      setAllCustomers(updatedAllCustomers);
+      
+      // Send notification to employee if TVBH is assigned
+      if (tvbh && tvbh.trim() !== '') {
+        const employeeEmail = await getEmployeeEmailByTVBH(tvbh);
+        if (employeeEmail) {
+          await sendNotificationToEmployee(
+            employeeEmail,
+            customer.tenKhachHang || 'Khách hàng',
+            customer.soDienThoai || '',
+            tvbh
+          );
+        }
+      }
+      
+      setOpenDropdown(null);
+      toast.success(`Đã phân chia khách hàng cho ${tvbh || 'chưa gán'}!`);
+    } catch (err) {
+      console.error('Error updating customer TVBH:', err);
+      toast.error('Lỗi khi phân chia khách hàng: ' + err.message);
+    }
+  };
+
   // Calculate dropdown position based on available space
   const calculateDropdownPosition = (dropdownKey) => {
     const container = document.querySelector(`[data-dropdown-key="${dropdownKey}"]`);
@@ -1191,7 +1298,7 @@ export default function QuanLyKhachHangPage() {
                     key={customer.firebaseKey} 
                     className="hover:bg-secondary-50"
                     style={{ 
-                      zIndex: (openDropdown === `mucDo-${customer.firebaseKey}` || openDropdown === `tinhTrang-${customer.firebaseKey}`) ? 9999 : 'auto',
+                      zIndex: (openDropdown === `mucDo-${customer.firebaseKey}` || openDropdown === `tinhTrang-${customer.firebaseKey}` || openDropdown === `tvbh-${customer.firebaseKey}`) ? 9999 : 'auto',
                       position: 'relative'
                     }}
                   >
@@ -1207,8 +1314,72 @@ export default function QuanLyKhachHangPage() {
                     <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
                       {customer.soDienThoai || '-'}
                     </td>
-                    <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400 max-w-[80px] sm:max-w-none truncate" title={customer.tvbh || ''}>
-                      {customer.tvbh || '-'}
+                    <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400 relative" style={{ overflow: 'visible', zIndex: openDropdown === `tvbh-${customer.firebaseKey}` ? 9999 : 'auto' }}>
+                      {userRole === 'admin' ? (
+                        <div 
+                          className="dropdown-container relative inline-block w-full" 
+                          style={{ zIndex: openDropdown === `tvbh-${customer.firebaseKey}` ? 9999 : 'auto' }}
+                          data-dropdown-key={`tvbh-${customer.firebaseKey}`}
+                        >
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenDropdown(openDropdown === `tvbh-${customer.firebaseKey}` ? null : `tvbh-${customer.firebaseKey}`);
+                            }}
+                            className="inline-flex items-center gap-1 px-1.5 sm:px-2 py-1 rounded-md text-[10px] sm:text-xs font-medium transition-colors whitespace-nowrap w-full justify-between bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200"
+                            title={customer.tvbh || 'Chưa phân chia'}
+                          >
+                            <span className="max-w-[80px] sm:max-w-[120px] truncate">{customer.tvbh || 'Chưa phân chia'}</span>
+                            <ChevronDown className="w-3 h-3 flex-shrink-0" />
+                          </button>
+                          {openDropdown === `tvbh-${customer.firebaseKey}` && dropdownPosition[`tvbh-${customer.firebaseKey}`] && (
+                            <div 
+                              className="fixed bg-white border overflow-y-auto max-h-[300px] border-gray-300 rounded-2xl shadow-xl p-2 z-[9999] flex flex-col gap-1 min-w-[180px]"
+                              data-dropdown-menu={`tvbh-${customer.firebaseKey}`}
+                              style={{ 
+                                position: 'fixed',
+                                left: `${dropdownPosition[`tvbh-${customer.firebaseKey}`].left}px`,
+                                top: `${dropdownPosition[`tvbh-${customer.firebaseKey}`].top}px`,
+                                zIndex: 9999
+                              }}
+                            >
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updateCustomerTVBH(customer, '');
+                                }}
+                                className={`inline-flex items-center justify-center px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-colors ${
+                                  !customer.tvbh 
+                                    ? 'bg-gray-200 text-gray-800 ring-2 ring-gray-300' 
+                                    : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                                }`}
+                              >
+                                Chưa phân chia
+                              </button>
+                              {employees.map((employee) => (
+                                <button
+                                  key={employee.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    updateCustomerTVBH(customer, employee.TVBH);
+                                  }}
+                                  className={`inline-flex items-center justify-center px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-colors ${
+                                    customer.tvbh === employee.TVBH 
+                                      ? 'bg-blue-200 text-blue-900 ring-2 ring-blue-300' 
+                                      : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                                  }`}
+                                >
+                                  {employee.TVBH}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="max-w-[80px] sm:max-w-none truncate" title={customer.tvbh || ''}>
+                          {customer.tvbh || '-'}
+                        </div>
+                      )}
                     </td>
                     <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400 max-w-[100px] sm:max-w-none truncate" title={customer.tinhThanh || ''}>
                       {customer.tinhThanh || '-'}

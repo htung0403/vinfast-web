@@ -75,7 +75,7 @@ function App() {
           <Route path="/de-nghi-xuat-hoa-don" element={<ProtectedRoute><DeNghiXuatHoaDon /></ProtectedRoute>} />
           <Route path="/thoa-thuan-ho-tro-lai-vay-shinhan-cdx" element={<ProtectedRoute><TTHTLV_CĐX_Shinhan_gui_DL /></ProtectedRoute>} />
           <Route path="/bieu-mau-tpbank" element={<ProtectedRoute><TT_HTLV_CĐX_TPB /></ProtectedRoute>} />
-          <Route path="/thoa-thuan-ho-tro-lai-suat-vay-lfvn-cdx" element={<ProtectedRoute><Thoa_thuan_ho_tro_lai_suat_vay_CĐX_Vinfast_va_LFVN /></ProtectedRoute>} />
+          <Route path="/thoa-thuan-ho-tro-lai-suat-vay-cdx-vinfast-va-lfvn" element={<ProtectedRoute><Thoa_thuan_ho_tro_lai_suat_vay_CĐX_Vinfast_va_LFVN /></ProtectedRoute>} />
           <Route path="/phieu-tang-bao-hiem" element={<ProtectedRoute><PhieuTangBaoHiem /></ProtectedRoute>} />
           <Route path="/phieu-rut-coc" element={<ProtectedRoute><PhieuRutCoc /></ProtectedRoute>} />
           <Route path="/pdi-kh" element={<ProtectedRoute><PDI_KH /></ProtectedRoute>} />

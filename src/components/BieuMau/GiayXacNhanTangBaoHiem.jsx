@@ -15,16 +15,11 @@ const GiayXacNhanTangBaoHiem = () => {
   const [recipientInfo, setRecipientInfo] = useState(
     "TRUNG TÂM THẾ CHẤP VÙNG 9"
   );
-  const [customerAddress, setCustomerAddress] = useState("");
   const [insuranceContract, setInsuranceContract] = useState("");
   const [insuranceValue, setInsuranceValue] = useState("");
   const [insuranceStart, setInsuranceStart] = useState("");
   const [insuranceEnd, setInsuranceEnd] = useState("");
   const [branch, setBranch] = useState(null);
-  const [model, setModel] = useState("");
-  const [vin, setVin] = useState("");
-  const [engineNumber, setEngineNumber] = useState("");
-  const [vehicleValue, setVehicleValue] = useState("");
   const [startHour, setStartHour] = useState("10");
   const [startMinute, setStartMinute] = useState("00");
   const [endHour, setEndHour] = useState("09");
@@ -79,21 +74,30 @@ const GiayXacNhanTangBaoHiem = () => {
 
         // Lấy thông tin chi nhánh
         let showroomName = incoming.showroom || "TRƯỜNG CHINH";
+        let contractDataFromDB = null;
 
-        // Nếu có firebaseKey, thử lấy showroom từ contracts
+        // Nếu có firebaseKey, thử lấy dữ liệu từ exportedContracts hoặc contracts
         if (incoming.firebaseKey) {
           try {
             const contractId = incoming.firebaseKey;
-            const contractsRef = ref(database, `contracts/${contractId}`);
-            const snapshot = await get(contractsRef);
+            // Thử exportedContracts trước (vì đây là từ trang hợp đồng đã xuất)
+            let contractsRef = ref(database, `exportedContracts/${contractId}`);
+            let snapshot = await get(contractsRef);
+            
+            // Nếu không có trong exportedContracts, thử contracts
+            if (!snapshot.exists()) {
+              contractsRef = ref(database, `contracts/${contractId}`);
+              snapshot = await get(contractsRef);
+            }
+            
             if (snapshot.exists()) {
-              const contractData = snapshot.val();
-              if (contractData.showroom) {
-                showroomName = contractData.showroom;
+              contractDataFromDB = snapshot.val();
+              if (contractDataFromDB.showroom) {
+                showroomName = contractDataFromDB.showroom;
               }
             }
           } catch (err) {
-            console.error("Error loading showroom from contracts:", err);
+            console.error("Error loading contract from database:", err);
           }
         }
 
@@ -101,38 +105,73 @@ const GiayXacNhanTangBaoHiem = () => {
           getBranchByShowroomName(showroomName) || getDefaultBranch();
         setBranch(branchInfo);
 
+        // Map dữ liệu từ incoming và contractDataFromDB
+        // Ưu tiên contractDataFromDB nếu có, sau đó mới đến incoming
+        const getValue = (field, dbField = null) => {
+          if (contractDataFromDB) {
+            // Thử các tên field khác nhau từ database
+            const dbValue = dbField 
+              ? contractDataFromDB[dbField] || contractDataFromDB[field]
+              : contractDataFromDB[field];
+            if (dbValue) return dbValue;
+          }
+          return incoming[field] || incoming[dbField] || "";
+        };
+
         const processedData = {
           customerName:
-            incoming.customerName ||
-            incoming["Tên KH"] ||
+            getValue("customerName", "Tên KH") ||
+            getValue("tenKh", "Tên Kh") ||
             "",
-          contractNumber: incoming.vso || "",
+          contractNumber: 
+            getValue("vso", "VSO") || 
+            getValue("contractNumber", "") || "",
           createdAt:
-            formatDateToVNPartial(incoming.createdAt) || "",
-          model: incoming.model || "",
-          vin: incoming.vin || "",
-          engineNumber: incoming.engineNumber || "",
-          vehicleValue: incoming.vehicleValue || "",
-          insuranceValue: incoming.insuranceValue || "",
-          insuranceContract: incoming.insuranceContract || "",
-          insuranceStart: incoming.insuranceStart || "",
-          insuranceEnd: incoming.insuranceEnd || "",
-          customerAddress:
-            incoming.customerAddress ||
+            formatDateToVNPartial(
+              getValue("createdAt", "ngày xhd") ||
+              getValue("ngayXhd", "ngày XHD")
+            ) || "",
+          model: 
+            getValue("model", "Dòng xe") ||
+            getValue("dongXe", "Dòng Xe") ||
             "",
-          showroom: incoming.showroom || branchInfo.shortName.toUpperCase(),
+          vin: 
+            getValue("vin", "Số Khung") ||
+            getValue("soKhung", "soKhung") ||
+            getValue("chassisNumber", "") ||
+            "",
+          engineNumber: 
+            getValue("engineNumber", "Số Máy") ||
+            getValue("soMay", "soMay") ||
+            "",
+          vehicleValue: 
+            getValue("vehicleValue", "Giá Hợp Đồng") ||
+            getValue("contractPrice", "giaHopDong") ||
+            getValue("giaHopDong", "") ||
+            "",
+          insuranceValue: 
+            getValue("insuranceValue", "") || "",
+          insuranceContract: 
+            getValue("insuranceContract", "") || "",
+          insuranceStart: 
+            getValue("insuranceStart", "") || "",
+          insuranceEnd: 
+            getValue("insuranceEnd", "") || "",
+          customerAddress:
+            getValue("customerAddress", "Địa Chỉ") ||
+            getValue("address", "diaChi") ||
+            getValue("diaChi", "") ||
+            "",
+          showroom: 
+            showroomName || 
+            branchInfo.shortName.toUpperCase(),
         };
         setData(processedData);
         // Initialize editable fields from data
-        setCustomerAddress(processedData.customerAddress);
         setInsuranceContract(processedData.insuranceContract);
         setInsuranceValue(processedData.insuranceValue);
         setInsuranceStart(convertToDateInput(processedData.insuranceStart));
         setInsuranceEnd(convertToDateInput(processedData.insuranceEnd));
-        setModel(processedData.model);
-        setVin(processedData.vin);
-        setEngineNumber(processedData.engineNumber);
-        setVehicleValue(processedData.vehicleValue);
         if (incoming.recipientInfo) {
           setRecipientInfo(incoming.recipientInfo);
         }
@@ -157,15 +196,10 @@ const GiayXacNhanTangBaoHiem = () => {
         };
         setData(defaultData);
         // Initialize editable fields from default data
-        setCustomerAddress(defaultData.customerAddress);
         setInsuranceContract(defaultData.insuranceContract);
         setInsuranceValue(defaultData.insuranceValue);
         setInsuranceStart(defaultData.insuranceStart);
         setInsuranceEnd(defaultData.insuranceEnd);
-        setModel(defaultData.model);
-        setVin(defaultData.vin);
-        setEngineNumber(defaultData.engineNumber);
-        setVehicleValue(defaultData.vehicleValue);
       }
       setLoading(false);
     };
@@ -360,81 +394,19 @@ const GiayXacNhanTangBaoHiem = () => {
                 Người được bảo hiểm: <strong>{data.customerName}</strong>
               </p>
               <p>
-                Địa chỉ:{" "}
-                <span className="print:hidden">
-                  <input
-                    type="text"
-                    value={customerAddress}
-                    onChange={(e) => setCustomerAddress(e.target.value)}
-                    className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-full max-w-md focus:outline-none focus:border-blue-500"
-                    placeholder={data.customerAddress}
-                  />
-                </span>
-                <span className="hidden print:inline">
-                  {customerAddress || data.customerAddress}
-                </span>
+                Địa chỉ: <strong>{data.customerAddress || ""}</strong>
               </p>
               <p>
-                Hiệu xe:{" "}
-                <span className="print:hidden">
-                  <input
-                    type="text"
-                    value={model || data?.model || ""}
-                    onChange={(e) => setModel(e.target.value)}
-                    className="border-b border-gray-400 px-2 py-1 text-sm w-64 focus:outline-none focus:border-blue-500"
-                  />
-                </span>
-                <span className="hidden print:inline">
-                  {model || data?.model || ""}
-                </span>
+                Hiệu xe: <strong>{data?.model || ""}</strong>
               </p>
               <p>
-                Số khung:{" "}
-                <strong>
-                  <span className="print:hidden">
-                    <input
-                      type="text"
-                      value={vin || data?.vin || ""}
-                      onChange={(e) => setVin(e.target.value)}
-                      className="border-b border-gray-400 px-2 py-1 text-sm w-64 focus:outline-none focus:border-blue-500"
-                    />
-                  </span>
-                  <span className="hidden print:inline">
-                    {vin || data?.vin || ""}
-                  </span>
-                </strong>
+                Số khung: <strong>{data?.vin || ""}</strong>
               </p>
               <p>
-                Số máy:{" "}
-                <strong>
-                  <span className="print:hidden">
-                    <input
-                      type="text"
-                      value={engineNumber || data?.engineNumber || ""}
-                      onChange={(e) => setEngineNumber(e.target.value)}
-                      className="border-b border-gray-400 px-2 py-1 text-sm w-64 focus:outline-none focus:border-blue-500"
-                    />
-                  </span>
-                  <span className="hidden print:inline">
-                    {engineNumber || data?.engineNumber || ""}
-                  </span>
-                </strong>
+                Số máy: <strong>{data?.engineNumber || ""}</strong>
               </p>
               <p>
-                Giá trị xe :{" "}
-                <strong>
-                  <span className="print:hidden">
-                    <input
-                      type="text"
-                      value={vehicleValue || data?.vehicleValue || ""}
-                      onChange={(e) => setVehicleValue(e.target.value)}
-                      className="border-b border-gray-400 px-2 py-1 text-sm w-64 focus:outline-none focus:border-blue-500"
-                    />
-                  </span>
-                  <span className="hidden print:inline">
-                    {formatCurrency(vehicleValue || data?.vehicleValue || "")}
-                  </span>
-                </strong>
+                Giá trị xe : <strong>{formatCurrency(data?.vehicleValue || "")}</strong>
               </p>
               <p>
                 Giá trị hợp đồng bảo hiểm :{" "}

@@ -26,7 +26,10 @@ const CheckboxFilter = memo(
         <button
           ref={anchorRef}
           type="button"
-          onClick={() => setOpenDropdown((prev) => (prev === id ? null : id))}
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpenDropdown((prev) => (prev === id ? null : id));
+          }}
           className="w-full px-4 py-2 bg-white border border-gray-200 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-all duration-200 flex items-center justify-between group shadow-sm"
         >
           <div className="flex items-center gap-3">

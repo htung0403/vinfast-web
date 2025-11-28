@@ -3,10 +3,11 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import FilterPanel from '../components/FilterPanel';
 import { ref, get, update, remove, push, set } from 'firebase/database';
 import { database } from '../firebase/config';
-import { X, Trash2, Plus, Check, AlertTriangle, Edit, Download, ArrowLeft } from 'lucide-react';
+import { X, Trash2, Plus, Check, AlertTriangle, Edit, Download, ArrowLeft, Gift } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { uniqueNgoaiThatColors, uniqueNoiThatColors } from '../data/calculatorData';
 import { getBranchByShowroomName, getAllBranches } from '../data/branchData';
+import { loadPromotionsFromFirebase } from '../data/promotionsData';
 
 export default function HopDongPage() {
   const [userTeam, setUserTeam] = useState('');
@@ -42,6 +43,13 @@ export default function HopDongPage() {
   const [loading, setLoading] = useState(true);
   const [selectedContracts, setSelectedContracts] = useState(new Set());
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isAddPromotionModalOpen, setIsAddPromotionModalOpen] = useState(false);
+  const [newPromotionName, setNewPromotionName] = useState('');
+  const [promotions, setPromotions] = useState([]);
+  const [editingPromotionId, setEditingPromotionId] = useState(null);
+  const [editingPromotionName, setEditingPromotionName] = useState('');
+  const [deletingPromotionId, setDeletingPromotionId] = useState(null);
+  const [loadingPromotions, setLoadingPromotions] = useState(false);
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
@@ -255,8 +263,24 @@ export default function HopDongPage() {
 
   // Apply permission filter to contracts
   useEffect(() => {
-    if (allContracts.length === 0 && userRole !== "admin") {
-      // If no contracts loaded yet, wait
+    // If no contracts loaded yet and not admin, wait for contracts to load
+    if (allContracts.length === 0) {
+      // If admin, can set loading false immediately (no contracts to show)
+      if (userRole === "admin") {
+        setContracts([]);
+        setFilteredContracts([]);
+        setLoading(false);
+        return;
+      }
+      // For user/leader, wait for contracts to load first
+      // But if employees are already loaded, we know there are no contracts
+      if (employeesLoaded) {
+        setContracts([]);
+        setFilteredContracts([]);
+        setLoading(false);
+        return;
+      }
+      // Still waiting for either contracts or employees to load
       return;
     }
 
@@ -265,7 +289,7 @@ export default function HopDongPage() {
     if (userRole === "user") {
       // User: only see their own contracts (by TVBH matching actual employee name)
       if (!employeesLoaded) {
-        // Still loading employee data, show empty
+        // Still loading employee data, show empty but keep loading
         filtered = [];
       } else if (actualEmployeeName) {
         // Filter by actual employee name
@@ -278,25 +302,29 @@ export default function HopDongPage() {
         // Employee name not found, show empty
         filtered = [];
       }
-      // Set loading false after filtering for user
-      setLoading(false);
+      // Set loading false after filtering for user (whether employees loaded or not)
+      if (employeesLoaded) {
+        setLoading(false);
+      }
     } else if (userRole === "leader") {
       // Leader: see contracts of employees in same department
       if (!employeesLoaded) {
-        // Still loading employee data, show empty
+        // Still loading employee data, show empty but keep loading
         filtered = [];
-      } else if (userDepartment && teamEmployeeNames.length > 0) {
-        // Filter by team employee names
-        filtered = allContracts.filter((contract) => {
-          const contractTVBH = contract.TVBH || "";
-          return teamEmployeeNames.includes(contractTVBH);
-        });
       } else {
-        // No team members found, show empty
-        filtered = [];
+        if (userDepartment && teamEmployeeNames.length > 0) {
+          // Filter by team employee names
+          filtered = allContracts.filter((contract) => {
+            const contractTVBH = contract.TVBH || "";
+            return teamEmployeeNames.includes(contractTVBH);
+          });
+        } else {
+          // No team members found, show empty
+          filtered = [];
+        }
+        // Set loading false after filtering for leader
+        setLoading(false);
       }
-      // Set loading false after filtering for leader
-      setLoading(false);
     } else if (userRole === "admin") {
       // Admin: see all contracts (no filter)
       filtered = allContracts;
@@ -699,6 +727,131 @@ export default function HopDongPage() {
     setIsExportModalOpen(false);
   };
 
+  // Load promotions from Firebase
+  const loadPromotions = async () => {
+    setLoadingPromotions(true);
+    try {
+      const promotionsList = await loadPromotionsFromFirebase();
+      setPromotions(promotionsList);
+    } catch (err) {
+      console.error("Error loading promotions:", err);
+      toast.error("Lỗi khi tải danh sách chương trình ưu đãi");
+      setPromotions([]);
+    } finally {
+      setLoadingPromotions(false);
+    }
+  };
+
+  // Open add promotion modal
+  const openAddPromotionModal = () => {
+    setIsAddPromotionModalOpen(true);
+    setNewPromotionName('');
+    setEditingPromotionId(null);
+    setEditingPromotionName('');
+    loadPromotions();
+  };
+
+  // Close add promotion modal
+  const closeAddPromotionModal = () => {
+    setIsAddPromotionModalOpen(false);
+    setNewPromotionName('');
+    setEditingPromotionId(null);
+    setEditingPromotionName('');
+    setDeletingPromotionId(null);
+  };
+
+  // Handle add promotion
+  const handleAddPromotion = async () => {
+    if (!newPromotionName || !newPromotionName.trim()) {
+      toast.warning("Vui lòng nhập tên chương trình ưu đãi!");
+      return;
+    }
+
+    try {
+      const promotionsRef = ref(database, "promotions");
+      const newPromotionRef = push(promotionsRef);
+      const promotionData = {
+        name: newPromotionName.trim(),
+        createdAt: new Date().toISOString(),
+        createdBy: userEmail || username || "admin",
+      };
+      
+      await set(newPromotionRef, promotionData);
+      
+      toast.success("Thêm chương trình ưu đãi thành công!");
+      setNewPromotionName('');
+      await loadPromotions(); // Reload list
+    } catch (err) {
+      console.error("Error adding promotion:", err);
+      toast.error("Lỗi khi thêm chương trình ưu đãi: " + err.message);
+    }
+  };
+
+  // Start editing promotion
+  const startEditPromotion = (promotion) => {
+    setEditingPromotionId(promotion.id);
+    setEditingPromotionName(promotion.name || '');
+  };
+
+  // Cancel editing
+  const cancelEditPromotion = () => {
+    setEditingPromotionId(null);
+    setEditingPromotionName('');
+  };
+
+  // Save edited promotion
+  const handleSaveEditPromotion = async () => {
+    if (!editingPromotionName || !editingPromotionName.trim()) {
+      toast.warning("Vui lòng nhập tên chương trình ưu đãi!");
+      return;
+    }
+
+    try {
+      const promotionRef = ref(database, `promotions/${editingPromotionId}`);
+      
+      await update(promotionRef, {
+        name: editingPromotionName.trim(),
+        updatedAt: new Date().toISOString(),
+        updatedBy: userEmail || username || "admin",
+      });
+      
+      toast.success("Cập nhật chương trình ưu đãi thành công!");
+      setEditingPromotionId(null);
+      setEditingPromotionName('');
+      await loadPromotions(); // Reload list
+    } catch (err) {
+      console.error("Error updating promotion:", err);
+      toast.error("Lỗi khi cập nhật chương trình ưu đãi: " + err.message);
+    }
+  };
+
+  // Open delete confirmation
+  const openDeletePromotionConfirm = (promotionId) => {
+    setDeletingPromotionId(promotionId);
+  };
+
+  // Close delete confirmation
+  const closeDeletePromotionConfirm = () => {
+    setDeletingPromotionId(null);
+  };
+
+  // Handle delete promotion
+  const handleDeletePromotion = async () => {
+    if (!deletingPromotionId) return;
+
+    try {
+      const promotionRef = ref(database, `promotions/${deletingPromotionId}`);
+      await remove(promotionRef);
+      
+      toast.success("Xóa chương trình ưu đãi thành công!");
+      setDeletingPromotionId(null);
+      await loadPromotions(); // Reload list
+    } catch (err) {
+      console.error("Error deleting promotion:", err);
+      toast.error("Lỗi khi xóa chương trình ưu đãi: " + err.message);
+    }
+  };
+
   // Export selected contracts to exportedContracts
   const handleExportContracts = async () => {
     if (selectedContracts.size === 0) return;
@@ -856,6 +1009,15 @@ export default function HopDongPage() {
                 >
                   <Download className="w-4 h-4" />
                   <span>Xuất hợp đồng ({selectedContracts.size})</span>
+                </button>
+              )}
+              {userRole === "admin" && (
+                <button
+                  onClick={openAddPromotionModal}
+                  className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-purple-600 text-white rounded-lg border-2 border-transparent hover:bg-white hover:border-purple-600 hover:text-purple-600 transition-all duration-200 flex items-center justify-center gap-2 font-medium text-sm sm:text-base"
+                >
+                  <Gift className="w-4 h-4" />
+                  <span>Thêm chương trình ưu đãi</span>
                 </button>
               )}
               <button
@@ -1509,6 +1671,200 @@ export default function HopDongPage() {
                 </div>
               </div>
             </div>
+      )}
+
+      {/* Add Promotion Modal */}
+      {isAddPromotionModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[calc(100vh-2rem)] overflow-auto">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-purple-600 to-purple-400 px-4 sm:px-6 py-3 sm:py-4 rounded-t-lg sticky top-0 z-10">
+              <h3 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
+                <Gift className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span>Quản lý chương trình ưu đãi</span>
+              </h3>
+            </div>
+
+            {/* Content */}
+            <div className="p-4 sm:p-6">
+              {/* Add new promotion form */}
+              <div className="mb-6 pb-6 border-b border-gray-200">
+                <label htmlFor="promotionName" className="block text-sm font-medium text-gray-700 mb-2">
+                  Tên chương trình ưu đãi mới <span className="text-red-500">*</span>
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    id="promotionName"
+                    type="text"
+                    value={newPromotionName}
+                    onChange={(e) => setNewPromotionName(e.target.value)}
+                    placeholder="Ví dụ: Chính sách MLTTVN 3: Giảm 4% Tiền mặt"
+                    className="flex-1 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none text-sm sm:text-base"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleAddPromotion();
+                      }
+                    }}
+                  />
+                  <button
+                    onClick={handleAddPromotion}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2 text-sm font-medium"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span className="hidden sm:inline">Thêm</span>
+                  </button>
+                </div>
+                <p className="mt-2 text-xs text-gray-500">
+                  Nhập tên chương trình ưu đãi mới. Tên này sẽ xuất hiện trong danh sách ưu đãi khi tạo hợp đồng.
+                </p>
+              </div>
+
+              {/* List of existing promotions */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">Danh sách chương trình ưu đãi hiện có</h4>
+                {loadingPromotions ? (
+                  <div className="text-center py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600 mx-auto"></div>
+                    <p className="text-sm text-gray-500 mt-2">Đang tải...</p>
+                  </div>
+                ) : promotions.length === 0 ? (
+                  <div className="text-center py-4 text-sm text-gray-500">
+                    Chưa có chương trình ưu đãi nào
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                    {promotions.map((promotion) => (
+                      <div
+                        key={promotion.id}
+                        className="border border-gray-200 rounded-lg p-3 hover:bg-gray-50 transition-colors"
+                      >
+                        {editingPromotionId === promotion.id ? (
+                          // Edit mode
+                          <div className="flex items-start gap-2">
+                            <input
+                              type="text"
+                              value={editingPromotionName}
+                              onChange={(e) => setEditingPromotionName(e.target.value)}
+                              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none text-sm"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleSaveEditPromotion();
+                                } else if (e.key === 'Escape') {
+                                  cancelEditPromotion();
+                                }
+                              }}
+                              autoFocus
+                            />
+                            <button
+                              onClick={handleSaveEditPromotion}
+                              className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                              aria-label="Lưu"
+                            >
+                              <Check className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={cancelEditPromotion}
+                              className="px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm"
+                              aria-label="Hủy"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          // Display mode
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-gray-900">{promotion.name}</p>
+                              {promotion.createdAt && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Tạo lúc: {new Date(promotion.createdAt).toLocaleString('vi-VN')}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => startEditPromotion(promotion)}
+                                className="px-2 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                                aria-label="Sửa"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => openDeletePromotionConfirm(promotion.id)}
+                                className="px-2 py-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm"
+                                aria-label="Xóa"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="px-4 sm:px-6 py-3 sm:py-4 bg-gray-50 rounded-b-lg flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 sticky bottom-0 border-t border-gray-200">
+              <button
+                onClick={closeAddPromotionModal}
+                className="w-full sm:w-auto px-4 sm:px-5 py-2 sm:py-2.5 bg-gray-500 text-white font-medium rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center gap-2 text-sm sm:text-base"
+                aria-label="Đóng"
+              >
+                <X className="w-4 h-4" />
+                <span>Đóng</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Promotion Confirmation Modal */}
+      {deletingPromotionId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="bg-gradient-to-r from-red-600 to-pink-600 px-4 sm:px-6 py-3 sm:py-4 rounded-t-lg">
+              <h3 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span>Xác nhận xóa</span>
+              </h3>
+            </div>
+            <div className="p-4 sm:p-6">
+              <p className="text-gray-700 mb-4">
+                Bạn có chắc chắn muốn xóa chương trình ưu đãi này không?
+              </p>
+              {promotions.find(p => p.id === deletingPromotionId) && (
+                <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                  <p className="text-sm font-medium text-gray-900">
+                    {promotions.find(p => p.id === deletingPromotionId).name}
+                  </p>
+                </div>
+              )}
+              <p className="text-red-600 font-medium text-sm mt-4 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4" />
+                <span>Hành động này không thể hoàn tác!</span>
+              </p>
+            </div>
+            <div className="bg-gray-50 px-4 sm:px-6 py-3 sm:py-4 rounded-b-lg flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
+              <button
+                onClick={closeDeletePromotionConfirm}
+                className="w-full sm:w-auto px-4 sm:px-5 py-2 sm:py-2.5 bg-gray-500 text-white font-medium rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center gap-2 text-sm sm:text-base"
+              >
+                <X className="w-4 h-4" />
+                <span>Hủy</span>
+              </button>
+              <button
+                onClick={handleDeletePromotion}
+                className="w-full sm:w-auto px-4 sm:px-5 py-2 sm:py-2.5 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2 text-sm sm:text-base"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Xóa</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Export Confirmation Modal */}

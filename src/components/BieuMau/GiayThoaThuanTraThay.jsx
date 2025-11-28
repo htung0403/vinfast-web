@@ -6,6 +6,7 @@ import {
 } from "../../data/branchData";
 import { ref, get } from "firebase/database";
 import { database } from "../../firebase/config";
+import { vndToWords } from "../../utils/vndToWords";
 
 const GiayThoaThuanTraThay = () => {
   const location = useLocation();
@@ -41,6 +42,7 @@ const GiayThoaThuanTraThay = () => {
   const [noiCapKH, setNoiCapKH] = useState("");
 
   // Spouse fields
+  const [coVoChong, setCoVoChong] = useState(false);
   const [tenVoChong, setTenVoChong] = useState("");
   const [diaChiVoChong, setDiaChiVoChong] = useState("");
   const [dienThoaiVoChong, setDienThoaiVoChong] = useState("");
@@ -159,6 +161,14 @@ const GiayThoaThuanTraThay = () => {
         );
 
         // Spouse info (if available)
+        const hasSpouseData =
+          dataSource.tenVoChong ||
+          dataSource["Tên Vợ/Chồng"] ||
+          dataSource.diaChiVoChong ||
+          dataSource["Địa Chỉ Vợ/Chồng"] ||
+          dataSource.cccdVoChong ||
+          dataSource["CCCD Vợ/Chồng"];
+        setCoVoChong(!!hasSpouseData);
         setTenVoChong(
           dataSource.tenVoChong || dataSource["Tên Vợ/Chồng"] || ""
         );
@@ -209,17 +219,31 @@ const GiayThoaThuanTraThay = () => {
         setGiaTriXe(giaTri);
 
         // Loan info
-        setSoTienVay(
+        const loanAmount =
           dataSource.soTienVay ||
-            dataSource["Số Tiền Vay"] ||
-            dataSource.loanAmount ||
-            ""
-        );
-        setSoTienVayBangChu(
-          dataSource.soTienVayBangChu ||
-            dataSource["Số Tiền Vay Bằng Chữ"] ||
-            ""
-        );
+          dataSource["Số Tiền Vay"] ||
+          dataSource.loanAmount ||
+          "";
+        if (loanAmount) {
+          const loanValue =
+            typeof loanAmount === "string"
+              ? loanAmount.replace(/\D/g, "")
+              : String(loanAmount);
+          setSoTienVay(loanValue);
+          // Tự động chuyển sang chữ nếu chưa có
+          if (
+            !dataSource.soTienVayBangChu &&
+            !dataSource["Số Tiền Vay Bằng Chữ"]
+          ) {
+            setSoTienVayBangChu(vndToWords(loanValue));
+          } else {
+            setSoTienVayBangChu(
+              dataSource.soTienVayBangChu ||
+                dataSource["Số Tiền Vay Bằng Chữ"] ||
+                ""
+            );
+          }
+        }
         setTyLeVay(
           dataSource.tyLeVay ||
             dataSource["Tỷ Lệ Vay"] ||
@@ -606,23 +630,39 @@ const GiayThoaThuanTraThay = () => {
               </div>
             </div>
 
-            <h2 className="text-base font-bold mt-3">
-              Có vợ/chồng là <br />
-              <span className="font-bold mt-3">Ông/Bà</span>
-              <span className="print:hidden">
+            {/* Checkbox for spouse */}
+            <div className="print:hidden mb-2">
+              <label className="flex items-center">
                 <input
-                  type="text"
-                  value={tenVoChong}
-                  onChange={(e) => setTenVoChong(e.target.value)}
-                  className="border-b border-gray-400 px-2 py-1 text-sm w-64 ml-2 focus:outline-none focus:border-blue-500"
-                  placeholder="Nhập tên vợ/chồng"
+                  type="checkbox"
+                  checked={coVoChong}
+                  onChange={(e) => setCoVoChong(e.target.checked)}
+                  className="mr-2"
                 />
-              </span>
-              <span className="hidden print:inline ml-2">
-                {tenVoChong || "______"}
-              </span>
-            </h2>
-            <div className="text-sm space-y-2">
+                Có vợ/chồng
+              </label>
+            </div>
+
+            {/* Spouse Section */}
+            {coVoChong && (
+              <>
+                <h2 className="text-base font-bold mt-3">
+                  Có vợ/chồng là <br />
+                  <span className="font-bold mt-3">Ông/Bà</span>
+                  <span className="print:hidden">
+                    <input
+                      type="text"
+                      value={tenVoChong}
+                      onChange={(e) => setTenVoChong(e.target.value)}
+                      className="border-b border-gray-400 px-2 py-1 text-sm w-64 ml-2 focus:outline-none focus:border-blue-500"
+                      placeholder="Nhập tên vợ/chồng"
+                    />
+                  </span>
+                  <span className="hidden print:inline ml-2">
+                    {tenVoChong || "______"}
+                  </span>
+                </h2>
+                <div className="text-sm space-y-2">
               <div>
                 <span className="">Địa chỉ:</span>
                 <span className="print:hidden">
@@ -709,7 +749,9 @@ const GiayThoaThuanTraThay = () => {
                   {noiCapVoChong || "____"}
                 </span>
               </div>
-            </div>
+                </div>
+              </>
+            )}
             <p className=" mt-2">
               ("<strong>Khách Hàng</strong>")
             </p>
@@ -897,8 +939,20 @@ const GiayThoaThuanTraThay = () => {
                         type="text"
                         value={formatCurrency(soTienVay)}
                         onChange={(e) => {
-                          const val = e.target.value.replace(/\D/g, "");
+                          const rawValue = e.target.value;
+                          const val = rawValue.replace(/\D/g, "");
                           setSoTienVay(val);
+                          // Tự động chuyển số tiền sang chữ khi nhập
+                          if (val && val.length > 0) {
+                            const numValue = parseInt(val, 10);
+                            if (!isNaN(numValue) && numValue > 0) {
+                              setSoTienVayBangChu(vndToWords(val));
+                            } else {
+                              setSoTienVayBangChu("");
+                            }
+                          } else {
+                            setSoTienVayBangChu("");
+                          }
                         }}
                         className="border-b border-gray-400 px-1 py-0 text-sm w-48 focus:outline-none focus:border-blue-500"
                         placeholder="Nhập số tiền"

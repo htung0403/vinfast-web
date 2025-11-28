@@ -70,7 +70,7 @@ export default function HopDongDaXuatPage() {
     const email = localStorage.getItem("userEmail") || "";
     const usernameValue = localStorage.getItem("username") || "";
     const userDepartmentValue = localStorage.getItem("userDepartment") || "";
-    
+
     setUserTeam(team);
     setUserRole(role);
     setUserEmail(email);
@@ -142,7 +142,7 @@ export default function HopDongDaXuatPage() {
   useEffect(() => {
     const loadEmployeesData = async () => {
       setEmployeesLoaded(false);
-      
+
       if (!userEmail && !userRole) {
         setEmployeesLoaded(true);
         return;
@@ -160,36 +160,67 @@ export default function HopDongDaXuatPage() {
         // Find current user's actual name from employees by email
         if (userEmail) {
           const userEntry = Object.entries(data).find(([key, employee]) => {
-            const employeeEmail = (employee && (employee.mail || employee.Mail || employee.email || "")).toString().toLowerCase();
+            const employeeEmail = (
+              employee &&
+              (employee.mail || employee.Mail || employee.email || "")
+            )
+              .toString()
+              .toLowerCase();
             return employeeEmail === userEmail.toLowerCase();
           });
 
           if (userEntry) {
             const [userId, employeeData] = userEntry;
             // Get actual name from employee - try multiple fields
-            foundEmployeeName = employeeData.TVBH || employeeData.user || employeeData.username || employeeData.name || "";
+            foundEmployeeName =
+              employeeData.TVBH ||
+              employeeData.user ||
+              employeeData.username ||
+              employeeData.name ||
+              "";
             setActualEmployeeName(foundEmployeeName);
           }
         }
 
         // Build employees mapping and team names
         Object.entries(data).forEach(([key, employee]) => {
-          const employeeName = employee.TVBH || employee.user || employee.username || employee.name || "";
-          const employeeDept = employee.phongBan || employee["Phòng Ban"] || employee.department || employee["Bộ phận"] || "";
-          const employeeEmail = (employee.mail || employee.Mail || employee.email || "").toString().toLowerCase();
+          const employeeName =
+            employee.TVBH ||
+            employee.user ||
+            employee.username ||
+            employee.name ||
+            "";
+          const employeeDept =
+            employee.phongBan ||
+            employee["Phòng Ban"] ||
+            employee.department ||
+            employee["Bộ phận"] ||
+            "";
+          const employeeEmail = (
+            employee.mail ||
+            employee.Mail ||
+            employee.email ||
+            ""
+          )
+            .toString()
+            .toLowerCase();
 
           if (employeeName) {
             employeesMapping[employeeName] = employeeDept;
-            
+
             // For leader: collect all employees in same department
-            if (userRole === "leader" && userDepartment && employeeDept === userDepartment) {
+            if (
+              userRole === "leader" &&
+              userDepartment &&
+              employeeDept === userDepartment
+            ) {
               teamNames.push(employeeName);
             }
           }
         });
 
         setEmployeesMap(employeesMapping);
-        
+
         if (userRole === "leader") {
           // Include current user in team if found
           if (foundEmployeeName && !teamNames.includes(foundEmployeeName)) {
@@ -200,7 +231,7 @@ export default function HopDongDaXuatPage() {
           // Admin can see all employees
           setTeamEmployeeNames(Object.keys(employeesMapping));
         }
-        
+
         setEmployeesLoaded(true);
       } catch (err) {
         toast.error("Lỗi khi tải dữ liệu nhân viên: " + err.message);
@@ -310,8 +341,24 @@ export default function HopDongDaXuatPage() {
 
   // Apply permission filter to contracts
   useEffect(() => {
-    if (allContracts.length === 0 && userRole !== "admin") {
-      // If no contracts loaded yet, wait
+    // If no contracts loaded yet and not admin, wait for contracts to load
+    if (allContracts.length === 0) {
+      // If admin, can set loading false immediately (no contracts to show)
+      if (userRole === "admin") {
+        setContracts([]);
+        setFilteredContracts([]);
+        setLoading(false);
+        return;
+      }
+      // For user/leader, wait for contracts to load first
+      // But if employees are already loaded, we know there are no contracts
+      if (employeesLoaded) {
+        setContracts([]);
+        setFilteredContracts([]);
+        setLoading(false);
+        return;
+      }
+      // Still waiting for either contracts or employees to load
       return;
     }
 
@@ -320,38 +367,44 @@ export default function HopDongDaXuatPage() {
     if (userRole === "user") {
       // User: only see their own contracts (by TVBH matching actual employee name)
       if (!employeesLoaded) {
-        // Still loading employee data, show empty
+        // Still loading employee data, show empty but keep loading
         filtered = [];
       } else if (actualEmployeeName) {
         // Filter by actual employee name
         filtered = allContracts.filter((contract) => {
           const contractTVBH = contract.tvbh || "";
-          return contractTVBH === actualEmployeeName || 
-                 contractTVBH.toLowerCase() === actualEmployeeName.toLowerCase();
+          return (
+            contractTVBH === actualEmployeeName ||
+            contractTVBH.toLowerCase() === actualEmployeeName.toLowerCase()
+          );
         });
       } else {
         // Employee name not found, show empty
         filtered = [];
       }
-      // Set loading false after filtering for user
-      setLoading(false);
+      // Set loading false after filtering for user (whether employees loaded or not)
+      if (employeesLoaded) {
+        setLoading(false);
+      }
     } else if (userRole === "leader") {
       // Leader: see contracts of employees in same department
       if (!employeesLoaded) {
-        // Still loading employee data, show empty
+        // Still loading employee data, show empty but keep loading
         filtered = [];
-      } else if (userDepartment && teamEmployeeNames.length > 0) {
-        // Filter by team employee names
-        filtered = allContracts.filter((contract) => {
-          const contractTVBH = contract.tvbh || "";
-          return teamEmployeeNames.includes(contractTVBH);
-        });
       } else {
-        // No team members found, show empty
-        filtered = [];
+        if (userDepartment && teamEmployeeNames.length > 0) {
+          // Filter by team employee names
+          filtered = allContracts.filter((contract) => {
+            const contractTVBH = contract.tvbh || "";
+            return teamEmployeeNames.includes(contractTVBH);
+          });
+        } else {
+          // No team members found, show empty
+          filtered = [];
+        }
+        // Set loading false after filtering for leader
+        setLoading(false);
       }
-      // Set loading false after filtering for leader
-      setLoading(false);
     } else if (userRole === "admin") {
       // Admin: see all contracts (no filter)
       filtered = allContracts;
@@ -360,7 +413,14 @@ export default function HopDongDaXuatPage() {
 
     setContracts(filtered);
     setFilteredContracts(filtered);
-  }, [allContracts, userRole, actualEmployeeName, userDepartment, teamEmployeeNames, employeesLoaded]);
+  }, [
+    allContracts,
+    userRole,
+    actualEmployeeName,
+    userDepartment,
+    teamEmployeeNames,
+    employeesLoaded,
+  ]);
 
   // Apply search and filters (permission filter already applied in loadFromFirebase)
   useEffect(() => {
@@ -954,7 +1014,8 @@ export default function HopDongDaXuatPage() {
             </p>
             {filteredContracts.length > itemsPerPage && (
               <p className="text-xs sm:hidden text-secondary-500">
-                Trang {currentPage}/{totalPages} ({startIndex + 1}-{Math.min(endIndex, filteredContracts.length)})
+                Trang {currentPage}/{totalPages} ({startIndex + 1}-
+                {Math.min(endIndex, filteredContracts.length)})
               </p>
             )}
           </div>
@@ -1055,264 +1116,301 @@ export default function HopDongDaXuatPage() {
                       </th>
                     </tr>
                   </thead>
-                <tbody className="bg-neutral-white divide-y divide-secondary-100">
-                  {currentContracts.map((contract, index) => {
-                    const isMissingData = hasMissingData(contract);
-                    return (
-                      <tr
-                        key={contract.firebaseKey || contract.id}
-                        className={`hover:bg-secondary-50 ${
-                          isMissingData
-                            ? "bg-yellow-50 border-l-4 border-yellow-400"
-                            : ""
-                        }`}
-                      >
-                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm font-semibold text-black border border-secondary-400">
-                          {startIndex + index + 1}
-                        </td>
-                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
-                          {contract.ngayXhd || "-"}
-                        </td>
-                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
-                          <div className="max-w-[80px] sm:max-w-none truncate" title={contract.tvbh || "-"}>
-                            {contract.tvbh || "-"}
-                          </div>
-                        </td>
-                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
-                          {contract.vso || "-"}
-                        </td>
-                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
-                          <div className="max-w-[100px] sm:max-w-none truncate" title={contract.tenKh || "-"}>
-                            {contract.tenKh || "-"}
-                          </div>
-                        </td>
-                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
-                          {contract.soDienThoai || "-"}
-                        </td>
-                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
-                          <div className="max-w-[120px] sm:max-w-none truncate" title={contract.email || "-"}>
-                            {contract.email || "-"}
-                          </div>
-                        </td>
-                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
-                          <div className="max-w-[120px] sm:max-w-none truncate" title={contract.diaChi || "-"}>
-                            {contract.diaChi || "-"}
-                          </div>
-                        </td>
-                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
-                          {contract.cccd || "-"}
-                        </td>
-                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
-                          {contract.ngayCap || "-"}
-                        </td>
-                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
-                          <div className="max-w-[100px] sm:max-w-none truncate" title={contract.noiCap || "-"}>
-                            {contract.noiCap || "-"}
-                          </div>
-                        </td>
-                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
-                          {contract.dongXe || "-"}
-                        </td>
-                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
-                          <div className="max-w-[100px] sm:max-w-none truncate" title={contract.phienBan || "-"}>
-                            {contract.phienBan || "-"}
-                          </div>
-                        </td>
-                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
-                          <div className="max-w-[100px] sm:max-w-none truncate" title={getColorName(contract.ngoaiThat || contract["Ngoại Thất"] || contract.exterior, true)}>
-                            {getColorName(
-                              contract.ngoaiThat ||
-                                contract["Ngoại Thất"] ||
-                                contract.exterior,
-                              true
+                  <tbody className="bg-neutral-white divide-y divide-secondary-100">
+                    {currentContracts.map((contract, index) => {
+                      const isMissingData = hasMissingData(contract);
+                      return (
+                        <tr
+                          key={contract.firebaseKey || contract.id}
+                          className={`hover:bg-secondary-50 ${
+                            isMissingData
+                              ? "bg-yellow-50 border-l-4 border-yellow-400"
+                              : ""
+                          }`}
+                        >
+                          <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm font-semibold text-black border border-secondary-400">
+                            {startIndex + index + 1}
+                          </td>
+                          <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                            {contract.ngayXhd || "-"}
+                          </td>
+                          <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                            <div
+                              className="max-w-[80px] sm:max-w-none truncate"
+                              title={contract.tvbh || "-"}
+                            >
+                              {contract.tvbh || "-"}
+                            </div>
+                          </td>
+                          <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                            {contract.vso || "-"}
+                          </td>
+                          <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                            <div
+                              className="max-w-[100px] sm:max-w-none truncate"
+                              title={contract.tenKh || "-"}
+                            >
+                              {contract.tenKh || "-"}
+                            </div>
+                          </td>
+                          <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                            {contract.soDienThoai || "-"}
+                          </td>
+                          <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                            <div
+                              className="max-w-[120px] sm:max-w-none truncate"
+                              title={contract.email || "-"}
+                            >
+                              {contract.email || "-"}
+                            </div>
+                          </td>
+                          <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                            <div
+                              className="max-w-[120px] sm:max-w-none truncate"
+                              title={contract.diaChi || "-"}
+                            >
+                              {contract.diaChi || "-"}
+                            </div>
+                          </td>
+                          <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                            {contract.cccd || "-"}
+                          </td>
+                          <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                            {contract.ngayCap || "-"}
+                          </td>
+                          <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                            <div
+                              className="max-w-[100px] sm:max-w-none truncate"
+                              title={contract.noiCap || "-"}
+                            >
+                              {contract.noiCap || "-"}
+                            </div>
+                          </td>
+                          <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                            {contract.dongXe || "-"}
+                          </td>
+                          <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                            <div
+                              className="max-w-[100px] sm:max-w-none truncate"
+                              title={contract.phienBan || "-"}
+                            >
+                              {contract.phienBan || "-"}
+                            </div>
+                          </td>
+                          <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                            <div
+                              className="max-w-[100px] sm:max-w-none truncate"
+                              title={getColorName(
+                                contract.ngoaiThat ||
+                                  contract["Ngoại Thất"] ||
+                                  contract.exterior,
+                                true
+                              )}
+                            >
+                              {getColorName(
+                                contract.ngoaiThat ||
+                                  contract["Ngoại Thất"] ||
+                                  contract.exterior,
+                                true
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                            <div
+                              className="max-w-[100px] sm:max-w-none truncate"
+                              title={getColorName(
+                                contract.noiThat ||
+                                  contract["Nội Thất"] ||
+                                  contract.interior,
+                                false
+                              )}
+                            >
+                              {getColorName(
+                                contract.noiThat ||
+                                  contract["Nội Thất"] ||
+                                  contract.interior,
+                                false
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                            {formatCurrency(contract.giaNiemYet)}
+                          </td>
+                          <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                            {formatCurrency(contract.giaGiam)}
+                          </td>
+                          <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                            {formatCurrency(contract.giaHopDong)}
+                          </td>
+                          <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                            {contract.soKhung || "-"}
+                          </td>
+                          <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                            {contract.soMay || "-"}
+                          </td>
+                          <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                            {contract.tinhTrang || "-"}
+                          </td>
+                          <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                            <div
+                              className="max-w-[100px] sm:max-w-none truncate"
+                              title={contract.nganHang || "-"}
+                            >
+                              {contract.nganHang || "-"}
+                            </div>
+                          </td>
+                          <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                            {formatCurrency(
+                              contract.tienDatCoc || contract.giaGiam
                             )}
-                          </div>
-                        </td>
-                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
-                          <div className="max-w-[100px] sm:max-w-none truncate" title={getColorName(contract.noiThat || contract["Nội Thất"] || contract.interior, false)}>
-                            {getColorName(
-                              contract.noiThat ||
-                                contract["Nội Thất"] ||
-                                contract.interior,
-                              false
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
-                          {formatCurrency(contract.giaNiemYet)}
-                        </td>
-                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
-                          {formatCurrency(contract.giaGiam)}
-                        </td>
-                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
-                          {formatCurrency(contract.giaHopDong)}
-                        </td>
-                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
-                          {contract.soKhung || "-"}
-                        </td>
-                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
-                          {contract.soMay || "-"}
-                        </td>
-                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
-                          {contract.tinhTrang || "-"}
-                        </td>
-                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
-                          <div className="max-w-[100px] sm:max-w-none truncate" title={contract.nganHang || "-"}>
-                            {contract.nganHang || "-"}
-                          </div>
-                        </td>
-                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
-                          {formatCurrency(
-                            contract.tienDatCoc || contract.giaGiam
-                          )}
-                        </td>
-                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
-                          {formatCurrency(contract.tienDoiUng)}
-                        </td>
-                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
-                          {formatCurrency(calculateBankLoan(contract))}
-                        </td>
-                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400 text-center font-semibold">
-                          {calculateDaysFromExport(contract.ngayXhd)}
-                          {calculateDaysFromExport(contract.ngayXhd) !== "-" &&
-                            " ngày"}
-                        </td>
-                        {/* Actions column - sticky to right */}
-                        <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400 sticky right-0 z-20 bg-primary-200">
-                          <div className="flex items-center justify-end gap-1 sm:gap-2">
-                            <button
-                              onClick={() => openImageModal(contract)}
-                              className="px-1.5 sm:px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
-                              aria-label={`Quản lý ảnh ${
-                                contract.tenKh || contract.id
-                              }`}
-                              title="Quản lý ảnh"
-                            >
-                              <Image className="w-3 h-3 sm:w-4 sm:h-4" />
-                              <span className="hidden sm:inline">Ảnh</span>
-                            </button>
-                            <button
-                              onClick={() =>
-                                navigate(
-                                  `/hop-dong-da-xuat/edit/${
-                                    contract.firebaseKey || contract.id
-                                  }`
-                                )
-                              }
-                              className="px-1.5 sm:px-3 py-1 bg-secondary-600 text-white rounded-md hover:bg-secondary-700 transition-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
-                              aria-label={`Sửa hợp đồng ${
-                                contract.tenKh || contract.id
-                              }`}
-                            >
-                              <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
-                              <span className="hidden sm:inline">Sửa</span>
-                            </button>
-                            <button
-                              onClick={() => openDeleteConfirm(contract)}
-                              className="px-1.5 sm:px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
-                              aria-label={`Xóa hợp đồng ${
-                                contract.tenKh || contract.id
-                              }`}
-                            >
-                              <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
-                              <span className="hidden sm:inline">Xóa</span>
-                            </button>
-                            {/* Print / Giấy xác nhận button */}
-                            <button
-                              onClick={() => {
-                                if (isMissingData) {
-                                  toast.warning(
-                                    "Vui lòng điền đầy đủ thông tin hợp đồng trước khi in!"
-                                  );
-                                  return;
-                                }
-                                const printData = {
-                                  id: contract.id,
-                                  firebaseKey: contract.firebaseKey,
-                                  stt: startIndex + index + 1,
-                                  createdAt: contract.ngayXhd,
-                                  TVBH: contract.tvbh,
-                                  vso: contract.vso,
-                                  customerName: contract.tenKh,
-                                  phone: contract.soDienThoai,
-                                  email: contract.email,
-                                  Email: contract.email,
-                                  address: contract.diaChi,
-                                  cccd: contract.cccd,
-                                  issueDate: contract.ngayCap,
-                                  issuePlace: contract.noiCap,
-                                  model: contract.dongXe,
-                                  variant: contract.phienBan,
-                                  exterior: contract.ngoaiThat,
-                                  interior: contract.noiThat,
-                                  contractPrice: contract.giaHopDong,
-                                  deposit: contract.giaGiam,
-                                  payment: "",
-                                  bank: contract.nganHang || "",
-                                  status: contract.tinhTrang,
-                                  soKhung: contract.soKhung,
-                                  soMay: contract.soMay,
-                                  "Số Khung": contract.soKhung,
-                                  "Số Máy": contract.soMay,
-                                  chassisNumber: contract.soKhung,
-                                  engineNumber: contract.soMay,
-                                  representativeName: contract.tvbh,
-                                };
-                                setPrintContract(printData);
-                                // Load bankLoanFile from contract if exists
-                                const contractKey =
-                                  contract.firebaseKey || contract.id;
-                                setCurrentContractKey(contractKey);
-                                setBankLoanFile(
-                                  contract.bankLoanFile ||
-                                    contract["File cho vay ngân hàng"] ||
-                                    null
-                                );
-                                setIsPrintModalOpen(true);
-                              }}
-                              disabled={isMissingData}
-                              className={`px-1.5 sm:px-3 py-1 rounded-md transition-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-sm ${
-                                isMissingData
-                                  ? "bg-gray-400 text-gray-200 cursor-not-allowed"
-                                  : "bg-green-600 text-white hover:bg-green-700"
-                              }`}
-                              title={
-                                isMissingData
-                                  ? "Vui lòng điền đầy đủ thông tin hợp đồng trước khi in"
-                                  : `Chọn mẫu in ${
-                                      contract.tenKh || contract.id
-                                    }`
-                              }
-                              aria-label={
-                                isMissingData
-                                  ? "Không thể in - thiếu dữ liệu"
-                                  : `Chọn mẫu in ${
-                                      contract.tenKh || contract.id
-                                    }`
-                              }
-                            >
-                              <svg
-                                className="w-3 h-3 sm:w-4 sm:h-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                                xmlns="http://www.w3.org/2000/svg"
+                          </td>
+                          <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                            {formatCurrency(contract.tienDoiUng)}
+                          </td>
+                          <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400">
+                            {formatCurrency(calculateBankLoan(contract))}
+                          </td>
+                          <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400 text-center font-semibold">
+                            {calculateDaysFromExport(contract.ngayXhd)}
+                            {calculateDaysFromExport(contract.ngayXhd) !==
+                              "-" && " ngày"}
+                          </td>
+                          {/* Actions column - sticky to right */}
+                          <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400 sticky right-0 z-20 bg-primary-200">
+                            <div className="flex items-center justify-end gap-1 sm:gap-2">
+                              <button
+                                onClick={() => openImageModal(contract)}
+                                className="px-1.5 sm:px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
+                                aria-label={`Quản lý ảnh ${
+                                  contract.tenKh || contract.id
+                                }`}
+                                title="Quản lý ảnh"
                               >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth="2"
-                                  d="M6 9V2h12v7M6 18h12v4H6v-4zM6 14h12v4H6v-4z"
-                                ></path>
-                              </svg>
-                              <span className="hidden sm:inline">In</span>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
+                                <Image className="w-3 h-3 sm:w-4 sm:h-4" />
+                                <span className="hidden sm:inline">Ảnh</span>
+                              </button>
+                              <button
+                                onClick={() =>
+                                  navigate(
+                                    `/hop-dong-da-xuat/edit/${
+                                      contract.firebaseKey || contract.id
+                                    }`
+                                  )
+                                }
+                                className="px-1.5 sm:px-3 py-1 bg-secondary-600 text-white rounded-md hover:bg-secondary-700 transition-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
+                                aria-label={`Sửa hợp đồng ${
+                                  contract.tenKh || contract.id
+                                }`}
+                              >
+                                <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
+                                <span className="hidden sm:inline">Sửa</span>
+                              </button>
+                              <button
+                                onClick={() => openDeleteConfirm(contract)}
+                                className="px-1.5 sm:px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-sm"
+                                aria-label={`Xóa hợp đồng ${
+                                  contract.tenKh || contract.id
+                                }`}
+                              >
+                                <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
+                                <span className="hidden sm:inline">Xóa</span>
+                              </button>
+                              {/* Print / Giấy xác nhận button */}
+                              <button
+                                onClick={() => {
+                                  if (isMissingData) {
+                                    toast.warning(
+                                      "Vui lòng điền đầy đủ thông tin hợp đồng trước khi in!"
+                                    );
+                                    return;
+                                  }
+                                  const printData = {
+                                    id: contract.id,
+                                    firebaseKey: contract.firebaseKey,
+                                    stt: startIndex + index + 1,
+                                    createdAt: contract.ngayXhd,
+                                    TVBH: contract.tvbh,
+                                    vso: contract.vso,
+                                    customerName: contract.tenKh,
+                                    phone: contract.soDienThoai,
+                                    email: contract.email,
+                                    Email: contract.email,
+                                    address: contract.diaChi,
+                                    cccd: contract.cccd,
+                                    issueDate: contract.ngayCap,
+                                    issuePlace: contract.noiCap,
+                                    model: contract.dongXe,
+                                    variant: contract.phienBan,
+                                    exterior: contract.ngoaiThat,
+                                    interior: contract.noiThat,
+                                    contractPrice: contract.giaHopDong,
+                                    deposit: contract.giaGiam,
+                                    payment: "",
+                                    bank: contract.nganHang || "",
+                                    status: contract.tinhTrang,
+                                    soKhung: contract.soKhung,
+                                    soMay: contract.soMay,
+                                    "Số Khung": contract.soKhung,
+                                    "Số Máy": contract.soMay,
+                                    chassisNumber: contract.soKhung,
+                                    engineNumber: contract.soMay,
+                                    representativeName: contract.tvbh,
+                                  };
+                                  setPrintContract(printData);
+                                  // Load bankLoanFile from contract if exists
+                                  const contractKey =
+                                    contract.firebaseKey || contract.id;
+                                  setCurrentContractKey(contractKey);
+                                  setBankLoanFile(
+                                    contract.bankLoanFile ||
+                                      contract["File cho vay ngân hàng"] ||
+                                      null
+                                  );
+                                  setIsPrintModalOpen(true);
+                                }}
+                                disabled={isMissingData}
+                                className={`px-1.5 sm:px-3 py-1 rounded-md transition-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-sm ${
+                                  isMissingData
+                                    ? "bg-gray-400 text-gray-200 cursor-not-allowed"
+                                    : "bg-green-600 text-white hover:bg-green-700"
+                                }`}
+                                title={
+                                  isMissingData
+                                    ? "Vui lòng điền đầy đủ thông tin hợp đồng trước khi in"
+                                    : `Chọn mẫu in ${
+                                        contract.tenKh || contract.id
+                                      }`
+                                }
+                                aria-label={
+                                  isMissingData
+                                    ? "Không thể in - thiếu dữ liệu"
+                                    : `Chọn mẫu in ${
+                                        contract.tenKh || contract.id
+                                      }`
+                                }
+                              >
+                                <svg
+                                  className="w-3 h-3 sm:w-4 sm:h-4"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth="2"
+                                    d="M6 9V2h12v7M6 18h12v4H6v-4zM6 14h12v4H6v-4z"
+                                  ></path>
+                                </svg>
+                                <span className="hidden sm:inline">In</span>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
                 </table>
               </div>
             </div>
@@ -1433,39 +1531,6 @@ export default function HopDongDaXuatPage() {
           {isPrintModalOpen &&
             printContract &&
             (() => {
-              // Helper to parse currency string to number
-              const parseCurrency = (value) => {
-                if (!value) return 0;
-                const str = String(value).replace(/[^\d]/g, ""); // Remove all non-digits
-                return parseFloat(str) || 0;
-              };
-
-              // Determine loan amount and bank for conditional display
-              const bank = (printContract.bank || "").toLowerCase();
-              const contractPrice = parseCurrency(
-                printContract.contractPrice || printContract.giaHopDong || 0
-              );
-              const deposit = parseCurrency(
-                printContract.deposit || printContract.giaGiam || 0
-              );
-              const loanAmount = contractPrice - deposit;
-              const loanPercentage =
-                contractPrice > 0 ? (loanAmount / contractPrice) * 100 : 0;
-              const isLoan0 = loanPercentage < 1; // Vay 0 đồng
-              const isLoan90 = loanPercentage >= 85 && loanPercentage <= 95; // Vay khoảng 90%
-              const isVPBank =
-                bank.includes("vpbank") ||
-                bank.includes("vp bank") ||
-                bank.includes("vietnam prosperity");
-              const isTPBank =
-                bank.includes("tpbank") ||
-                bank.includes("tp bank") ||
-                bank.includes("tien phong");
-              const isLotte =
-                bank.includes("lotte") ||
-                bank.includes("cty tài chính lotte") ||
-                bank.includes("công ty tài chính lotte");
-
               // Handle bank loan file upload
               const handleBankLoanFileUpload = async (e) => {
                 const file = e.target.files[0];
@@ -1793,94 +1858,87 @@ export default function HopDongDaXuatPage() {
                         </button>
 
                         <button
-                          onClick={() =>
-                            handlePrintNavigate("/giay-xac-nhan")
-                          }
+                          onClick={() => handlePrintNavigate("/giay-xac-nhan")}
                           className="w-full px-3 sm:px-4 py-2 sm:py-2.5 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm sm:text-base"
                         >
                           Xác nhận thanh toán
                         </button>
 
-                        {/* Conditional options based on loan amount */}
-                        {isLoan0 && (
-                          <div className="space-y-2 mt-3 pl-2 sm:pl-4 border-l-4 border-yellow-400 bg-yellow-50 p-2 sm:p-3 rounded">
-                            <p className="text-xs sm:text-sm font-semibold text-yellow-800 mb-2">
-                              KH vay 0 đồng - Các biểu mẫu bổ sung:
-                            </p>
-                            <button
-                              onClick={() =>
-                                handlePrintNavigate("/giay-thoa-thuan-tra-thay")
-                              }
-                              className="w-full px-3 sm:px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors text-xs sm:text-sm"
-                            >
-                              Thỏa thuận hỗ trợ trả thay
-                            </button>
-                            <button
-                              onClick={() =>
-                                handlePrintNavigate("/giay-thoa-thuan-tra-cham")
-                              }
-                              className="w-full px-3 sm:px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors text-xs sm:text-sm"
-                            >
-                              Thỏa thuận hỗ trợ trả chậm
-                            </button>
-                            <button
-                              onClick={() =>
-                                handlePrintNavigate("/xac-nhan-cong-no")
-                              }
-                              className="w-full px-3 sm:px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors text-xs sm:text-sm"
-                            >
-                              Xác nhận công nợ
-                            </button>
-                            <button
-                              onClick={() =>
-                                handlePrintNavigate("/giay-xac-nhan")
-                              }
-                              className="w-full px-3 sm:px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors text-xs sm:text-sm"
-                            >
-                              Xác nhận thanh toán
-                            </button>
-                          </div>
-                        )}
+                        {/* Các biểu mẫu bổ sung - hiển thị tất cả */}
+                        <div className="space-y-2 mt-3 pl-2 sm:pl-4 border-l-4 border-yellow-400 bg-yellow-50 p-2 sm:p-3 rounded">
+                          <p className="text-xs sm:text-sm font-semibold text-yellow-800 mb-2">
+                            Thỏa thuận lãi vay 0 đồng:
+                          </p>
+                          <button
+                            onClick={() =>
+                              handlePrintNavigate("/giay-thoa-thuan-tra-cham")
+                            }
+                            className="w-full px-3 sm:px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors text-xs sm:text-sm"
+                          >
+                            Thỏa thuận thanh toán chậm
+                          </button>
+                          <button
+                            onClick={() =>
+                              handlePrintNavigate("/giay-thoa-thuan-tra-thay")
+                            }
+                            className="w-full px-3 sm:px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors text-xs sm:text-sm"
+                          >
+                            Thỏa thuận hỗ trợ trả thay
+                          </button>
+                          <button
+                            onClick={() =>
+                              handlePrintNavigate("/xac-nhan-cong-no")
+                            }
+                            className="w-full px-3 sm:px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors text-xs sm:text-sm"
+                          >
+                            Xác nhận công nợ
+                          </button>
+                        </div>
 
-                        {isLoan90 && (
-                          <div className="space-y-2 mt-3 pl-2 sm:pl-4 border-l-4 border-blue-400 bg-blue-50 p-2 sm:p-3 rounded">
-                            <p className="text-xs sm:text-sm font-semibold text-blue-800 mb-2">
-                              KH vay 90% - Biểu mẫu theo ngân hàng:
-                            </p>
-                            {isVPBank && (
-                              <button
-                                onClick={() =>
-                                  handlePrintNavigate(
-                                    "/giay-thoa-thuan-htls-vpbank"
-                                  )
-                                }
-                                className="w-full px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-xs sm:text-sm"
-                              >
-                                Thỏa thuận hỗ trợ lãi suất ngân hàng VPBank
-                              </button>
-                            )}
-                            {(isTPBank || isLotte) && (
-                              <button
-                                onClick={() =>
-                                  handlePrintNavigate(
-                                    `/bieu-mau-${isTPBank ? "tpbank" : "lotte"}`
-                                  )
-                                }
-                                className="w-full px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-xs sm:text-sm"
-                              >
-                                {isTPBank
-                                  ? "Biểu mẫu TPBank"
-                                  : "Biểu mẫu CTY tài chính Lotte"}
-                              </button>
-                            )}
-                            {!isVPBank && !isTPBank && !isLotte && bank && (
-                              <p className="text-xs sm:text-sm text-gray-600 italic">
-                                Ngân hàng: {printContract.bank} - Vui lòng chọn
-                                biểu mẫu phù hợp
-                              </p>
-                            )}
-                          </div>
-                        )}
+                        {/* Biểu mẫu theo ngân hàng - hiển thị tất cả */}
+                        <div className="space-y-2 mt-3 pl-2 sm:pl-4 border-l-4 border-blue-400 bg-blue-50 p-2 sm:p-3 rounded">
+                          <p className="text-xs sm:text-sm font-semibold text-blue-800 mb-2">
+                            Thỏa thuận hỗ trợ lãi vay 90%:
+                          </p>
+                          <button
+                            onClick={() =>
+                              handlePrintNavigate(
+                                "/giay-thoa-thuan-htls-vpbank"
+                              )
+                            }
+                            className="w-full px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-xs sm:text-sm"
+                          >
+                            Thỏa thuận hỗ trợ lãi suất ngân hàng VPBank
+                          </button>
+                          <button
+                            onClick={() =>
+                              handlePrintNavigate("/bieu-mau-tpbank")
+                            }
+                            className="w-full px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-xs sm:text-sm"
+                          >
+                            Thỏa thuận hỗ trợ lãi suất vay CĐX TPB
+                          </button>
+                          <button
+                            onClick={() =>
+                              handlePrintNavigate(
+                                "/thoa-thuan-ho-tro-lai-suat-vay-cdx-vinfast-va-lfvn"
+                              )
+                            }
+                            className="w-full px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-xs sm:text-sm"
+                          >
+                            Thoả thuận hỗ trợ lãi suất vay CĐX Vinfast và LFVN
+                          </button>
+                          <button
+                            onClick={() =>
+                              handlePrintNavigate(
+                                "/thoa-thuan-ho-tro-lai-suat-vay-cdx-vinfast-va-lfvn"
+                              )
+                            }
+                            className="w-full px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-xs sm:text-sm"
+                          >
+                            Thoả thuận hỗ trợ lãi suất vay CĐX Vinfast và LFVN
+                          </button>
+                        </div>
                       </div>
 
                       {/* Legacy options (keep for backward compatibility) */}

@@ -6,7 +6,7 @@ import {
 } from "../../data/branchData";
 import { ref, get } from "firebase/database";
 import { database } from "../../firebase/config";
-import logoImage from "../../assets/images/logo.jpg";
+import logoImage from "../../assets/images/logo.svg";
 
 const PhuLucHopDong = () => {
   const location = useLocation();

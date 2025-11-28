@@ -103,22 +103,10 @@ export default function FilterPanel({
   }, [availableFilters, activeTab]);
 
   useEffect(() => {
-    const handler = (e) => {
-      if (
-        panelRef.current?.contains(e.target) ||
-        e.target.closest(".filter-panel-portal")
-      )
-        return;
-      // Use the correct property name and ensure it exists before calling
-      if (window.__filterPanelState?.setOpenDropdown) {
-        window.__filterPanelState.setOpenDropdown(null);
-      }
-    };
+    // Remove the conflicting click outside handler - PortalDropdown handles this
     const updateHandler = () => forceUpdate({});
-    document.addEventListener("mousedown", handler);
     document.addEventListener("filter-panel-update", updateHandler);
     return () => {
-      document.removeEventListener("mousedown", handler);
       document.removeEventListener("filter-panel-update", updateHandler);
     };
   }, []);

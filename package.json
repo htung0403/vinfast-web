@@ -12,6 +12,7 @@
     "bcryptjs": "^3.0.3",
     "chart.js": "^4.5.1",
     "chartjs-plugin-datalabels": "^2.2.0",
+    "cloudinary": "^2.8.0",
     "firebase": "^10.13.0",
     "lucide-react": "^0.553.0",
     "rc-slider": "^11.1.9",

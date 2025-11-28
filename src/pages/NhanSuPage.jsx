@@ -1250,10 +1250,18 @@ export default function NhanSuPage() {
                           'Vị trí': updatedForDB.chucVu,
                           username: updatedForDB.user,
                           email: updatedForDB.mail,
+                          phone: updatedForDB.soDienThoai,
                           'Sinh Nhật': updatedForDB.sinhNhat,
+                          birthdate: updatedForDB.sinhNhat,
                           'Ngày vào làm': updatedForDB.ngayVaoLam,
+                          startDate: updatedForDB.ngayVaoLam,
                           status: updatedForDB.tinhTrang,
                           role: updatedForDB.quyen,
+                          zalo: updatedForDB.zalo,
+                          tiktok: updatedForDB.tiktok,
+                          facebook: updatedForDB.facebook,
+                          fanpage: updatedForDB.fanpage,
+                          web: updatedForDB.web,
                         };
 
                         setUsers((prev) =>

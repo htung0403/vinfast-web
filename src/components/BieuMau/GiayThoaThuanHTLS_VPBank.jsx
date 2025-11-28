@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { ref, get } from "firebase/database";
 import { database } from "../../firebase/config";
 import { getBranchByShowroomName } from "../../data/branchData";
+import { vndToWords } from "../../utils/vndToWords";
 
 const GiayThoaThuanHTLS_VPBank = () => {
   const location = useLocation();
@@ -37,6 +38,7 @@ const GiayThoaThuanHTLS_VPBank = () => {
   const [maSoThueKH, setMaSoThueKH] = useState("");
   const [canCuocKH, setCanCuocKH] = useState("");
   const [ngayCapKH, setNgayCapKH] = useState("");
+  const [ngayCapKHRaw, setNgayCapKHRaw] = useState("");
   const [noiCapKH, setNoiCapKH] = useState("");
 
   // Vợ/Chồng
@@ -47,6 +49,7 @@ const GiayThoaThuanHTLS_VPBank = () => {
   const [maSoThueVC, setMaSoThueVC] = useState("");
   const [canCuocVC, setCanCuocVC] = useState("");
   const [ngayCapVC, setNgayCapVC] = useState("");
+  const [ngayCapVCRaw, setNgayCapVCRaw] = useState("");
   const [noiCapVC, setNoiCapVC] = useState("");
 
   // Thông tin xe
@@ -58,15 +61,23 @@ const GiayThoaThuanHTLS_VPBank = () => {
   const [giaTriXe, setGiaTriXe] = useState("");
 
   // Thông tin vay
-  const [soTienVay, setSoTienVay] = useState("647.000.000");
-  const [soTienVayBangChu, setSoTienVayBangChu] = useState(
-    "Sáu trăm bốn mươi bảy triệu đồng"
-  );
+  const [soTienVay, setSoTienVay] = useState("");
+  const [soTienVayBangChu, setSoTienVayBangChu] = useState("");
   const [laiSuatNH, setLaiSuatNH] = useState("8.9");
   const [thoiHanVay, setThoiHanVay] = useState("");
   const [laiSuatKH, setLaiSuatKH] = useState("6.9");
   const [laiSuatSau24T, setLaiSuatSau24T] = useState("3");
   const [tyLeVay, setTyLeVay] = useState("90");
+
+  // Ngày bắt đầu và kết thúc chương trình (mặc định 30/07/2025 và 31/12/2025)
+  const [ngayBatDauChuongTrinh, setNgayBatDauChuongTrinh] =
+    useState("30/07/2025");
+  const [ngayBatDauChuongTrinhRaw, setNgayBatDauChuongTrinhRaw] =
+    useState("2025-07-30");
+  const [ngayKetThucChuongTrinh, setNgayKetThucChuongTrinh] =
+    useState("31/12/2025");
+  const [ngayKetThucChuongTrinhRaw, setNgayKetThucChuongTrinhRaw] =
+    useState("2025-12-31");
 
   const formatCurrency = (value) => {
     if (!value) return "";
@@ -74,10 +85,52 @@ const GiayThoaThuanHTLS_VPBank = () => {
     return number.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   };
 
+  const pad = (num) => String(num).padStart(2, "0");
+
+  // Helper function to format date as dd/mm/yyyy
+  const formatDateForDisplay = (dateStr) => {
+    if (!dateStr) return "";
+    const d = new Date(dateStr);
+    if (isNaN(d)) return "";
+    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+  };
+
+  // Helper function to convert dd/mm/yyyy to yyyy-mm-dd
+  const convertToDateInputFormat = (dateStr) => {
+    if (!dateStr) return "";
+    // If already in yyyy-mm-dd format, return as is
+    if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      return dateStr;
+    }
+    // If in dd/mm/yyyy format, convert to yyyy-mm-dd
+    if (dateStr.includes("/")) {
+      const parts = dateStr.split("/");
+      if (parts.length === 3) {
+        const day = parts[0].padStart(2, "0");
+        const month = parts[1].padStart(2, "0");
+        const year = parts[2];
+        return `${year}-${month}-${day}`;
+      }
+    }
+    // Try to parse as date
+    try {
+      const d = new Date(dateStr);
+      if (!isNaN(d.getTime())) {
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      }
+    } catch (e) {
+      // If parsing fails, return empty
+    }
+    return "";
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return "";
     // Nếu đã là định dạng dd/mm/yyyy hoặc dd-mm-yyyy thì giữ nguyên
-    if (dateString.includes("/") || (dateString.includes("-") && dateString.split("-")[0].length <= 2)) {
+    if (
+      dateString.includes("/") ||
+      (dateString.includes("-") && dateString.split("-")[0].length <= 2)
+    ) {
       return dateString;
     }
     // Nếu là ISO date (yyyy-mm-dd)
@@ -97,7 +150,7 @@ const GiayThoaThuanHTLS_VPBank = () => {
 
   useEffect(() => {
     const loadData = async () => {
-      let showroomName = location.state?.showroom || "Chi Nhánh Trường Chinh";
+      let showroomName = location.state?.showroom;
       let showroomLoadedFromContracts = false;
 
       // Nếu có firebaseKey, thử lấy showroom từ contracts trước
@@ -113,12 +166,12 @@ const GiayThoaThuanHTLS_VPBank = () => {
               showroomName = contractData.showroom;
               showroomLoadedFromContracts = true;
               console.log("Showroom loaded from contracts:", showroomName);
-              
+
               // Cập nhật thông tin công ty và địa chỉ dựa trên showroom
               const branchInfo = getBranchByShowroomName(showroomName);
               if (branchInfo) {
                 setCongTy(
-                  `CÔNG TY CỔ PHẦN ĐẦU TƯ THƯƠNG MẠI VÀ DỊCH VỤ Ô TÔ ĐÔNG SÀI GÒN - CHI NHÁNH ${branchInfo.shortName.toUpperCase()}`
+                  `${branchInfo.name.toUpperCase()}`
                 );
                 setDiaChiTruSo(branchInfo.address);
               }
@@ -144,81 +197,211 @@ const GiayThoaThuanHTLS_VPBank = () => {
             // Chỉ override showroom nếu chưa có từ contracts
             if (contractData.showroom && !showroomLoadedFromContracts) {
               showroomName = contractData.showroom;
-              console.log("Showroom loaded from exportedContracts:", showroomName);
-              
+              console.log(
+                "Showroom loaded from exportedContracts:",
+                showroomName
+              );
+
               // Cập nhật thông tin công ty và địa chỉ dựa trên showroom
               const branchInfo = getBranchByShowroomName(showroomName);
               if (branchInfo) {
                 setCongTy(
-                  `CÔNG TY CỔ PHẦN ĐẦU TƯ THƯƠNG MẠI VÀ DỊCH VỤ Ô TÔ ĐÔNG SÀI GÒN - CHI NHÁNH ${branchInfo.shortName.toUpperCase()}`
+                  `${branchInfo.name.toUpperCase()}`
                 );
                 setDiaChiTruSo(branchInfo.address);
               }
             }
-            
+
             // Lấy Model từ database
-            if (contractData.dongXe || contractData.model || contractData["Dòng xe"]) {
-              setModel(contractData.dongXe || contractData.model || contractData["Dòng xe"] || "");
+            if (
+              contractData.dongXe ||
+              contractData.model ||
+              contractData["Dòng xe"]
+            ) {
+              setModel(
+                contractData.dongXe ||
+                  contractData.model ||
+                  contractData["Dòng xe"] ||
+                  ""
+              );
             }
-            
+
             // Lấy Số Khung từ database
-            if (contractData.soKhung || contractData["Số Khung"] || contractData.chassisNumber) {
-              setSoKhung(contractData.soKhung || contractData["Số Khung"] || contractData.chassisNumber || "");
+            if (
+              contractData.soKhung ||
+              contractData["Số Khung"] ||
+              contractData.chassisNumber
+            ) {
+              setSoKhung(
+                contractData.soKhung ||
+                  contractData["Số Khung"] ||
+                  contractData.chassisNumber ||
+                  ""
+              );
             }
-            
+
             // Lấy Số Máy từ database
-            if (contractData.soMay || contractData["Số Máy"] || contractData.engineNumber) {
-              setSoMay(contractData.soMay || contractData["Số Máy"] || contractData.engineNumber || "");
+            if (
+              contractData.soMay ||
+              contractData["Số Máy"] ||
+              contractData.engineNumber
+            ) {
+              setSoMay(
+                contractData.soMay ||
+                  contractData["Số Máy"] ||
+                  contractData.engineNumber ||
+                  ""
+              );
             }
-            
+
             // Lấy Giá trị xe từ database
-            if (contractData.giaHD || contractData.contractPrice || contractData["Giá HD"] || contractData["Giá Hợp Đồng"]) {
-              const price = contractData.giaHD || contractData.contractPrice || contractData["Giá HD"] || contractData["Giá Hợp Đồng"] || "";
+            if (
+              contractData.giaHD ||
+              contractData.contractPrice ||
+              contractData["Giá HD"] ||
+              contractData["Giá Hợp Đồng"]
+            ) {
+              const price =
+                contractData.giaHD ||
+                contractData.contractPrice ||
+                contractData["Giá HD"] ||
+                contractData["Giá Hợp Đồng"] ||
+                "";
               if (price) {
                 setGiaTriXe(formatCurrency(price.toString()));
               }
             }
-            
+
             // Lấy VSO từ database
             if (contractData.vso || contractData.VSO) {
               setVso(contractData.vso || contractData.VSO || "");
             }
-            
+
             // Lấy thông tin khách hàng từ database
             // Tên khách hàng
             if (contractData.customerName || contractData["Tên KH"]) {
-              setOngBaKH(contractData.customerName || contractData["Tên KH"] || "");
+              setOngBaKH(
+                contractData.customerName || contractData["Tên KH"] || ""
+              );
             }
-            
+
             // Địa chỉ khách hàng
-            if (contractData.address || contractData["Địa chỉ"] || contractData["Địa Chỉ"]) {
-              setDiaChiKH(contractData.address || contractData["Địa chỉ"] || contractData["Địa Chỉ"] || "");
+            if (
+              contractData.address ||
+              contractData["Địa chỉ"] ||
+              contractData["Địa Chỉ"]
+            ) {
+              setDiaChiKH(
+                contractData.address ||
+                  contractData["Địa chỉ"] ||
+                  contractData["Địa Chỉ"] ||
+                  ""
+              );
             }
-            
+
             // Điện thoại khách hàng
-            if (contractData.phone || contractData["Số Điện Thoại"] || contractData["Số điện thoại"]) {
-              setDienThoaiKH(contractData.phone || contractData["Số Điện Thoại"] || contractData["Số điện thoại"] || "");
+            if (
+              contractData.phone ||
+              contractData["Số Điện Thoại"] ||
+              contractData["Số điện thoại"]
+            ) {
+              setDienThoaiKH(
+                contractData.phone ||
+                  contractData["Số Điện Thoại"] ||
+                  contractData["Số điện thoại"] ||
+                  ""
+              );
             }
-            
+
             // Mã số thuế (nếu có)
-            if (contractData.maSoThue || contractData["Mã số thuế"] || contractData["Mã Số Thuế"]) {
-              setMaSoThueKH(contractData.maSoThue || contractData["Mã số thuế"] || contractData["Mã Số Thuế"] || "");
+            if (
+              contractData.maSoThue ||
+              contractData["Mã số thuế"] ||
+              contractData["Mã Số Thuế"]
+            ) {
+              setMaSoThueKH(
+                contractData.maSoThue ||
+                  contractData["Mã số thuế"] ||
+                  contractData["Mã Số Thuế"] ||
+                  ""
+              );
             }
-            
+
             // Căn cước/CCCD
-            if (contractData.cccd || contractData.CCCD || contractData["Căn cước"] || contractData.customerCCCD) {
-              setCanCuocKH(contractData.cccd || contractData.CCCD || contractData["Căn cước"] || contractData.customerCCCD || "");
+            if (
+              contractData.cccd ||
+              contractData.CCCD ||
+              contractData["Căn cước"] ||
+              contractData.customerCCCD
+            ) {
+              setCanCuocKH(
+                contractData.cccd ||
+                  contractData.CCCD ||
+                  contractData["Căn cước"] ||
+                  contractData.customerCCCD ||
+                  ""
+              );
             }
-            
+
             // Ngày cấp - format dd/mm/yyyy
-            if (contractData.ngayCap || contractData.issueDate || contractData["Ngày Cấp"] || contractData["Ngày cấp"]) {
-              const ngayCap = contractData.ngayCap || contractData.issueDate || contractData["Ngày Cấp"] || contractData["Ngày cấp"] || "";
-              setNgayCapKH(formatDate(ngayCap));
+            if (
+              contractData.ngayCap ||
+              contractData.issueDate ||
+              contractData["Ngày Cấp"] ||
+              contractData["Ngày cấp"]
+            ) {
+              const ngayCap =
+                contractData.ngayCap ||
+                contractData.issueDate ||
+                contractData["Ngày Cấp"] ||
+                contractData["Ngày cấp"] ||
+                "";
+              const formattedDate = formatDate(ngayCap);
+              setNgayCapKH(formattedDate);
+              setNgayCapKHRaw(convertToDateInputFormat(ngayCap));
             }
-            
+
             // Nơi cấp
-            if (contractData.noiCap || contractData.issuePlace || contractData["Nơi Cấp"] || contractData["Nơi cấp"]) {
-              setNoiCapKH(contractData.noiCap || contractData.issuePlace || contractData["Nơi Cấp"] || contractData["Nơi cấp"] || "");
+            if (
+              contractData.noiCap ||
+              contractData.issuePlace ||
+              contractData["Nơi Cấp"] ||
+              contractData["Nơi cấp"]
+            ) {
+              setNoiCapKH(
+                contractData.noiCap ||
+                  contractData.issuePlace ||
+                  contractData["Nơi Cấp"] ||
+                  contractData["Nơi cấp"] ||
+                  ""
+              );
+            }
+
+            // Số tiền vay (nếu có)
+            const loanAmount =
+              contractData.soTienVay ||
+              contractData["Số Tiền Vay"] ||
+              contractData.loanAmount ||
+              "";
+            if (loanAmount) {
+              const loanValue =
+                typeof loanAmount === "string"
+                  ? loanAmount.replace(/\D/g, "")
+                  : String(loanAmount);
+              setSoTienVay(loanValue);
+              // Tự động chuyển sang chữ nếu chưa có
+              if (
+                !contractData.soTienVayBangChu &&
+                !contractData["Số Tiền Vay Bằng Chữ"]
+              ) {
+                setSoTienVayBangChu(vndToWords(loanValue));
+              } else {
+                setSoTienVayBangChu(
+                  contractData.soTienVayBangChu ||
+                    contractData["Số Tiền Vay Bằng Chữ"] ||
+                    ""
+                );
+              }
             }
           }
         } catch (error) {
@@ -231,7 +414,7 @@ const GiayThoaThuanHTLS_VPBank = () => {
         const branchInfo = getBranchByShowroomName(showroomName);
         if (branchInfo) {
           setCongTy(
-            `CÔNG TY CỔ PHẦN ĐẦU TƯ THƯƠNG MẠI VÀ DỊCH VỤ Ô TÔ ĐÔNG SÀI GÒN - CHI NHÁNH ${branchInfo.shortName.toUpperCase()}`
+            `${branchInfo.name.toUpperCase()}`
           );
           setDiaChiTruSo(branchInfo.address);
         }
@@ -253,7 +436,7 @@ const GiayThoaThuanHTLS_VPBank = () => {
           const branchInfo = getBranchByShowroomName(stateData.showroom);
           if (branchInfo) {
             setCongTy(
-              `CÔNG TY CỔ PHẦN ĐẦU TƯ THƯƠNG MẠI VÀ DỊCH VỤ Ô TÔ ĐÔNG SÀI GÒN - CHI NHÁNH ${branchInfo.shortName.toUpperCase()}`
+              `${branchInfo.name.toUpperCase()}`
             );
             setDiaChiTruSo(branchInfo.address);
           }
@@ -266,12 +449,40 @@ const GiayThoaThuanHTLS_VPBank = () => {
         if (stateData.customerPhone) setDienThoaiKH(stateData.customerPhone);
         if (stateData.customerCCCD) setCanCuocKH(stateData.customerCCCD);
         if (stateData.contractNumber) setSoHopDong(stateData.contractNumber);
-        if (stateData.vso || stateData.VSO) setVso(stateData.vso || stateData.VSO || "");
+        if (stateData.vso || stateData.VSO)
+          setVso(stateData.vso || stateData.VSO || "");
         if (stateData.hieuxe) setModel(stateData.hieuxe);
         if (stateData.soKhung) setSoKhung(stateData.soKhung);
         if (stateData.soMay) setSoMay(stateData.soMay);
         if (stateData.totalPrice)
           setGiaTriXe(formatCurrency(stateData.totalPrice.toString()));
+
+        // Số tiền vay (nếu có)
+        const loanAmount =
+          stateData.soTienVay ||
+          stateData["Số Tiền Vay"] ||
+          stateData.loanAmount ||
+          "";
+        if (loanAmount) {
+          const loanValue =
+            typeof loanAmount === "string"
+              ? loanAmount.replace(/\D/g, "")
+              : String(loanAmount);
+          setSoTienVay(loanValue);
+          // Tự động chuyển sang chữ nếu chưa có
+          if (
+            !stateData.soTienVayBangChu &&
+            !stateData["Số Tiền Vay Bằng Chữ"]
+          ) {
+            setSoTienVayBangChu(vndToWords(loanValue));
+          } else {
+            setSoTienVayBangChu(
+              stateData.soTienVayBangChu ||
+                stateData["Số Tiền Vay Bằng Chữ"] ||
+                ""
+            );
+          }
+        }
       } else {
         setData({
           customerName: "",
@@ -362,7 +573,6 @@ const GiayThoaThuanHTLS_VPBank = () => {
             {/* Bên Bán */}
             <div>
               <p className="font-bold mb-2">
-                  
                 <span className="print:hidden">
                   <input
                     type="text"
@@ -474,8 +684,8 @@ const GiayThoaThuanHTLS_VPBank = () => {
                 </span>
                 )
               </p>
-              <p className="mb-2 text-center font-bold">("Bên bán")</p>
-              <p className="text-center font-bold mb-2">VÀ</p>
+              <p className="mb-2 font-bold">("Bên bán")</p>
+              <p className="font-bold mb-2">VÀ</p>
             </div>
 
             {/* Khách Hàng */}
@@ -550,9 +760,16 @@ const GiayThoaThuanHTLS_VPBank = () => {
                 cấp ngày{" "}
                 <span className="print:hidden">
                   <input
-                    type="text"
-                    value={ngayCapKH}
-                    onChange={(e) => setNgayCapKH(e.target.value)}
+                    type="date"
+                    value={ngayCapKHRaw}
+                    onChange={(e) => {
+                      setNgayCapKHRaw(e.target.value);
+                      if (e.target.value) {
+                        setNgayCapKH(formatDateForDisplay(e.target.value));
+                      } else {
+                        setNgayCapKH("");
+                      }
+                    }}
                     className="border-b border-gray-400 px-1 w-32 focus:outline-none focus:border-blue-500"
                   />
                 </span>
@@ -656,9 +873,16 @@ const GiayThoaThuanHTLS_VPBank = () => {
                     cấp ngày{" "}
                     <span className="print:hidden">
                       <input
-                        type="text"
-                        value={ngayCapVC}
-                        onChange={(e) => setNgayCapVC(e.target.value)}
+                        type="date"
+                        value={ngayCapVCRaw}
+                        onChange={(e) => {
+                          setNgayCapVCRaw(e.target.value);
+                          if (e.target.value) {
+                            setNgayCapVC(formatDateForDisplay(e.target.value));
+                          } else {
+                            setNgayCapVC("");
+                          }
+                        }}
                         className="border-b border-gray-400 px-1 w-32 focus:outline-none focus:border-blue-500"
                       />
                     </span>
@@ -676,7 +900,7 @@ const GiayThoaThuanHTLS_VPBank = () => {
                 </>
               )}
 
-              <p className="mb-2 text-center font-bold">("Khách Hàng")</p>
+              <p className="mb-2 font-bold">("Khách Hàng")</p>
             </div>
 
             <p className="text-justify">
@@ -687,7 +911,7 @@ const GiayThoaThuanHTLS_VPBank = () => {
 
             {/* XÉT RẰNG */}
             <div>
-              <p className="font-bold text-center mb-4">XÉT RẰNG:</p>
+              <p className="font-bold mb-4">XÉT RẰNG:</p>
 
               <div className="space-y-3">
                 <p className="text-justify">
@@ -775,8 +999,49 @@ const GiayThoaThuanHTLS_VPBank = () => {
                   Vượng (sau đây gọi là "<strong>Ngân Hàng</strong>") theo chính
                   sách hỗ trợ lãi vay của VinFast được đại diện thực hiện bởi
                   Bên bán ("<strong>Chính sách Hỗ trợ lãi vay</strong>") áp dụng
-                  cho (các) Khách hàng đặt cọc mua xe/xuất hóa đơn từ ngày
-                  30/07/2025 đến hết ngày 31/12/2025.
+                  cho (các) Khách hàng đặt cọc mua xe/xuất hóa đơn từ ngày{" "}
+                  <span className="print:hidden">
+                    <input
+                      type="date"
+                      value={ngayBatDauChuongTrinhRaw}
+                      onChange={(e) => {
+                        setNgayBatDauChuongTrinhRaw(e.target.value);
+                        if (e.target.value) {
+                          setNgayBatDauChuongTrinh(
+                            formatDateForDisplay(e.target.value)
+                          );
+                        } else {
+                          setNgayBatDauChuongTrinh("");
+                        }
+                      }}
+                      className="border-b border-gray-400 px-1 w-32 focus:outline-none focus:border-blue-500"
+                    />
+                  </span>
+                  <span className="hidden print:inline">
+                    {ngayBatDauChuongTrinh}
+                  </span>{" "}
+                  đến hết ngày{" "}
+                  <span className="print:hidden">
+                    <input
+                      type="date"
+                      value={ngayKetThucChuongTrinhRaw}
+                      onChange={(e) => {
+                        setNgayKetThucChuongTrinhRaw(e.target.value);
+                        if (e.target.value) {
+                          setNgayKetThucChuongTrinh(
+                            formatDateForDisplay(e.target.value)
+                          );
+                        } else {
+                          setNgayKetThucChuongTrinh("");
+                        }
+                      }}
+                      className="border-b border-gray-400 px-1 w-32 focus:outline-none focus:border-blue-500"
+                    />
+                  </span>
+                  <span className="hidden print:inline">
+                    {ngayKetThucChuongTrinh}
+                  </span>
+                  .
                 </p>
 
                 <p className="text-justify">
@@ -794,7 +1059,7 @@ const GiayThoaThuanHTLS_VPBank = () => {
               </div>
             </div>
 
-            <p className="text-justify mt-4 font-bold">
+            <p className="text-justify mt-4">
               Do vậy, để thực hiện Chính sách Hỗ trợ lãi vay nêu trên, Các Bên
               thống nhất ký kết Thỏa Thuận này với những nội dung như sau:
             </p>
@@ -802,39 +1067,67 @@ const GiayThoaThuanHTLS_VPBank = () => {
             {/* ĐIỀU 1 */}
             <div className="mt-6">
               <p className="font-bold mb-3">
-                1. Thỏa thuận về việc Hỗ Trợ Lãi Vay
+                Điều 1. Thỏa thuận về việc Hỗ Trợ Lãi Vay
               </p>
 
-              <div className="ml-6 space-y-3">
+              <div className="space-y-3">
                 <p className="text-justify">
-                  1. Các Bên tại đây đồng ý rằng, khoản lãi vay mà VinFast sẽ hỗ
-                  trợ trả thay Khách Hàng cho Ngân Hàng thông qua VinFast
+                  1.1. Các Bên tại đây đồng ý rằng, khoản lãi vay mà VinFast sẽ
+                  hỗ trợ trả thay Khách Hàng cho Ngân Hàng thông qua VinFast
                   Trading đối với mỗi Hợp Đồng Tín Dụng (sau đây là "
                   <strong>Khoản Hỗ Trợ Lãi Vay</strong>") được tính như sau:
                 </p>
                 <p className="text-center my-3">
-                  <strong>
-                    Khoản Hỗ Trợ Lãi Vay tháng T = Dự nợ gốc × Lãi suất hỗ trợ ×
-                    số ngày vay thực tế trong tháng T/365
-                  </strong>
+                  Khoản Hỗ Trợ Lãi Vay tháng T (1) ={" "}
+                  <span className="underline">
+                    Dự nợ gốc (2) × Lãi suất hỗ trợ (3) × số ngày vay thực tế trong
+                    tháng T (1)/365
+                  </span>
+                </p>
+                <p className="ml-6">Trong đó:</p>
+                <p className="ml-6 italic">
+                  (1) Tháng T: tháng kỳ tính toán, nằm trong thời gian triển
+                  khai chương trình hỗ trợ của VinFast
+                </p>
+                <p className="ml-6 italic">
+                  (2) Dự nợ gốc: nguyên tắc tính theo dư nợ giảm dần; là số dư
+                  nợ gốc Khách Hàng phải trả tại tháng T (T là tháng giải ngân);
+                  tháng đầu tiên bằng số tiền gốc Khách Hàng được giải ngân
+                </p>
+                <p className="ml-6 italic">
+                  (3) Lãi suất hỗ trợ: là mức lãi suất trả thay được VinFast
+                  đồng ý trả thay cho Khách Hàng
                 </p>
 
-                <p className="font-bold mt-4">2. Chính sách Hỗ trợ lãi vay:</p>
+                <p className="mt-4">1.2. Chính sách Hỗ trợ lãi vay:</p>
                 <div className="ml-6 space-y-2">
                   <p>
-                    1) Số tiền Khách Hàng vay Ngân Hàng để thanh toán:{" "}
+                    a) Số tiền Khách Hàng vay Ngân Hàng để thanh toán:{" "}
                     <span className="print:hidden">
                       <input
                         type="text"
-                        value={soTienVay}
-                        onChange={(e) =>
-                          setSoTienVay(formatCurrency(e.target.value))
-                        }
-                        className="border-b border-gray-400 px-1 w-40 focus:outline-none focus:border-blue-500"
+                        value={formatCurrency(soTienVay)}
+                        onChange={(e) => {
+                          const rawValue = e.target.value;
+                          const val = rawValue.replace(/\D/g, "");
+                          setSoTienVay(val);
+                          // Tự động chuyển số tiền sang chữ khi nhập
+                          if (val && val.length > 0) {
+                            const numValue = parseInt(val, 10);
+                            if (!isNaN(numValue) && numValue > 0) {
+                              setSoTienVayBangChu(vndToWords(val));
+                            } else {
+                              setSoTienVayBangChu("");
+                            }
+                          } else {
+                            setSoTienVayBangChu("");
+                          }
+                        }}
+                        className="border-b border-gray-400 font-bold px-1 w-40 focus:outline-none focus:border-blue-500"
                       />
                     </span>
                     <span className="hidden print:inline font-bold">
-                      {soTienVay}
+                      {formatCurrency(soTienVay) || "______"}
                     </span>{" "}
                     VNĐ (
                     <em>
@@ -844,21 +1137,21 @@ const GiayThoaThuanHTLS_VPBank = () => {
                           type="text"
                           value={soTienVayBangChu}
                           onChange={(e) => setSoTienVayBangChu(e.target.value)}
-                          className="border-b border-gray-400 px-1 w-64 focus:outline-none focus:border-blue-500"
+                          className="border-b border-gray-400 px-1 w-64 focus:outline-none font-bold italic focus:border-blue-500"
                         />
                       </span>
-                      <span className="hidden print:inline">
-                        {soTienVayBangChu}
+                      <span className="hidden print:inline font-bold">
+                        {soTienVayBangChu || "______"}
                       </span>
                     </em>
                     ) tương ứng với tỷ lệ vay Ngân Hàng: 90% giá trị xe
                   </p>
                   <p>
-                    2) Ngân Hàng vay: Ngân hàng TMCP Việt Nam Thịnh Vượng ("
+                    b) Ngân Hàng vay: Ngân hàng TMCP Việt Nam Thịnh Vượng ("
                     <strong>Ngân Hàng</strong>")
                   </p>
                   <p>
-                    3) Lãi suất Ngân hàng áp dụng:{" "}
+                    c) Lãi suất Ngân hàng áp dụng:{" "}
                     <span className="print:hidden">
                       <input
                         type="text"
@@ -872,11 +1165,11 @@ const GiayThoaThuanHTLS_VPBank = () => {
                     trợ của Ngân Hàng so với Khách hàng thông thường).
                   </p>
                   <p>
-                    4) Lãi suất sau thời gian cố định: Lãi suất cơ sở + Biên độ
+                    d) Lãi suất sau thời gian cố định: Lãi suất cơ sở + Biên độ
                     3%/năm. Chi tiết theo ghi nhận tại Hợp Đồng Tín Dụng.
                   </p>
                   <p>
-                    5) Thời hạn vay:{" "}
+                    e) Thời hạn vay:{" "}
                     <span className="print:hidden">
                       <input
                         type="text"
@@ -891,7 +1184,7 @@ const GiayThoaThuanHTLS_VPBank = () => {
                     tháng;
                   </p>
                   <p className="text-justify">
-                    6) VinFast sẽ hỗ trợ trả thay cho Khách Hàng một khoản tiền
+                    f) VinFast sẽ hỗ trợ trả thay cho Khách Hàng một khoản tiền
                     lãi ("<strong>Khoản Hỗ Trợ Lãi Vay</strong>") trong suốt
                     thời gian vay (tối đa bằng 96 tháng) nhưng không quá 36
                     tháng ("<strong>Thời Hạn Hỗ Trợ Lãi Vay</strong>").
@@ -927,59 +1220,93 @@ const GiayThoaThuanHTLS_VPBank = () => {
                 </div>
 
                 <p className="text-justify mt-4">
-                  3. Khách Hàng chịu trách nhiệm thanh toán với Ngân Hàng toàn
-                  bộ các khoản lãi và chi phí phát sinh trên mức hỗ trợ lãi vay
-                  của VinFast quy định ở trên bao gồm các khoản phí trả nợ trước
-                  hạn; các khoản lãi quá hạn, lãi chậm trả lãi; lãi tăng lên do
-                  Khách Hàng vi phạm nghĩa vụ trả nợ.
+                  1.3. Để tránh hiểu nhầm Các Bên thống nhất rằng: Trong mọi
+                  trường hợp VinFast, VinFast Trading không chịu trách nhiệm đối
+                  với bất kỳ mức lãi nào ngoài mức lãi quy định trên đây vì lý
+                  do Khách Hàng không tuân thủ các quy định của Ngân Hàng hay vì
+                  bất kỳ lý do gì không phải do lỗi của VinFast, VinFast
+                  Trading. Khách Hàng chịu trách nhiệm thanh toán với Ngân Hàng
+                  toàn bộ các khoản lãi và chi phí phát sinh trên mức hỗ trợ lãi
+                  vay của VinFast quy định ở trên bao gồm các khoản phí trả nợ
+                  trước hạn; các khoản lãi quá hạn, lãi chậm trả lãi; lãi tăng
+                  lên do Khách Hàng vi phạm nghĩa vụ trả nợ hoặc vi phạm nghĩa
+                  vụ khác; các khoản tiền hoàn trả ưu đãi do trả nợ trước hạn;
+                  tiền bồi thường vi phạm Hợp Đồng Tín Dụng,.... VinFast/VinFast
+                  Trading không có trách nhiệm thông báo, làm rõ, nhắc nợ hay
+                  thanh toán thay các khoản tiền này cho Khách Hàng.
                 </p>
 
                 <p className="text-justify mt-4">
-                  4. Thời Hạn Hỗ Trợ Lãi Vay sẽ tự động chấm dứt trước hạn trong
-                  trường hợp (i) Hợp Đồng Tín Dụng chấm dứt trước khi hết Thời
-                  Hạn Hỗ Trợ Lãi Vay vì bất cứ lý do gì hoặc (ii) theo thỏa
+                  1.4. Thời Hạn Hỗ Trợ Lãi Vay sẽ tự động chấm dứt trước hạn
+                  trong trường hợp (i) Hợp Đồng Tín Dụng chấm dứt trước khi hết
+                  Thời Hạn Hỗ Trợ Lãi Vay vì bất cứ lý do gì hoặc (ii) theo thỏa
                   thuận về việc chấm dứt Thỏa Thuận Hỗ Trợ Lãi Vay giữa Khách
-                  Hàng và VinFast/VinFast Trading.
-                </p>
-
-                <p className="text-justify mt-4">
-                  5. Không phụ thuộc vào các thỏa thuận nêu trên, Các Bên đồng ý
-                  rằng, thỏa thuận trả thay lãi vay theo Thỏa Thuận này là thỏa
-                  thuận riêng giữa các Bên, không ràng buộc, liên quan đến Ngân
+                  Hàng và VinFast/VinFast Trading. Hết Thời Hạn Hỗ Trợ Lãi Vay
+                  hoặc khi Thời Hạn Hỗ Trợ Lãi Vay chấm dứt trước hạn, Khách
+                  Hàng có nghĩa vụ tiếp tục thực hiện trả nợ lãi cho Ngân Hàng
+                  theo đúng quy định tại Hợp Đồng Tín Dụng và quy định của Ngân
                   Hàng.
                 </p>
 
                 <p className="text-justify mt-4">
-                  6. Khách Hàng đồng ý cho phép Ngân Hàng, VinFast, VinFast
+                  1.5. Không phụ thuộc vào các thỏa thuận nêu trên, Các Bên đồng
+                  ý rằng, thỏa thuận trả thay lãi vay theo Thỏa Thuận này là
+                  thỏa thuận riêng giữa các Bên (bao gồm cả VinFast, VinFast
+                  Trading), không ràng buộc, liên quan đến Ngân Hàng. Ngân Hàng
+                  chỉ tham gia với vai trò hỗ trợ VinFast, VinFast Trading
+                  chuyển số tiền lãi được VinFast/VinFast Trading hỗ trợ trả
+                  thay cho Khách hàng để Khách Hàng trả nợ lãi. Do đó, trường
+                  hợp VinFast/VinFast Trading không thực hiện/thực hiện không
+                  đầy đủ việc hỗ trợ lãi vay đã thỏa thuận với Khách Hàng, Khách
+                  Hàng vẫn có nghĩa vụ thanh toán đầy đủ các khoản tiền lãi theo
+                  đúng thỏa thuận với Ngân Hàng tại Hợp Đồng Tín Dụng. Trường
+                  hợp VinFast/VinFast Trading vi phạm nội dung tại Thỏa Thuận
+                  này dẫn đến khoản tiền lãi của Khách Hàng bị chậm thanh toán,
+                  Ngân Hàng được quyền xử lý, quản lý và phân loại nợ đối với
+                  khoản vay của Khách Hàng phù hợp với quy định có liên quan của
+                  pháp luật và thỏa thuận giữa Ngân Hàng và Khách Hàng tại Hợp
+                  Đồng Tín Dụng.
+                </p>
+
+                <p className="text-justify mt-4">
+                  1.6. Khách Hàng đồng ý cho phép Ngân Hàng, VinFast, VinFast
                   Trading, Bên bán được cung cấp các thông tin cá nhân, thông
-                  tin liên quan đến xe ô tô, khoản vay và các thông tin khác của
-                  Khách Hàng cho bên còn lại theo yêu cầu.
+                  tin liên quan đến xe ô tô, khoản vay được VinFast, VinFast
+                  Trading cam kết trả thay lãi vay và các thông tin khác của
+                  Khách Hàng tại Ngân Hàng hoặc tại VinFast, VinFast Trading,
+                  Bên bán cho bên còn lại theo yêu cầu của bên còn lại với thời
+                  gian và số lượng cung cấp không hạn chế. Việc sử dụng thông
+                  tin sau khi được Ngân Hàng, VinFast, VinFast Trading, Bên bán
+                  cung cấp, thực hiện theo quyết định của Ngân Hàng, VinFast,
+                  VinFast Trading, Bên bán.
                 </p>
               </div>
             </div>
 
             {/* ĐIỀU 2 */}
             <div className="mt-6">
-              <p className="font-bold mb-3">2. Quyền và nghĩa vụ của các Bên</p>
+              <p className="font-bold mb-3">
+                Điều 2. Quyền và nghĩa vụ của các Bên
+              </p>
 
-              <div className="ml-6 space-y-4">
+              <div className="space-y-4">
                 <div>
                   <p className="font-bold mb-2">
-                    1. Quyền và nghĩa vụ của VinFast Trading:
+                    2.1. Quyền và nghĩa vụ của VinFast Trading:
                   </p>
                   <div className="ml-6 space-y-2">
                     <p className="text-justify">
-                      1) Thực hiện kiểm tra, đối chiếu và xác nhận với Ngân Hàng
+                      a) Thực hiện kiểm tra, đối chiếu và xác nhận với Ngân Hàng
                       các Khoản Hỗ Trợ Lãi Vay hỗ trợ cho Khách Hàng theo thỏa
                       thuận giữa Ngân Hàng, VinFast và VinFast Trading tại Thỏa
                       Thuận Hợp Tác;
                     </p>
                     <p className="text-justify">
-                      2) Thực hiện việc hỗ trợ Khoản Hỗ Trợ Lãi Vay của Khách
+                      b) Thực hiện việc hỗ trợ Khoản Hỗ Trợ Lãi Vay của Khách
                       Hàng theo Chính sách Hỗ trợ lãi vay theo Thỏa Thuận này;
                     </p>
                     <p className="text-justify">
-                      3) Không chịu trách nhiệm đối với các mâu thuẫn, tranh
+                      c) Không chịu trách nhiệm đối với các mâu thuẫn, tranh
                       chấp, khiếu kiện hay khiếu nại nào liên quan đến và/hoặc
                       phát sinh giữa Ngân Hàng, Khách Hàng và các tổ chức, cá
                       nhân khác trong quá trình thực hiện Hợp Đồng Tín Dụng và
@@ -991,22 +1318,22 @@ const GiayThoaThuanHTLS_VPBank = () => {
 
                 <div>
                   <p className="font-bold mb-2">
-                    2. Quyền và nghĩa vụ của Khách Hàng:
+                    2.2. Quyền và nghĩa vụ của Khách Hàng:
                   </p>
                   <div className="ml-6 space-y-2">
                     <p className="text-justify">
-                      1) Được VinFast (thông qua VinFast Trading) thực hiện việc
+                      a) Được VinFast (thông qua VinFast Trading) thực hiện việc
                       hỗ trợ Khoản Hỗ Trợ Lãi Vay và áp dụng Chính sách Hỗ trợ
                       lãi vay theo quy định của Thỏa Thuận này.
                     </p>
                     <p className="text-justify">
-                      2) Tự chi trả, thanh toán nợ gốc, phí trả nợ trước hạn và
+                      b) Tự chi trả, thanh toán nợ gốc, phí trả nợ trước hạn và
                       bất kỳ khoản lãi, lãi quá hạn nào phát sinh ngoài phạm vi
                       Khoản Hỗ Trợ Lãi Vay, Thời Hạn Hỗ Trợ Lãi Vay và Chính
                       sách Hỗ trợ lãi vay.
                     </p>
                     <p className="text-justify">
-                      3) Trong Thời Hạn Hỗ Trợ Lãi Vay, trường hợp
+                      c) Trong Thời Hạn Hỗ Trợ Lãi Vay, trường hợp
                       VinFast/VinFast Trading chậm/không thanh toán Khoản Hỗ Trợ
                       Lãi Vay đến hạn cho Ngân Hàng, và việc VinFast/VinFast
                       Trading chậm/không thanh toán Khoản Hỗ Trợ Lãi Vay không
@@ -1026,14 +1353,14 @@ const GiayThoaThuanHTLS_VPBank = () => {
                       liên quan (nếu có).
                     </p>
                     <p className="text-justify">
-                      4) Khách Hàng không được VinFast/VinFast Trading hỗ trợ
+                      d) Khách Hàng không được VinFast/VinFast Trading hỗ trợ
                       Khoản Hỗ Trợ Lãi Vay kể từ thời điểm Khách Hàng ký Văn bản
                       chuyển nhượng Hợp Đồng Mua Bán và/hoặc xe ô tô là đối
                       tượng của hợp đồng mua bán/chuyển nhượng với bất kỳ bên
                       thứ ba nào khác.
                     </p>
                     <p className="text-justify">
-                      5) Trong Thời Hạn Hỗ Trợ Lãi Vay, nếu Khách Hàng tất toán
+                      e) Trong Thời Hạn Hỗ Trợ Lãi Vay, nếu Khách Hàng tất toán
                       khoản vay trước hạn, ký Văn bản chuyển nhượng Hợp Đồng Mua
                       Bán và/hoặc xe ô tô là đối tượng của hợp đồng mua bán/
                       chuyển nhượng với bất kỳ bên thứ ba nào khác, không thực
@@ -1054,9 +1381,11 @@ const GiayThoaThuanHTLS_VPBank = () => {
 
             {/* ĐIỀU 3 */}
             <div className="mt-6">
-              <p className="font-bold mb-3">3. Điều khoản hỗ trợ Ngân Hàng</p>
+              <p className="font-bold mb-3">
+                Điều 3. Điều khoản hỗ trợ Ngân Hàng
+              </p>
 
-              <div className="ml-6 space-y-3">
+              <div className="space-y-3">
                 <p className="text-justify">
                   Khách Hàng cam kết không có bất kỳ khiếu nại, khiếu kiện nào
                   và đảm bảo Đơn Vị Hỗ Trợ Kỹ Thuật (như được định nghĩa phía
@@ -1065,16 +1394,16 @@ const GiayThoaThuanHTLS_VPBank = () => {
                   bất kỳ tổn thất và thiệt hại nào (nếu có) phát sinh từ hoặc
                   liên quan đến việc thực thi các nội dung nêu dưới đây:
                 </p>
-                <div className="ml-6 space-y-3">
+                <div className="space-y-3">
                   <p className="text-justify">
-                    1. Khách Hàng cho phép Ngân Hàng thu thập, xử lý các thông
+                    3.1. Khách Hàng cho phép Ngân Hàng thu thập, xử lý các thông
                     tin về xe, vị trí xe, tình trạng xe cho mục đích quản lý tài
                     sản bảo đảm, xử lý tài sản bảo đảm cho khoản vay theo Hợp
                     Đồng Tín Dụng thông qua bên thứ ba là Đơn Vị Hỗ Trợ Kỹ
                     Thuật, như được định nghĩa phía dưới.
                   </p>
                   <p className="text-justify">
-                    2. Trong trường hợp Khách Hàng vi phạm nghĩa vụ trả nợ quá{" "}
+                    3.2. Trong trường hợp Khách Hàng vi phạm nghĩa vụ trả nợ quá{" "}
                     <strong>10 ngày</strong> hoặc thời hạn khác theo yêu cầu của
                     Ngân Hàng, Ngân Hàng có quyền đề nghị VinFast Trading
                     và/hoặc bất kỳ bên thứ ba khác được VinFast Trading ủy
@@ -1087,7 +1416,7 @@ const GiayThoaThuanHTLS_VPBank = () => {
                     giữa Khách Hàng và Ngân Hàng;
                   </p>
                   <p className="text-justify">
-                    3. Trong trường hợp Khách Hàng vi phạm nghĩa vụ trả nợ quá{" "}
+                    3.3. Trong trường hợp Khách Hàng vi phạm nghĩa vụ trả nợ quá{" "}
                     <strong>30 ngày</strong> hoặc thời hạn khác theo yêu cầu từ
                     Ngân Hàng, Ngân Hàng có quyền gửi yêu cầu cho Đơn Vị Hỗ Trợ
                     Kỹ Thuật kích hoạt tính năng giới hạn mức SOC của Pin tại
@@ -1100,15 +1429,15 @@ const GiayThoaThuanHTLS_VPBank = () => {
 
             {/* ĐIỀU 4 */}
             <div className="mt-6">
-              <p className="font-bold mb-3">4. Hiệu lực của Thỏa Thuận</p>
+              <p className="font-bold mb-3">Điều 4. Hiệu lực của Thỏa Thuận</p>
 
-              <div className="ml-6 space-y-3">
+              <div className="space-y-3">
                 <p className="text-justify">
-                  1. Thỏa Thuận này có hiệu lực kể từ ngày ký đến ngày hết hiệu
+                  4.1. Thỏa Thuận này có hiệu lực kể từ ngày ký đến ngày hết hiệu
                   lực của Hợp Đồng Tín Dụng.
                 </p>
                 <p className="text-justify">
-                  2. Khách Hàng không được chuyển nhượng, chuyển giao quyền và
+                  4.2. Khách Hàng không được chuyển nhượng, chuyển giao quyền và
                   nghĩa vụ của mình theo Thỏa Thuận này cho bất kỳ bên thứ ba
                   nào nếu không được chấp thuận trước bằng văn bản của
                   VinFast/VinFast Trading. Tuy nhiên, Khách Hàng đồng ý rằng
@@ -1124,17 +1453,17 @@ const GiayThoaThuanHTLS_VPBank = () => {
                   đối với Khách hàng theo Thỏa thuận này.
                 </p>
                 <p className="text-justify">
-                  3. Mọi sửa đổi, bổ sung Thỏa Thuận này phải được lập thành văn
+                  4.3. Mọi sửa đổi, bổ sung Thỏa Thuận này phải được lập thành văn
                   bản và được ký bởi người đại diện hợp pháp của mỗi Bên.
                 </p>
                 <p className="text-justify">
-                  4. Thỏa Thuận này được điều chỉnh theo các quy định của pháp
+                  4.4. Thỏa Thuận này được điều chỉnh theo các quy định của pháp
                   luật Việt Nam. Mọi tranh chấp phát sinh từ Thỏa Thuận này nếu
                   không được giải quyết bằng thương lượng và hòa giải giữa Các
                   Bên, thì sẽ được giải quyết tại Tòa án có thẩm quyền.
                 </p>
                 <p className="text-justify">
-                  5. Thỏa Thuận này được lập thành 04 (bốn) bản có giá trị như
+                  4.5. Thỏa Thuận này được lập thành 04 (bốn) bản có giá trị như
                   nhau, mỗi Bên giữ 02 (hai) bản để thực hiện.
                 </p>
               </div>

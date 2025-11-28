@@ -10,7 +10,7 @@ import {
   uniqueNgoaiThatColors,
   uniqueNoiThatColors,
 } from "../../data/calculatorData";
-import VinfastLogo from "../../assets/images/logo.jpg";
+import VinfastLogo from "../../assets/images/logo.svg";
 
 const DeXuatGiaban = () => {
   const location = useLocation();
@@ -568,8 +568,8 @@ const DeXuatGiaban = () => {
           {/* Header */}
           <div className="flex items-start justify-between mb-4">
             {/* Logo */}
-            <div className="w-24">
-              <img src={VinfastLogo} alt="VinFast Logo" className="w-full" />
+            <div className="w-16">
+              <img src={VinfastLogo} alt="VinFast Logo" className="w-16 h-16" />
             </div>
 
             {/* Company Info */}

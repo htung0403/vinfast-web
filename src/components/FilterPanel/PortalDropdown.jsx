@@ -58,15 +58,21 @@ const PortalDropdown = memo(({ open, anchorRef, onClose, children }) => {
   useEffect(() => {
     if (!open) return;
     const handleClick = (e) => {
-      if (
-        anchorRef.current?.contains(e.target) ||
-        menuRef.current?.contains(e.target)
-      )
+      // Don't close if clicking on anchor button or dropdown menu
+      const clickedOnAnchor = anchorRef.current?.contains(e.target);
+      const clickedOnMenu = menuRef.current?.contains(e.target);
+      const clickedOnPortal = e.target.closest('.filter-panel-portal');
+      
+      if (clickedOnAnchor || clickedOnMenu || clickedOnPortal) {
         return;
+      }
+      
+      // Close dropdown when clicking outside
       onClose();
     };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    // Use click event with capture phase to check after button onClick
+    document.addEventListener("click", handleClick, true);
+    return () => document.removeEventListener("click", handleClick, true);
   }, [open, onClose, anchorRef]);
 
   if (!open) return null;

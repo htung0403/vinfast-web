@@ -29,8 +29,10 @@ function Login() {
         
         // Tìm user với email khớp (hỗ trợ cả trường mail/Mail/email)
         const userEntry = Object.entries(users).find(([key, user]) => {
-          const userEmail = (user && (user.mail || user.Mail || user.email || '')) .toString().toLowerCase();
-          return userEmail === email.toLowerCase();
+          if (!user) return false;
+          const userEmail = (user.mail || user.Mail || user.email || '').toString().toLowerCase().trim();
+          const inputEmail = email.toLowerCase().trim();
+          return userEmail === inputEmail;
         });
 
         if (userEntry) {
@@ -39,6 +41,7 @@ function Login() {
           // Kiểm tra xem user có mật khẩu không (hợp lệ cả 'pass' và 'password')
           const storedHash = userData.pass || userData.password || '';
           if (!storedHash) {
+            setError('Tài khoản chưa được thiết lập mật khẩu. Vui lòng liên hệ quản trị viên!');
             toast.error('Tài khoản chưa được thiết lập mật khẩu. Vui lòng liên hệ quản trị viên!', {
               position: "top-right",
               autoClose: 5000,
@@ -69,18 +72,21 @@ function Login() {
               navigate('/trang-chu');
             }, 2000);
           } else {
+            setError('Email hoặc mật khẩu không đúng!');
             toast.error('Email hoặc mật khẩu không đúng!', {
               position: "top-right",
               autoClose: 4000,
             });
           }
         } else {
+          setError('Email hoặc mật khẩu không đúng!');
           toast.error('Email hoặc mật khẩu không đúng!', {
             position: "top-right",
             autoClose: 4000,
           });
         }
       } else {
+        setError('Không tìm thấy dữ liệu người dùng!');
         toast.error('Không tìm thấy dữ liệu người dùng!', {
           position: "top-right",
           autoClose: 4000,
@@ -88,10 +94,12 @@ function Login() {
       }
     } catch (err) {
       console.error('Login error:', err);
-      toast.error('Đã xảy ra lỗi khi đăng nhập. Vui lòng thử lại!', {
+      const errorMessage = err.message || 'Đã xảy ra lỗi khi đăng nhập. Vui lòng thử lại!';
+      toast.error(errorMessage, {
         position: "top-right",
         autoClose: 5000,
       });
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -190,6 +198,20 @@ function Login() {
           <p>&copy; 2025 VinFast. All rights reserved.</p>
         </div>
       </div>
+      
+      {/* Toast Container */}
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={true}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="colored"
+      />
     </div>
   );
 }

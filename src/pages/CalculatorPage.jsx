@@ -22,7 +22,7 @@ import {
 } from '../data/calculatorData';
 
 // Import images
-import logoImage from '../assets/images/logo.jpg';
+import logoImage from '../assets/images/logo1.jpg';
 import vf3Full from '../assets/images/vf3_full.jpg';
 import vf3Interior from '../assets/images/vf3_in.jpg';
 import vf5Full from '../assets/images/vf5_full.webp';
@@ -145,6 +145,7 @@ export default function CalculatorPage() {
   const [exteriorColor, setExteriorColor] = useState('');
   const [interiorColor, setInteriorColor] = useState('');
   const [registrationLocation, setRegistrationLocation] = useState('hcm');
+  const [registrationFee, setRegistrationFee] = useState(chi_phi_dich_vu_dang_ky);
 
   // Discounts and promotions
   const [discount2, setDiscount2] = useState(false);
@@ -161,6 +162,21 @@ export default function CalculatorPage() {
   const [customInterestRate, setCustomInterestRate] = useState('');
 
   const [imageFade, setImageFade] = useState(false);
+
+  // Helper function to format currency for input (without ₫ symbol)
+  const formatCurrencyInput = (value) => {
+    if (!value && value !== 0) return '';
+    const numericValue = String(value).replace(/\D/g, '');
+    if (!numericValue) return '';
+    return new Intl.NumberFormat('vi-VN').format(parseInt(numericValue));
+  };
+
+  // Helper function to parse currency from formatted string
+  const parseCurrencyInput = (value) => {
+    if (!value) return 0;
+    const numericValue = String(value).replace(/\D/g, '');
+    return numericValue ? parseInt(numericValue, 10) : 0;
+  };
 
   // Build derived versions from carPriceData
   const derivedVersions = useMemo(() => {
@@ -420,9 +436,9 @@ export default function CalculatorPage() {
     const inspectionFee = phi_kiem_dinh;
     const bhvcRate = 0.014;
     const bodyInsurance = Math.round((finalPayable + bhvc2 + premiumColor) * bhvcRate);
-    const registrationFee = chi_phi_dich_vu_dang_ky;
+    const registrationFeeValue = Number(registrationFee) || 0;
 
-    const totalOnRoadCost = plateFee + roadFee + liabilityInsurance + inspectionFee + bodyInsurance + registrationFee;
+    const totalOnRoadCost = plateFee + roadFee + liabilityInsurance + inspectionFee + bodyInsurance + registrationFeeValue;
     const totalCost = finalPayable + totalOnRoadCost;
 
     // Loan calculations
@@ -493,7 +509,7 @@ export default function CalculatorPage() {
       liabilityInsurance,
       inspectionFee,
       bodyInsurance,
-      registrationFee,
+      registrationFee: registrationFeeValue,
       totalOnRoadCost,
       totalCost,
       loanData,
@@ -517,6 +533,7 @@ export default function CalculatorPage() {
     loanRatio,
     loanTerm,
     customInterestRate,
+    registrationFee,
   ]);
 
   // Collect invoice data
@@ -986,11 +1003,18 @@ export default function CalculatorPage() {
                       <span className="text-gray-600">Phí bảo trì đường bộ</span>
                       <span className="text-gray-900 font-semibold">{formatCurrency(calculations.roadFee)}</span>
                     </div>
-                    <div className="flex justify-between py-2 border-b border-gray-200">
+                    <div className="flex justify-between items-center py-2 border-b border-gray-200">
                       <span className="text-gray-600">Phí dịch vụ</span>
-                      <span className="text-gray-900 font-semibold">
-                        {formatCurrency(calculations.registrationFee)}
-                      </span>
+                      <input
+                        type="text"
+                        value={formatCurrencyInput(registrationFee)}
+                        onChange={(e) => {
+                          const parsedValue = parseCurrencyInput(e.target.value);
+                          setRegistrationFee(Math.max(0, parsedValue));
+                        }}
+                        className="w-40 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-right font-semibold"
+                        placeholder="0"
+                      />
                     </div>
                     <div className="flex justify-between py-2">
                       <span className="text-gray-600">BHVC bao gồm Pin</span>

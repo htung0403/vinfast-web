@@ -7,6 +7,7 @@ import {
 import { ref, get } from "firebase/database";
 import { database } from "../../firebase/config";
 import { uniqueNgoaiThatColors } from "../../data/calculatorData";
+import { vndToWords } from "../../utils/vndToWords";
 
 const GiayDeNghiThanhToan = () => {
   const location = useLocation();
@@ -146,130 +147,6 @@ const GiayDeNghiThanhToan = () => {
     return `${numericAmount.replace(/\B(?=(\d{3})+(?!\d))/g, ".")} đồng`;
   };
 
-  // Helper function to convert number to Vietnamese words
-  const numberToWords = (amount) => {
-    if (!amount) return "";
-
-    // Convert to number
-    const numericAmount =
-      typeof amount === "string" ? amount.replace(/\D/g, "") : String(amount);
-    const num = parseInt(numericAmount, 10);
-
-    if (isNaN(num) || num === 0) return "Không đồng";
-
-    const ones = [
-      "",
-      "một",
-      "hai",
-      "ba",
-      "bốn",
-      "năm",
-      "sáu",
-      "bảy",
-      "tám",
-      "chín",
-    ];
-    const tens = [
-      "",
-      "mười",
-      "hai mươi",
-      "ba mươi",
-      "bốn mươi",
-      "năm mươi",
-      "sáu mươi",
-      "bảy mươi",
-      "tám mươi",
-      "chín mươi",
-    ];
-    const hundreds = [
-      "",
-      "một trăm",
-      "hai trăm",
-      "ba trăm",
-      "bốn trăm",
-      "năm trăm",
-      "sáu trăm",
-      "bảy trăm",
-      "tám trăm",
-      "chín trăm",
-    ];
-
-    const readGroup = (n, showZeroHundred = false) => {
-      if (n === 0) return "";
-
-      let result = "";
-      const hundred = Math.floor(n / 100);
-      const ten = Math.floor((n % 100) / 10);
-      const one = n % 10;
-
-      if (hundred > 0) {
-        result += hundreds[hundred] + " ";
-      } else if (showZeroHundred && ten > 0) {
-        // Show "không trăm" when hundred is 0 but there are tens (not just ones)
-        result += "không trăm ";
-      }
-
-      if (ten > 0) {
-        if (ten === 1) {
-          result += "mười ";
-          if (one > 0) {
-            if (one === 5) {
-              result += "lăm ";
-            } else if (one === 1) {
-              result += "một ";
-            } else {
-              result += ones[one] + " ";
-            }
-          }
-        } else {
-          result += tens[ten] + " ";
-          if (one > 0) {
-            if (one === 5 && ten > 0) {
-              result += "lăm ";
-            } else if (one === 1 && ten > 1) {
-              result += "mốt ";
-            } else {
-              result += ones[one] + " ";
-            }
-          }
-        }
-      } else if (one > 0) {
-        if (hundred > 0 && one === 5) {
-          result += "lăm ";
-        } else {
-          result += ones[one] + " ";
-        }
-      }
-
-      return result.trim();
-    };
-
-    const billion = Math.floor(num / 1000000000);
-    const million = Math.floor((num % 1000000000) / 1000000);
-    const thousand = Math.floor((num % 1000000) / 1000);
-    const remainder = num % 1000;
-
-    let result = "";
-
-    if (billion > 0) {
-      result += readGroup(billion, true) + " tỷ ";
-    }
-    if (million > 0) {
-      result += readGroup(million, true) + " triệu ";
-    }
-    if (thousand > 0) {
-      result += readGroup(thousand, true) + " nghìn ";
-    }
-    if (remainder > 0) {
-      result += readGroup(remainder, false) + " ";
-    }
-
-    // Capitalize first letter and add "chẵn Việt Nam đồng"
-    const trimmed = result.trim();
-    if (!trimmed) return "Không đồng";
-    const capitalized = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
-    return capitalized + " Việt Nam đồng";
-  };
 
   const handleBack = () => {
     navigate(-1);
@@ -425,7 +302,7 @@ const GiayDeNghiThanhToan = () => {
 
             <div>
               - Giá bán:<strong> {formatCurrency(data.salePrice)}</strong> (Bằng
-              chữ: <strong>{numberToWords(data.salePrice)}</strong>)
+              chữ: <strong>{vndToWords(data.salePrice)}</strong>)
             </div>
 
             <div>

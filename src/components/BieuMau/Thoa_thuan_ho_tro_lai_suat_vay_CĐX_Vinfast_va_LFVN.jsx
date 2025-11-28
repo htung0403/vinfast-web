@@ -2,21 +2,43 @@ import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ref, get } from "firebase/database";
 import { database } from "../../firebase/config";
+import logoImage from "../../assets/images/logo.svg";
+import { vndToWords } from "../../utils/vndToWords";
+import {
+  getBranchByShowroomName,
+  getDefaultBranch,
+} from "../../data/branchData";
 
 const Thoa_thuan_ho_tro_lai_suat_vay_CĐX_Vinfast_va_LFVN = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [branch, setBranch] = useState(null);
 
   // Helper functions
   const formatCurrency = (amount) => {
     if (!amount) return "";
-    const num = typeof amount === "string" ? parseFloat(amount) : amount;
+    // Remove all non-digit characters first
+    const numericAmount =
+      typeof amount === "string"
+        ? amount.replace(/\D/g, "")
+        : String(amount).replace(/\D/g, "");
+    if (!numericAmount) return "";
+    const num = parseFloat(numericAmount);
+    if (isNaN(num)) return "";
     return num.toLocaleString("vi-VN");
   };
 
   const pad = (num) => String(num).padStart(2, "0");
+
+  // Helper function to format date as dd/mm/yyyy
+  const formatDateForDisplay = (dateStr) => {
+    if (!dateStr) return "";
+    const d = new Date(dateStr);
+    if (isNaN(d)) return "";
+    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+  };
 
   // Editable fields
   const [ngayKy, setNgayKy] = useState("");
@@ -33,6 +55,7 @@ const Thoa_thuan_ho_tro_lai_suat_vay_CĐX_Vinfast_va_LFVN = () => {
   const [chucVu, setChucVu] = useState("");
   const [giayUyQuyen, setGiayUyQuyen] = useState("");
   const [ngayUyQuyen, setNgayUyQuyen] = useState("");
+  const [ngayUyQuyenRaw, setNgayUyQuyenRaw] = useState("");
 
   // Khách Hàng
   const [tenKH, setTenKH] = useState("");
@@ -57,10 +80,225 @@ const Thoa_thuan_ho_tro_lai_suat_vay_CĐX_Vinfast_va_LFVN = () => {
   const [tyLeVay, setTyLeVay] = useState("80%");
   const [thoiHanVay, setThoiHanVay] = useState("");
 
-  // Firebase effect
+  // Ngày bắt đầu chương trình
+  const [ngayBatDauChuongTrinh, setNgayBatDauChuongTrinh] = useState("");
+  const [ngayBatDauChuongTrinhRaw, setNgayBatDauChuongTrinhRaw] = useState("");
+
+  // Ngày hết hạn xuất hóa đơn (mặc định 31/12/2025)
+  const [ngayHetHanXuatHD, setNgayHetHanXuatHD] = useState("31/12/2025");
+  const [ngayHetHanXuatHDRaw, setNgayHetHanXuatHDRaw] = useState("2025-12-31");
+
+  // Ngày hết hạn giải ngân (mặc định 31/12/2025)
+  const [ngayHetHanGiaiNgan, setNgayHetHanGiaiNgan] = useState("31/12/2025");
+  const [ngayHetHanGiaiNganRaw, setNgayHetHanGiaiNganRaw] =
+    useState("2025-12-31");
+
+  // Số phụ lục
+  const [soPhuLuc, setSoPhuLuc] = useState("");
+
+  // Bổ sung thông tin vi phạm Hợp Đồng Tín Dụng
+  const [boSungHopDongTinDung, setBoSungHopDongTinDung] = useState("");
+
+  // Load data from location.state (from HopDongDaXuatPage) or Firebase
   useEffect(() => {
-    const fetchData = async () => {
+    const loadData = async () => {
       try {
+        // Load branch data from showroom
+        let showroomName = location.state?.showroom || "Chi Nhánh Trường Chinh";
+
+        // Nếu có firebaseKey, thử lấy showroom từ contracts
+        if (location.state?.firebaseKey || location.state?.contractId) {
+          try {
+            const contractId = location.state.firebaseKey || location.state.contractId;
+            const contractsRef = ref(database, `contracts/${contractId}`);
+            const snapshot = await get(contractsRef);
+            if (snapshot.exists()) {
+              const contractData = snapshot.val();
+              if (contractData.showroom) {
+                showroomName = contractData.showroom;
+              }
+            }
+          } catch (err) {
+            // Error handling
+          }
+        }
+
+        // Try to get showroom from exportedContracts if available
+        if (location.state?.firebaseKey && !showroomName) {
+          try {
+            const contractId = location.state.firebaseKey;
+            const exportedRef = ref(database, `exportedContracts/${contractId}`);
+            const snapshot = await get(exportedRef);
+            if (snapshot.exists()) {
+              const contractData = snapshot.val();
+              if (contractData.showroom) {
+                showroomName = contractData.showroom;
+              }
+            }
+          } catch (err) {
+            // Error handling
+          }
+        }
+
+        const branchInfo =
+          getBranchByShowroomName(showroomName) || getDefaultBranch();
+        setBranch(branchInfo);
+
+        // Initialize company fields from branch
+        if (branchInfo) {
+          if (!congTy) setCongTy(branchInfo.name || "");
+          if (!diaChiTruSo) setDiaChiTruSo(branchInfo.address || "");
+          if (!maSoDN) setMaSoDN(branchInfo.taxCode || "");
+          if (!taiKhoan) setTaiKhoan(branchInfo.bankAccount || "");
+          if (!nganHangTK) setNganHangTK(branchInfo.bankName || "");
+          if (!daiDien) setDaiDien(branchInfo.representativeName || "");
+          if (!chucVu) setChucVu(branchInfo.position || "");
+        }
+
+        // Priority 1: Data from location.state (from HopDongDaXuatPage)
+        if (location.state) {
+          const stateData = location.state;
+
+          // Map data from HopDongDaXuatPage format
+          // Khách Hàng
+          setTenKH(
+            stateData.customerName ||
+              stateData.tenKh ||
+              stateData["Tên Kh"] ||
+              ""
+          );
+          setDiaChiKH(
+            stateData.address || stateData.diaChi || stateData["Địa Chỉ"] || ""
+          );
+          setDienThoaiKH(
+            stateData.phone ||
+              stateData.soDienThoai ||
+              stateData["Số Điện Thoại"] ||
+              ""
+          );
+          setCmtndKH(stateData.cccd || stateData.CCCD || "");
+
+          // Parse issue date
+          if (
+            stateData.issueDate ||
+            stateData.ngayCap ||
+            stateData["Ngày Cấp"]
+          ) {
+            const issueDateStr =
+              stateData.issueDate || stateData.ngayCap || stateData["Ngày Cấp"];
+            if (issueDateStr) {
+              // Try to parse date string (could be DD/MM/YYYY or ISO format)
+              let dateObj;
+              if (issueDateStr.includes("/")) {
+                const parts = issueDateStr.split("/");
+                if (parts.length === 3) {
+                  dateObj = new Date(
+                    parseInt(parts[2]),
+                    parseInt(parts[1]) - 1,
+                    parseInt(parts[0])
+                  );
+                }
+              } else {
+                dateObj = new Date(issueDateStr);
+              }
+              if (dateObj && !isNaN(dateObj.getTime())) {
+                setNgayCapKH(
+                  pad(dateObj.getDate()) +
+                    "/" +
+                    pad(dateObj.getMonth() + 1) +
+                    "/" +
+                    dateObj.getFullYear()
+                );
+              } else {
+                setNgayCapKH(issueDateStr);
+              }
+            }
+          }
+
+          setNoiCapKH(
+            stateData.issuePlace ||
+              stateData.noiCap ||
+              stateData["Nơi Cấp"] ||
+              ""
+          );
+
+          // Thông tin xe và hợp đồng
+          setSoHopDong(
+            stateData.vso ||
+              stateData.contractNumber ||
+              stateData.soHopDong ||
+              ""
+          );
+          setMauXe(
+            stateData.model || stateData.dongXe || stateData["Dòng xe"] || ""
+          );
+          setSoKhung(
+            stateData.soKhung ||
+              stateData["Số Khung"] ||
+              stateData.chassisNumber ||
+              ""
+          );
+          setSoMay(
+            stateData.soMay ||
+              stateData["Số Máy"] ||
+              stateData.engineNumber ||
+              ""
+          );
+
+          // Thông tin vay
+          let loanAmount = 0;
+
+          // Try to get loan amount from stateData first
+          if (
+            stateData.loanAmount ||
+            stateData.tienVay ||
+            stateData["Tiền vay"]
+          ) {
+            const loan =
+              stateData.loanAmount ||
+              stateData.tienVay ||
+              stateData["Tiền vay"];
+            loanAmount =
+              typeof loan === "string"
+                ? parseFloat(loan.replace(/[^\d]/g, "")) || 0
+                : parseFloat(loan) || 0;
+          } else if (stateData.contractPrice && stateData.deposit) {
+            // Calculate loan amount: contractPrice - deposit
+            const contractPrice =
+              typeof stateData.contractPrice === "string"
+                ? parseFloat(stateData.contractPrice.replace(/[^\d]/g, "")) || 0
+                : parseFloat(stateData.contractPrice) || 0;
+            const deposit =
+              typeof stateData.deposit === "string"
+                ? parseFloat(stateData.deposit.replace(/[^\d]/g, "")) || 0
+                : parseFloat(stateData.deposit) || 0;
+            loanAmount = contractPrice - deposit;
+          } else if (stateData.contractPrice) {
+            // If only contractPrice, use it as loan amount (assuming 100% loan)
+            loanAmount =
+              typeof stateData.contractPrice === "string"
+                ? parseFloat(stateData.contractPrice.replace(/[^\d]/g, "")) || 0
+                : parseFloat(stateData.contractPrice) || 0;
+          }
+
+          if (loanAmount > 0) {
+            setSoTienVay(String(loanAmount));
+            // Auto-fill amount in words
+            setSoTienVayBangChu(vndToWords(String(loanAmount)));
+          }
+
+          // Set current date for signing
+          const now = new Date();
+          setNgayKy(pad(now.getDate()));
+          setThangKy(pad(now.getMonth() + 1));
+          setNamKy(now.getFullYear().toString());
+
+          setData(stateData);
+          setLoading(false);
+          return;
+        }
+
+        // Priority 2: Fetch from Firebase using contractId
         if (location.state?.contractId) {
           const contractRef = ref(
             database,
@@ -101,7 +339,7 @@ const Thoa_thuan_ho_tro_lai_suat_vay_CĐX_Vinfast_va_LFVN = () => {
       }
     };
 
-    fetchData();
+    loadData();
   }, [location]);
 
   const handleBack = () => {
@@ -117,62 +355,15 @@ const Thoa_thuan_ho_tro_lai_suat_vay_CĐX_Vinfast_va_LFVN = () => {
   }
 
   return (
-    <div className="bg-white min-h-screen">
-      {/* Header buttons - hidden when printing */}
-      <div className="print:hidden bg-gray-100 p-4 flex justify-between items-center">
-        <button
-          onClick={handleBack}
-          className="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded"
-        >
-          Quay lại
-        </button>
-        <button
-          onClick={() => window.print()}
-          className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-        >
-          In Thỏa thuận hỗ trợ lãi suất LFVN
-        </button>
-      </div>
-
+    <div
+      className="bg-white min-h-screen"
+      style={{ fontFamily: "Times New Roman" }}
+    >
       {/* Content */}
       <div id="printable-content" className="max-w-4xl mx-auto p-6 bg-white">
-        <style>{`
-          @media print {
-            @page {
-              margin: 15mm;
-              size: A4;
-            }
-            body {
-              font-family: 'Times New Roman', Times, serif;
-              font-size: 12pt;
-              line-height: 1.4;
-            }
-            .print\\:hidden {
-              display: none !important;
-            }
-            .hidden {
-              display: none !important;
-            }
-            .print\\:inline {
-              display: inline !important;
-            }
-            .print\\:block {
-              display: block !important;
-            }
-            #printable-content {
-              max-width: none;
-              margin: 0;
-              padding: 0;
-              box-shadow: none;
-            }
-            .page-break {
-              page-break-before: always;
-            }
-          }
-        `}</style>
-
         {/* Header with title */}
         <div className="text-center mb-6">
+          <img src={logoImage} alt="Logo" className="w-20 h-20 mx-auto mb-4" />
           <h1 className="text-xl font-bold uppercase">
             THỎA THUẬN HỖ TRỢ LÃI VAY
           </h1>
@@ -215,17 +406,16 @@ const Thoa_thuan_ho_tro_lai_suat_vay_CĐX_Vinfast_va_LFVN = () => {
         </div>
 
         {/* Content */}
-        <div className="text-sm space-y-4 font-serif">
+        <div className="text-sm space-y-4">
           {/* Bên Bán */}
           <div>
             <p className="font-bold mb-2">
-              <strong>CÔNG TY</strong>{" "}
               <span className="print:hidden">
                 <input
                   type="text"
                   value={congTy}
                   onChange={(e) => setCongTy(e.target.value)}
-                  className="border-b border-gray-400 px-1 w-full focus:outline-none focus:border-blue-500"
+                  className="border-b border-gray-400 px-1 w-[90%] focus:outline-none focus:border-blue-500"
                 />
               </span>
               <span className="hidden print:inline underline">{congTy}</span>
@@ -237,7 +427,7 @@ const Thoa_thuan_ho_tro_lai_suat_vay_CĐX_Vinfast_va_LFVN = () => {
                   type="text"
                   value={diaChiTruSo}
                   onChange={(e) => setDiaChiTruSo(e.target.value)}
-                  className="border-b border-gray-400 px-1 w-full focus:outline-none focus:border-blue-500"
+                  className="border-b border-gray-400 px-1 w-[90%] focus:outline-none focus:border-blue-500"
                 />
               </span>
               <span className="hidden print:inline">{diaChiTruSo}</span>
@@ -310,20 +500,30 @@ const Thoa_thuan_ho_tro_lai_suat_vay_CĐX_Vinfast_va_LFVN = () => {
               <span className="hidden print:inline">{giayUyQuyen}</span> ngày{" "}
               <span className="print:hidden">
                 <input
-                  type="text"
-                  value={ngayUyQuyen}
-                  onChange={(e) => setNgayUyQuyen(e.target.value)}
+                  type="date"
+                  value={ngayUyQuyenRaw}
+                  onChange={(e) => {
+                    setNgayUyQuyenRaw(e.target.value);
+                    if (e.target.value) {
+                      setNgayUyQuyen(formatDateForDisplay(e.target.value));
+                    } else {
+                      setNgayUyQuyen("");
+                    }
+                  }}
                   className="border-b border-gray-400 px-1 w-32 focus:outline-none focus:border-blue-500"
                 />
               </span>
-              <span className="hidden print:inline">{ngayUyQuyen}</span>)
+              <span className="hidden print:inline">
+                {ngayUyQuyen || "[---/---/---]"}
+              </span>
+              )
             </p>
             <p className="mb-2 font-bold">
               ("<strong>Bên Bán</strong>")
             </p>
           </div>
 
-          <p className="text-center font-bold mb-4">
+          <p className="font-bold mb-4">
             <strong>VÀ</strong>
           </p>
 
@@ -347,7 +547,7 @@ const Thoa_thuan_ho_tro_lai_suat_vay_CĐX_Vinfast_va_LFVN = () => {
                   type="text"
                   value={diaChiKH}
                   onChange={(e) => setDiaChiKH(e.target.value)}
-                  className="border-b border-gray-400 px-1 w-full focus:outline-none focus:border-blue-500"
+                  className="border-b border-gray-400 px-1 w-[90%] focus:outline-none focus:border-blue-500"
                 />
               </span>
               <span className="hidden print:inline">{diaChiKH}</span>
@@ -439,7 +639,7 @@ const Thoa_thuan_ho_tro_lai_suat_vay_CĐX_Vinfast_va_LFVN = () => {
 
           {/* XÉT RẰNG */}
           <div>
-            <h3 className="font-bold mb-3">
+            <h3 className="font-bold">
               <strong>XÉT RẰNG:</strong>
             </h3>
 
@@ -503,19 +703,84 @@ const Thoa_thuan_ho_tro_lai_suat_vay_CĐX_Vinfast_va_LFVN = () => {
               <strong>LFVN</strong>") theo chính sách hỗ trợ lãi vay của VinFast
               ("<strong>Chính sách Hỗ trợ lãi vay</strong>") áp dụng cho các
               Khách hàng tham gia chương trình Chuyển đổi xanh mua xe và xuất
-              hóa đơn từ ngày …../…../2025 đến hết ngày 31/12/2025, giải ngân
-              đến hết ngày 31/12/2025. Công ty TNHH Kinh Doanh Thương Mại Và
-              Dịch Vụ VinFast – Mã số thuế: 0108926276 ("
-              <strong>VinFast Trading</strong>"), LFVN và Công ty cổ phần Sản
-              xuất và Kinh doanh VinFast – Mã số thuế: 0107894416 ("
-              <strong>VinFast</strong>") đã ký Thỏa thuận hợp tác ("
-              <strong>Thỏa Thuận Hợp Tác</strong>") về việc hỗ trợ Khách Hàng
-              vay mua xe ô tô điện VinFast. Theo đó, Khách Hàng sẽ được VinFast
-              hỗ trợ thanh toán cho LFVN một khoản tiền chênh lệch giữa số tiền
-              lãi của LFVN theo các quy định và điều kiện tại Thỏa Thuận Hợp Tác
-              với số tiền lãi Khách Hàng chi trả cố định hàng tháng. Khoản hỗ
-              trợ này sẽ được VinFast chi trả cho LFVN thông qua VinFast
-              Trading.
+              hóa đơn từ ngày{" "}
+              <span className="print:hidden">
+                <input
+                  type="date"
+                  value={ngayBatDauChuongTrinhRaw}
+                  onChange={(e) => {
+                    setNgayBatDauChuongTrinhRaw(e.target.value);
+                    if (e.target.value) {
+                      setNgayBatDauChuongTrinh(
+                        formatDateForDisplay(e.target.value)
+                      );
+                    } else {
+                      setNgayBatDauChuongTrinh("");
+                    }
+                  }}
+                  className="border-b border-gray-400 px-1 w-32 focus:outline-none focus:border-blue-500"
+                />
+              </span>
+              <span className="hidden print:inline">
+                {ngayBatDauChuongTrinh || "…../…../2025"}
+              </span>{" "}
+              đến hết ngày{" "}
+              <span className="print:hidden">
+                <input
+                  type="date"
+                  value={ngayHetHanXuatHDRaw}
+                  onChange={(e) => {
+                    setNgayHetHanXuatHDRaw(e.target.value);
+                    if (e.target.value) {
+                      setNgayHetHanXuatHD(formatDateForDisplay(e.target.value));
+                    } else {
+                      setNgayHetHanXuatHD("");
+                    }
+                  }}
+                  className="border-b border-gray-400 px-1 w-32 focus:outline-none focus:border-blue-500"
+                />
+              </span>
+              <span className="hidden print:inline">{ngayHetHanXuatHD}</span>,
+              giải ngân đến hết ngày{" "}
+              <span className="print:hidden">
+                <input
+                  type="date"
+                  value={ngayHetHanGiaiNganRaw}
+                  onChange={(e) => {
+                    setNgayHetHanGiaiNganRaw(e.target.value);
+                    if (e.target.value) {
+                      setNgayHetHanGiaiNgan(
+                        formatDateForDisplay(e.target.value)
+                      );
+                    } else {
+                      setNgayHetHanGiaiNgan("");
+                    }
+                  }}
+                  className="border-b border-gray-400 px-1 w-32 focus:outline-none focus:border-blue-500"
+                />
+              </span>
+              <span className="hidden print:inline">{ngayHetHanGiaiNgan}</span>.
+              Công ty TNHH Kinh Doanh Thương Mại Và Dịch Vụ VinFast – Mã số
+              thuế: 0108926276 (“<strong>VinFast Trading</strong>”), LFVN và
+              Công ty cổ phần Sản xuất và Kinh doanh VinFast – Mã số thuế:
+              0107894416 (“<strong>VinFast</strong>”) đã ký Thỏa thuận hợp tác
+              ("<strong>Thỏa Thuận Hợp Tác</strong>") về việc hỗ trợ Khách Hàng
+              vay mua xe ô tô điện VinFast tại Phụ lục số{" "}
+              <span className="print:hidden">
+                <input
+                  type="text"
+                  value={soPhuLuc}
+                  onChange={(e) => setSoPhuLuc(e.target.value)}
+                  className="border-b border-gray-400 px-1 w-32 focus:outline-none focus:border-blue-500"
+                  placeholder="………"
+                />
+              </span>
+              <span className="hidden print:inline">{soPhuLuc || "………"}</span>.
+              Theo đó, Khách Hàng sẽ được VinFast hỗ trợ thanh toán cho LFVN một
+              khoản tiền chênh lệch giữa số tiền lãi của LFVN theo các quy định
+              và điều kiện tại Thỏa Thuận Hợp Tác với số tiền lãi Khách Hàng chi
+              trả cố định hàng tháng. Khoản hỗ trợ này sẽ được VinFast chi trả
+              cho LFVN thông qua VinFast Trading.
             </p>
 
             <p className="mb-3">
@@ -526,8 +791,8 @@ const Thoa_thuan_ho_tro_lai_suat_vay_CĐX_Vinfast_va_LFVN = () => {
               bổ sung liên quan (sau đây gọi chung là "
               <strong>Hợp Đồng Tín Dụng</strong>"). Theo đó, LFVN cho Khách Hàng
               vay một khoản tiền để mua xe ô tô VinFast theo Hợp Đồng Mua Bán
-              Xe, giải ngân trực tiếp vào tài khoản của Bên Bán theo tiến độ
-              thanh toán của Hợp Đồng Mua Bán Xe;
+              Xe, giải ngân trực tiếp vào tài khoản của Bên Bán theo theo tiến
+              độ thanh toán của Hợp Đồng Mua Bán Xe;
             </p>
 
             <p className="mb-4">
@@ -544,34 +809,48 @@ const Thoa_thuan_ho_tro_lai_suat_vay_CĐX_Vinfast_va_LFVN = () => {
           {/* ĐIỀU 1 */}
           <div className="mb-6">
             <h3 className="font-bold mb-3">
-              1. <strong>Thỏa thuận về việc Hỗ Trợ Lãi Vay:</strong>
+              <strong>Điều 1: Thỏa thuận về việc Hỗ Trợ Lãi Vay:</strong>
             </h3>
 
             <div className="mb-4">
-              <p className="font-bold mb-2">1. Chính sách Hỗ trợ lãi vay:</p>
+              <p className="mb-2">1.1. Chính sách Hỗ trợ lãi vay:</p>
               <div className="ml-4 space-y-2">
                 <p>
                   - Số tiền Khách Hàng vay LFVN để thanh toán:{" "}
                   <span className="print:hidden">
                     <input
                       type="text"
-                      value={soTienVay}
-                      onChange={(e) => setSoTienVay(e.target.value)}
+                      value={formatCurrency(soTienVay)}
+                      onChange={(e) => {
+                        // Parse raw value (remove all non-digit characters)
+                        const rawValue = e.target.value.replace(/\D/g, "");
+                        setSoTienVay(rawValue);
+                        // Auto-update amount in words
+                        if (rawValue) {
+                          setSoTienVayBangChu(vndToWords(rawValue));
+                        } else {
+                          setSoTienVayBangChu("");
+                        }
+                      }}
                       className="border-b border-gray-400 px-1 w-48 focus:outline-none focus:border-blue-500"
+                      placeholder="Nhập số tiền"
                     />
                   </span>
-                  <span className="hidden print:inline">{soTienVay}</span> VNĐ
-                  (Bằng chữ:{" "}
+                  <span className="hidden print:inline">
+                    {formatCurrency(soTienVay) || "[---]"}
+                  </span>{" "}
+                  VNĐ (Bằng chữ:{" "}
                   <span className="print:hidden">
                     <input
                       type="text"
                       value={soTienVayBangChu}
                       onChange={(e) => setSoTienVayBangChu(e.target.value)}
-                      className="border-b border-gray-400 px-1 w-48 focus:outline-none focus:border-blue-500"
+                      className="border-b border-gray-400 px-1 w-64 focus:outline-none focus:border-blue-500"
+                      placeholder="Tự động điền"
                     />
                   </span>
                   <span className="hidden print:inline">
-                    {soTienVayBangChu}
+                    {soTienVayBangChu || "[---]"}
                   </span>
                   ) tương ứng với tỷ lệ vay LFVN:{" "}
                   <span className="print:hidden">
@@ -589,9 +868,9 @@ const Thoa_thuan_ho_tro_lai_suat_vay_CĐX_Vinfast_va_LFVN = () => {
                   - Bên cho vay: <strong>LFVN</strong>
                 </p>
                 <p>
-                  - Lãi suất LFVN áp dụng: <strong>8,9%/năm</strong>, cố định
-                  trong 24 tháng (đã bao gồm mức lãi suất hỗ trợ của LFVN so với
-                  Khách hàng thông thường)
+                  - Lãi suất LFVN áp dụng: 8,9%/năm, cố định trong 24 tháng (đã
+                  bao gồm mức lãi suất hỗ trợ của LFVN so với Khách hàng thông
+                  thường)
                 </p>
                 <p>
                   - Lãi suất sau thời gian cố định: Lãi suất cơ sở + Biên độ
@@ -613,28 +892,27 @@ const Thoa_thuan_ho_tro_lai_suat_vay_CĐX_Vinfast_va_LFVN = () => {
                   tháng
                 </p>
                 <p>
-                  - VinFast sẽ hỗ trợ Khách Hàng một khoản tiền ("
-                  <strong>Khoản Hỗ Trợ Lãi Vay</strong>") tương đương khoản
+                  - VinFast sẽ hỗ trợ Khách Hàng một khoản tiền (“
+                  <strong>Khoản Hỗ Trợ Lãi Vay</strong>”) tương đương khoản
                   chênh lệch giữa (i) số tiền lãi của LFVN theo các quy định và
                   điều kiện tại Thỏa Thuận Hợp Tác và (ii) số tiền lãi mà Khách
                   Hàng phải thanh toán, trong thời gian vay (tối đa bằng 96
-                  tháng), tương đương{" "}
-                  <strong>2%/năm trong 36 tháng trả nợ đầu tiên</strong> kể từ
-                  ngày bắt đầu tính lãi theo Hợp Đồng Tín Dụng ("
-                  <strong>Thời Hạn Hỗ Trợ Lãi Vay</strong>") hoặc cho đến khi
+                  tháng), tương đương 2%/năm trong 36 tháng trả nợ đầu tiên (~36
+                  tháng) kể từ ngày bắt đầu tính lãi theo Hợp Đồng Tín Dụng (“
+                  <strong>Thời Hạn Hỗ Trợ Lãi Vay</strong>”) hoặc cho đến khi
                   Thời Hạn Hỗ Trợ Lãi Vay chấm dứt trước thời hạn theo quy định
                   tại Thỏa Thuận này, tùy thời điểm nào đến trước.
                 </p>
                 <p>
                   - Số tiền gốc và lãi Khách Hàng thanh toán định kỳ. Theo đó,
                   Khách hàng sẽ thực hiện trả nợ theo định kỳ 01 tháng/lần một
-                  số tiền xác định theo phương pháp gốc trả đều hàng tháng với
+                  số tiền xác định theo phương pháp gốc trả đều hàng thángvới
                   lãi suất được xác định như sau:
                 </p>
                 <div className="ml-4">
                   <p>
-                    + Lãi suất cho vay trong hạn trong 24 tháng đầu tiên:{" "}
-                    <strong>6,9%/năm</strong>
+                    + Lãi suất cho vay trong hạn trong 24 tháng đầu tiên:
+                    6,9%/năm
                   </p>
                   <p>
                     + Lãi suất cho vay trong hạn trong 12 tháng tiếp theo: Lãi
@@ -650,39 +928,46 @@ const Thoa_thuan_ho_tro_lai_suat_vay_CĐX_Vinfast_va_LFVN = () => {
             </div>
 
             <div className="mb-4">
-              <p className="font-bold mb-2">
-                2. Để tránh hiểu nhầm Các Bên thống nhất rằng:
-              </p>
-              <p>
-                Trong mọi trường hợp VinFast cũng như VinFast Trading không chịu
-                trách nhiệm đối với bất kỳ mức lãi nào ngoài mức lãi quy định
-                trên đây vì lý do Khách Hàng không tuân thủ các quy định của
-                LFVN hay vì bất kỳ lý do gì không phải do lỗi của
-                VinFast/VinFast Trading. Khách Hàng chịu trách nhiệm thanh toán
-                với LFVN toàn bộ các khoản lãi và chi phí phát sinh trên mức hỗ
-                trợ lãi vay của VinFast Trading quy định ở trên bao gồm các
-                khoản phí trả nợ trước hạn; các khoản lãi quá hạn, lãi phạt do
-                chậm thanh toán gốc, lãi; lãi tăng lên do Khách Hàng vi phạm
-                nghĩa vụ trả nợ hoặc vi phạm nghĩa vụ khác; các khoản tiền hoàn
-                trả ưu đãi do trả nợ trước hạn; tiền bồi thường vi phạm Hợp Đồng
-                Tín Dụng... VinFast cũng như VinFast Trading không có trách
-                nhiệm thông báo, làm rõ, nhắc nợ hay thanh toán thay các khoản
-                tiền này cho Khách Hàng.
+              <p className="mb-2">
+                1.2. Để tránh hiểu nhầm Các Bên thống nhất rằng: Trong mọi
+                trường hợp VinFast cũng như VinFast Trading không chịu trách
+                nhiệm đối với bất kỳ mức lãi nào ngoài mức lãi quy định trên đây
+                vì lý do Khách Hàng không tuân thủ các quy định của LFVN hay vì
+                bất kỳ lý do gì không phải do lỗi của VinFast/VinFast Trading.
+                Khách Hàng chịu trách nhiệm thanh toán với LFVN toàn bộ các
+                khoản lãi và chi phí phát sinh trên mức hỗ trợ lãi vay của
+                VinFast Trading quy định ở trên bao gồm các khoản phí trả nợ
+                trước hạn; các khoản lãi quá hạn, lãi phạt do chậm thanh toán
+                gốc, lãi; lãi tăng lên do Khách Hàng vi phạm nghĩa vụ trả nợ
+                hoặc vi phạm nghĩa vụ khác; các khoản tiền hoàn trả ưu đãi do
+                trả nợ trước hạn; tiền bồi thường vi phạm Hợp Đồng Tín Dụng{" "}
+                <span className="print:hidden">
+                  <input
+                    type="text"
+                    value={boSungHopDongTinDung}
+                    onChange={(e) => setBoSungHopDongTinDung(e.target.value)}
+                    className="border-b border-gray-400 px-1 w-32 focus:outline-none focus:border-blue-500"
+                    placeholder="...."
+                  />
+                </span>
+                <span className="hidden print:inline">
+                  {boSungHopDongTinDung || "...."}
+                </span>
+                . VinFast cũng như VinFast Trading không có trách nhiệm thông
+                báo, làm rõ, nhắc nợ hay thanh toán thay các khoản tiền này cho
+                Khách Hàng.
               </p>
             </div>
 
             <div className="mb-4">
-              <p className="font-bold mb-2">
-                3. Thời Hạn Hỗ Trợ Lãi Vay sẽ tự động chấm dứt trước hạn trong
-                trường hợp:
-              </p>
-              <p>
-                Khách Hàng tất toán Khoản Vay Trước Hạn, hoặc trong trường hợp
-                Hợp Đồng Tín Dụng chấm dứt trước khi hết Thời Hạn Hỗ Trợ Lãi Vay
-                vì bất cứ lý do gì. Hết Thời Hạn Hỗ Trợ Lãi Vay hoặc khi Thời
-                Hạn Hỗ Trợ Lãi Vay chấm dứt trước hạn, Khách Hàng có nghĩa vụ
-                tiếp tục thực hiện trả nợ lãi cho LFVN theo đúng quy định tại
-                Hợp Đồng Tín Dụng và quy định của LFVN.
+              <p className="mb-2">
+                1.3. Thời Hạn Hỗ Trợ Lãi Vay sẽ tự động chấm dứt trước hạn trong
+                trường hợp Khách Hàng tất toán Khoản Vay Trước Hạn, hoặc trong
+                trường hợp Hợp Đồng Tín Dụng chấm dứt trước khi hết Thời Hạn Hỗ
+                Trợ Lãi Vay vì bất cứ lý do gì. Hết Thời Hạn Hỗ Trợ Lãi Vay hoặc
+                khi Thời Hạn Hỗ Trợ Lãi Vay chấm dứt trước hạn, Khách Hàng có
+                nghĩa vụ tiếp tục thực hiện trả nợ lãi cho LFVN theo đúng quy
+                định tại Hợp Đồng Tín Dụng và quy định của LFVN.
               </p>
             </div>
           </div>
@@ -690,27 +975,27 @@ const Thoa_thuan_ho_tro_lai_suat_vay_CĐX_Vinfast_va_LFVN = () => {
           {/* ĐIỀU 2 */}
           <div className="mb-6">
             <h3 className="font-bold mb-3">
-              2. <strong>Quyền và nghĩa vụ của các Bên</strong>
+              <strong>Điều 2: Quyền và nghĩa vụ của các Bên</strong>
             </h3>
 
             <div className="mb-4">
               <p className="font-bold mb-2">
-                1. Quyền và nghĩa vụ của VinFast Trading:
+                2.1. Quyền và nghĩa vụ của VinFast Trading:
               </p>
               <div className="ml-4 space-y-2">
                 <p>
-                  1) Thực hiện kiểm tra, đối chiếu và xác nhận với LFVN các
+                  a) Thực hiện kiểm tra, đối chiếu và xác nhận với LFVN các
                   Khoản Hỗ Trợ Lãi Vay hỗ trợ cho Khách Hàng ngay trong ngày khi
                   nhận được thông báo của LFVN có phát sinh các khoản vay của
                   Khách Hàng thông qua email trước khi ký chính thức Thông báo
                   thanh toán Khoản Hỗ Trợ Lãi Vay;
                 </p>
                 <p>
-                  2) Thực hiện việc hỗ trợ Khoản Hỗ Trợ Lãi Vay của Khách Hàng
+                  b) Thực hiện việc hỗ trợ Khoản Hỗ Trợ Lãi Vay của Khách Hàng
                   theo Chính sách Hỗ trợ lãi vay theo Thỏa Thuận này;
                 </p>
                 <p>
-                  3) Không chịu trách nhiệm đối với các mâu thuẫn, tranh chấp,
+                  c) Không chịu trách nhiệm đối với các mâu thuẫn, tranh chấp,
                   khiếu kiện hay khiếu nại nào liên quan đến và/hoặc phát sinh
                   giữa LFVN, Khách Hàng và các tổ chức, cá nhân khác trong quá
                   trình thực hiện Hợp Đồng Tín Dụng và các thỏa thuận liên quan
@@ -720,35 +1005,33 @@ const Thoa_thuan_ho_tro_lai_suat_vay_CĐX_Vinfast_va_LFVN = () => {
             </div>
 
             <div className="mb-4">
-              <p className="font-bold mb-2">
-                2. Quyền và nghĩa vụ của Khách Hàng:
-              </p>
+              <p className="mb-2">2.2. Quyền và nghĩa vụ của Khách Hàng:</p>
               <div className="ml-4 space-y-2">
                 <p>
-                  1) Được VinFast Trading thực hiện việc hỗ trợ Khoản Hỗ Trợ Lãi
+                  a) Được VinFast Trading thực hiện việc hỗ trợ Khoản Hỗ Trợ Lãi
                   Vay và áp dụng Chính sách Hỗ trợ lãi vay theo quy định của
                   Thỏa Thuận này.
                 </p>
                 <p>
-                  2) Tự chi trả, thanh toán nợ gốc, phí trả nợ trước hạn và bất
+                  b) Tự chi trả, thanh toán nợ gốc, phí trả nợ trước hạn và bất
                   kỳ khoản lãi, lãi quá hạn nào phát sinh ngoài phạm vi Khoản Hỗ
                   Trợ Lãi Vay, Thời Hạn Hỗ Trợ Lãi Vay và Chính sách Hỗ trợ lãi
                   vay.
                 </p>
                 <p>
-                  3) Khách Hàng cam kết miễn trừ cho VinFast, VinFast Trading
+                  c) Khách Hàng cam kết miễn trừ cho VinFast, VinFast Trading
                   mọi trách nhiệm, nghĩa vụ liên quan đến bất kỳ tranh chấp, mâu
                   thuẫn, khiếu kiện, hay khiếu nại nào phát sinh từ, hoặc liên
                   quan đến Hợp Đồng Tín Dụng.
                 </p>
                 <p>
-                  4) Khách Hàng không được VinFast Trading hỗ trợ Khoản Hỗ Trợ
+                  d) Khách Hàng không được VinFast Trading hỗ trợ Khoản Hỗ Trợ
                   Lãi Vay kể từ thời điểm Khách Hàng ký Văn bản chuyển nhượng
                   Hợp Đồng Mua Bán và/hoặc xe ô tô là đối tượng của hợp đồng mua
                   bán/chuyển nhượng với bất kỳ bên thứ ba nào khác.
                 </p>
                 <p>
-                  5) Trong Thời Hạn Hỗ Trợ Lãi Vay, nếu Khách Hàng tất toán
+                  e) Trong Thời Hạn Hỗ Trợ Lãi Vay, nếu Khách Hàng tất toán
                   Khoản vay trước hạn, ký Văn bản chuyển nhượng Hợp Đồng Mua Bán
                   và/hoặc xe ô tô là đối tượng của hợp đồng mua bán/ chuyển
                   nhượng với bất kỳ bên thứ ba nào khác, không thực hiện theo
@@ -767,7 +1050,7 @@ const Thoa_thuan_ho_tro_lai_suat_vay_CĐX_Vinfast_va_LFVN = () => {
           {/* ĐIỀU 3 */}
           <div className="mb-6">
             <h3 className="font-bold mb-3">
-              3. <strong>Điều khoản hỗ trợ LFVN</strong>
+              <strong>Điều 3: Điều khoản hỗ trợ LFVN</strong>
             </h3>
 
             <p className="mb-4">
@@ -781,31 +1064,29 @@ const Thoa_thuan_ho_tro_lai_suat_vay_CĐX_Vinfast_va_LFVN = () => {
 
             <div className="ml-4 space-y-3">
               <p>
-                1. Khách Hàng cho phép LFVN thu thập, xử lý các thông tin về xe,
+                a. Khách Hàng cho phép LFVN thu thập, xử lý các thông tin về xe,
                 vị trí xe, tình trạng xe cho mục đích quản lý tài sản đảm bảo
                 cho khoản vay theo Hợp Đồng Tín Dụng, và/hoặc sử dụng vào mục
                 đích khác theo thỏa thuận giữa Khách Hàng và LFVN, thông qua bên
                 thứ ba là Đơn Vị Hỗ Trợ Kỹ Thuật;
               </p>
               <p>
-                2. Trong trường hợp Khách Hàng vi phạm nghĩa vụ trả nợ quá{" "}
-                <strong>10 ngày</strong>, LFVN có quyền đề nghị VinFast Trading,
-                nhà sản xuất xe và/ hoặc bất kỳ bên thứ ba khác được VinFast
-                Trading ủy quyền (gọi chung là "
-                <strong>Đơn Vị Hỗ Trợ Kỹ Thuật</strong>") trích xuất dữ liệu
-                định vị xe của Khách Hàng và các thông tin liên quan đến xe để
-                cung cấp cho LFVN, Khách Hàng đồng ý để Đơn Vị Hỗ Trợ Kỹ Thuật
-                thu thập, xử lý, cung cấp và chia sẻ dữ liệu này cho LFVN để
-                phục vụ hoạt động xử lý thu hồi nợ, và/hoặc sử dụng vào mục đích
-                khác theo thỏa thuận giữa Khách Hàng và LFVN;
+                b. Trong trường hợp Khách Hàng vi phạm nghĩa vụ trả nợ quá 10
+                ngày, LFVN có quyền đề nghị VinFast Trading, nhà sản xuất xe và/
+                hoặc bất kỳ bên thứ ba khác được VinFast Trading ủy quyền (gọi
+                chung là "<strong>Đơn Vị Hỗ Trợ Kỹ Thuật</strong>") trích xuất
+                dữ liệu định vị xe của Khách Hàng và các thông tin liên quan đến
+                xe để cung cấp cho LFVN, Khách Hàng đồng ý để Đơn Vị Hỗ Trợ Kỹ
+                Thuật thu thập, xử lý, cung cấp và chia sẻ dữ liệu này cho LFVN
+                để phục vụ hoạt động xử lý thu hồi nợ , và/hoặc sử dụng vào mục
+                đích khác theo thỏa thuận giữa Khách Hàng và LFVN;
               </p>
               <p>
-                3. Trong trường hợp Khách Hàng vi phạm nghĩa vụ trả nợ quá{" "}
-                <strong>30 ngày</strong>, LFVN có quyền ủy quyền cho Đơn Vị Hỗ
-                Trợ Kỹ Thuật kích hoạt tính năng giới hạn mức SOC (dung lượng
-                pin) của pin tại ngưỡng <strong>30%</strong> theo đề nghị của
-                LFVN, và Khách Hàng đồng ý để Đơn Vị Hỗ Trợ Kỹ Thuật thực hiện
-                các việc này;
+                c. Trong trường hợp Khách Hàng vi phạm nghĩa vụ trả nợ quá 30
+                ngày, LFVN có quyền ủy quyền cho Đơn Vị Hỗ Trợ Kỹ Thuật kích
+                hoạt tính năng giới hạn mức SOC (dung lượng pin) của pin tại
+                ngưỡng 30% theo đề nghị của LFVN, và Khách Hàng đồng ý để Đơn Vị
+                Hỗ Trợ Kỹ Thuật thực hiện các việc này;
               </p>
             </div>
 
@@ -818,26 +1099,26 @@ const Thoa_thuan_ho_tro_lai_suat_vay_CĐX_Vinfast_va_LFVN = () => {
           {/* ĐIỀU 4 */}
           <div className="mb-6">
             <h3 className="font-bold mb-3">
-              4. <strong>Hiệu lực của Thỏa Thuận</strong>
+              <strong>Điều 4: Hiệu lực của Thỏa Thuận</strong>
             </h3>
 
             <div className="ml-4 space-y-3">
               <p>
-                1. Thỏa Thuận này có hiệu lực kể từ ngày ký đến ngày hết hiệu
+                4.1. Thỏa Thuận này có hiệu lực kể từ ngày ký đến ngày hết hiệu
                 lực của Hợp Đồng Tín Dụng. Thỏa Thuận có thể chấm dứt trước thời
                 hạn theo thỏa thuận của Các Bên hoặc xảy ra các trường hợp quy
                 định tại Điều 2.2.e Thỏa Thuận này.
               </p>
               <p>
-                2. Khách Hàng không được chuyển nhượng, chuyển giao quyền và
+                4.2. Khách Hàng không được chuyển nhượng, chuyển giao quyền và
                 nghĩa vụ của mình theo Thỏa Thuận này cho bất kỳ bên thứ ba nào
                 nếu không được chấp thuận trước bằng văn bản của VinFast
                 Trading. Tuy nhiên, Khách Hàng đồng ý rằng VinFast và/ hoặc
                 VinFast Trading có quyền chuyển nhượng, chuyển giao các
                 quyền/nghĩa vụ theo Thỏa Thuận này cho bên thứ ba, hoặc trong
-                trường hợp VinFast/ VinFast Trading tổ chức lại doanh nghiệp,
-                bao gồm sáp nhập vào một công ty khác hoặc được chia, hoặc tách
-                hoặc được chuyển đổi với điều kiện là việc chuyển nhượng, chuyển
+                trường hợp VinFast/ VinFast Trading tổ chức lại doanh nghiệp,
+                bao gồm sáp nhập vào một công ty khác hoặc được chia, hoặc tách
+                hoặc được chuyển đổi với điều kiện là việc chuyển nhượng, chuyển
                 giao các quyền/nghĩa vụ đó không gây thiệt hại đến quyền và lợi
                 ích của Khách Hàng theo Thỏa Thuận này và bên nhận chuyển giao
                 các quyền/nghĩa vụ theo Thỏa Thuận này chịu trách nhiệm tiếp tục
@@ -845,17 +1126,17 @@ const Thoa_thuan_ho_tro_lai_suat_vay_CĐX_Vinfast_va_LFVN = () => {
                 Thỏa thuận này.
               </p>
               <p>
-                3. Mọi sửa đổi, bổ sung Thỏa Thuận này phải được lập thành văn
+                4.3. Mọi sửa đổi, bổ sung Thỏa Thuận này phải được lập thành văn
                 bản và được ký bởi người đại diện hợp pháp của mỗi Bên.
               </p>
               <p>
-                4. Thỏa Thuận này được điều chỉnh theo các quy định của pháp
+                4.4. Thỏa Thuận này được điều chỉnh theo các quy định của pháp
                 luật Việt Nam. Mọi tranh chấp phát sinh từ Thỏa Thuận này nếu
                 không được giải quyết bằng thương lượng và hòa giải giữa Các
                 Bên, thì sẽ được giải quyết tại Tòa án có thẩm quyền.
               </p>
               <p>
-                5. Thỏa Thuận này được lập thành 04 (bốn) bản có giá trị như
+                4.5. Thỏa Thuận này được lập thành 04 (bốn) bản có giá trị như
                 nhau, mỗi Bên giữ 02 (hai) bản để thực hiện.
               </p>
             </div>
@@ -863,21 +1144,21 @@ const Thoa_thuan_ho_tro_lai_suat_vay_CĐX_Vinfast_va_LFVN = () => {
 
           {/* Signature table */}
           <div className="mt-8">
-            <table className="w-full border border-gray-300">
+            <table className="w-full">
               <tbody>
                 <tr>
-                  <th className="border border-gray-300 p-4 text-center font-bold w-1/2">
+                  <th className="p-4 text-center font-bold w-1/2">
                     ĐẠI DIỆN BÊN BÁN
                   </th>
-                  <th className="border border-gray-300 p-4 text-center font-bold w-1/2">
+                  <th className="p-4 text-center font-bold w-1/2">
                     KHÁCH HÀNG
                   </th>
                 </tr>
                 <tr>
-                  <td className="border border-gray-300 p-16 text-center">
+                  <td className="p-16 text-center">
                     &nbsp;
                   </td>
-                  <td className="border border-gray-300 p-16 text-center">
+                  <td className="p-16 text-center">
                     &nbsp;
                   </td>
                 </tr>
@@ -886,6 +1167,106 @@ const Thoa_thuan_ho_tro_lai_suat_vay_CĐX_Vinfast_va_LFVN = () => {
           </div>
         </div>
       </div>
+
+      {/* Action Buttons - hidden when printing */}
+      <div className="print:hidden bg-gray-100 p-4 flex justify-center items-center space-x-4 mt-8">
+        <button
+          onClick={handleBack}
+          className="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded"
+        >
+          Quay lại
+        </button>
+        <button
+          onClick={() => window.print()}
+          className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+        >
+          In Thỏa thuận hỗ trợ lãi suất LFVN
+        </button>
+      </div>
+
+      <style>{`
+          #printable-content {
+            font-family: 'Times New Roman', Times, serif !important;
+            font-size: 12pt;
+            line-height: 1.6;
+            color: #000;
+          }
+          
+          #printable-content * {
+            font-family: 'Times New Roman', Times, serif !important;
+          }
+          
+          #printable-content input,
+          #printable-content textarea {
+            font-family: 'Times New Roman', Times, serif !important;
+          }
+          
+          @media print {
+            @page {
+              margin: 10mm 10mm 25mm 10mm;
+              size: A4;
+            }
+            
+            body * {
+              visibility: hidden;
+            }
+            
+            #printable-content,
+            #printable-content * {
+              visibility: visible;
+            }
+            
+            #printable-content {
+              position: relative;
+              width: 100%;
+              padding: 0;
+              margin: 0;
+              max-width: none;
+              box-shadow: none;
+              font-family: 'Times New Roman', Times, serif !important;
+            }
+            
+            #printable-content * {
+              font-family: 'Times New Roman', Times, serif !important;
+            }
+            
+            #printable-content input,
+            #printable-content textarea,
+            #printable-content table,
+            #printable-content th,
+            #printable-content td {
+              font-family: 'Times New Roman', Times, serif !important;
+            }
+            
+            .print\\:hidden {
+              display: none !important;
+            }
+            
+            .hidden {
+              display: none !important;
+            }
+            
+            .print\\:inline {
+              display: inline !important;
+            }
+            
+            .print\\:block {
+              display: block !important;
+            }
+            
+            html, body {
+              margin: 0 !important;
+              padding: 0 !important;
+              height: auto !important;
+              overflow: visible !important;
+              font-family: 'Times New Roman', Times, serif !important;
+            }
+            
+            .page-break {
+              page-break-before: always;
+            }
+          }
+        `}</style>
     </div>
   );
 };

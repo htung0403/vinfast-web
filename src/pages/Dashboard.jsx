@@ -2,49 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ref, get } from "firebase/database";
 import { database } from "../firebase/config";
-import {
-  Calendar,
-  Users,
-  FileText,
-  Car,
-  TrendingUp,
-  UserPlus,
-} from "lucide-react";
-import { toast } from "react-toastify";
-
-// Helper function to get current week number
-const getCurrentWeek = () => {
-  const today = new Date();
-  const jan1 = new Date(today.getFullYear(), 0, 1);
-  const dayOfWeek = jan1.getDay();
-  const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-  const week1Monday = new Date(today.getFullYear(), 0, 1 + daysToMonday);
-  const diffTime = today - week1Monday;
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-  const weekNumber = Math.floor(diffDays / 7) + 1;
-  return weekNumber > 0 ? weekNumber : 1;
-};
-
-// Helper function to get start and end date of a week
-const getWeekDates = (weekNumber, year) => {
-  // January 1st of the year
-  const jan1 = new Date(year, 0, 1);
-  // Get the day of week (0 = Sunday, 1 = Monday, ...)
-  const dayOfWeek = jan1.getDay();
-  // Calculate days to add to get to Monday of week 1
-  // If Jan 1 is Sunday (0), we need to go back 6 days, if Monday (1), we go back 0 days, etc.
-  const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-  // Get Monday of week 1
-  const week1Monday = new Date(year, 0, 1 + daysToMonday);
-  // Calculate start date of the selected week (weekNumber - 1 weeks after week 1)
-  const startDate = new Date(week1Monday);
-  startDate.setDate(week1Monday.getDate() + (weekNumber - 1) * 7);
-  // End date is 6 days after start date (Sunday)
-  const endDate = new Date(startDate);
-  endDate.setDate(startDate.getDate() + 6);
-  endDate.setHours(23, 59, 59, 999);
-  return { startDate, endDate };
-};
+import { Calendar, Users, Car, TrendingUp, UserPlus } from 'lucide-react';
+import { toast } from 'react-toastify';
 
 // Helper function to get current week or previous week dates
 const getCurrentOrPreviousWeekDates = (option) => {
@@ -260,6 +219,9 @@ export default function Dashboard() {
       } catch (err) {
         toast.error("Lỗi khi tải dữ liệu hợp đồng: " + err.message);
         setAllContracts([]);
+      } finally {
+        // Ensure loading flag is always cleared when fetch finishes (even if empty)
+        setLoading(false);
       }
     };
 
@@ -269,12 +231,6 @@ export default function Dashboard() {
 
   // Apply permission filter to contracts
   useEffect(() => {
-    // If contracts haven't been loaded yet, wait
-    if (allContracts.length === 0 && loading) {
-      // Still loading, don't filter yet
-      return;
-    }
-
     // Don't filter until user info is loaded
     if (!userRole) {
       setContracts([]);
@@ -315,32 +271,28 @@ export default function Dashboard() {
                    contractTVBH.toLowerCase() === actualEmployeeName.toLowerCase();
           }
         );
-      } else if (!employeesLoaded) {
-        // Still loading employee data, wait
-        filteredContracts = [];
-        return;
       } else {
-        // Employee name not found, show empty
+        // Employee name not found or employees loaded but no match, show empty
         filteredContracts = [];
       }
       // Set loading false after filtering for user
       setLoading(false);
     } else if (userRole === "leader") {
       // Leader: see contracts of employees in same department
-      if (userDepartment && employeesLoaded) {
-        if (teamEmployeeNames.length > 0) {
+      if (employeesLoaded) {
+        if (userDepartment && teamEmployeeNames.length > 0) {
           filteredContracts = allContracts.filter((contract) => {
             const contractTVBH = contract.TVBH || "";
             return teamEmployeeNames.includes(contractTVBH);
           });
         } else {
-          // No team members found, show empty
+          // No department or no team members found, show empty
           filteredContracts = [];
         }
         // Set loading false after filtering for leader
         setLoading(false);
       } else {
-        // No department or employees not loaded, can't filter yet
+        // Employees not loaded yet, can't filter yet
         filteredContracts = [];
         // Don't set loading false yet, wait for employees to load
       }
@@ -350,7 +302,7 @@ export default function Dashboard() {
     }
 
     setContracts(filteredContracts);
-  }, [allContracts, userRole, username, userEmail, actualEmployeeName, userDepartment, teamEmployeeNames, employeesLoaded, loading]);
+  }, [allContracts, userRole, username, userEmail, actualEmployeeName, userDepartment, teamEmployeeNames, employeesLoaded]);
 
   // Fetch customers from Firebase
   useEffect(() => {
@@ -668,11 +620,11 @@ export default function Dashboard() {
     // We need to filter this by time range
     const baseNeedsAdviceCustomers = customers.filter((customer) => {
       const tinhTrang = customer.tinhTrang || "";
-      const mucDo = customer.mucDo || "";
       
+      // Lấy tất cả khách hàng trừ "Không quan tâm" và "Không mua"
       const needsAdvice = 
-        (tinhTrang === "Mới" || tinhTrang === "Đã liên hệ") &&
-        (mucDo === "Very hot" || mucDo === "Hot");
+        tinhTrang !== "Không quan tâm" && 
+        tinhTrang !== "Không mua";
       
       return needsAdvice;
     });
@@ -706,7 +658,6 @@ export default function Dashboard() {
     const byModel = {};
 
     let total = 0;
-    let signed = 0;
     let exported = 0;
     let pending = 0;
     let cancelled = 0;
@@ -720,7 +671,7 @@ export default function Dashboard() {
       // Count by status
       switch (contract.status) {
         case "mới":
-          signed++;
+          pending++; // "Tồn" = hợp đồng có status "mới"
           break;
         case "xuất":
           exported++;
@@ -735,7 +686,8 @@ export default function Dashboard() {
           transferred++;
           break;
         default:
-          pending++;
+          // Không tăng pending cho các status khác
+          break;
       }
 
       // Group by employee
@@ -772,9 +724,13 @@ export default function Dashboard() {
       }
 
       byEmployee[employee].total++;
+      // "Đã ký" = tổng số hợp đồng (total)
+      byEmployee[employee].signed = byEmployee[employee].total;
+      
+      // Các cột khác dựa trên trạng thái
       switch (contract.status) {
         case "mới":
-          byEmployee[employee].signed++;
+          byEmployee[employee].pending++; // "Tồn" = hợp đồng có status "mới"
           break;
         case "xuất":
           byEmployee[employee].exported++;
@@ -789,7 +745,8 @@ export default function Dashboard() {
           byEmployee[employee].transferred++;
           break;
         default:
-          byEmployee[employee].pending++;
+          // Không tăng pending cho các status khác
+          break;
       }
 
       // Group by model (reuse the model variable declared above)
@@ -807,9 +764,13 @@ export default function Dashboard() {
       }
 
       byModel[model].total++;
+      // "Đã ký" = tổng số hợp đồng (total)
+      byModel[model].signed = byModel[model].total;
+      
+      // Các cột khác dựa trên trạng thái
       switch (contract.status) {
         case "mới":
-          byModel[model].signed++;
+          byModel[model].pending++; // "Tồn" = hợp đồng có status "mới"
           break;
         case "xuất":
           byModel[model].exported++;
@@ -824,7 +785,8 @@ export default function Dashboard() {
           byModel[model].transferred++;
           break;
         default:
-          byModel[model].pending++;
+          // Không tăng pending cho các status khác
+          break;
       }
     });
 
@@ -838,7 +800,7 @@ export default function Dashboard() {
       byModel: Object.values(byModel).sort((a, b) => b.total - a.total),
       summary: {
         total,
-        signed,
+        signed: total, // "Đã ký" = tổng số hợp đồng (total)
         exported,
         pending,
         cancelled,
@@ -1109,25 +1071,11 @@ export default function Dashboard() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-6 mb-4 sm:mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-4 sm:mb-6">
         <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs sm:text-sm font-medium text-gray-600">Tổng hợp đồng</p>
-              <p className="text-xl sm:text-2xl font-bold text-primary-600">
-                {reportData.summary.total}
-              </p>
-            </div>
-            <div className="p-2 sm:p-3 bg-primary-100 rounded-full">
-              <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-primary-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs sm:text-sm font-medium text-gray-600">Đã ký</p>
               <p className="text-xl sm:text-2xl font-bold text-green-600">
                 {reportData.summary.signed}
               </p>

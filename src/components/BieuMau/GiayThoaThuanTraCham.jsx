@@ -6,6 +6,7 @@ import {
 } from "../../data/branchData";
 import { ref, get } from "firebase/database";
 import { database } from "../../firebase/config";
+import { vndToWords } from "../../utils/vndToWords";
 
 const GiayThoaThuanTraCham = () => {
   const location = useLocation();
@@ -27,6 +28,7 @@ const GiayThoaThuanTraCham = () => {
   const [chucVu, setChucVu] = useState("");
   const [soGiayUyQuyen, setSoGiayUyQuyen] = useState("");
   const [ngayUyQuyen, setNgayUyQuyen] = useState("");
+  const [ngayUyQuyenRaw, setNgayUyQuyenRaw] = useState("");
 
   // Customer fields
   const [tenKH, setTenKH] = useState("");
@@ -38,6 +40,7 @@ const GiayThoaThuanTraCham = () => {
   const [noiCapKH, setNoiCapKH] = useState("");
 
   // Spouse fields
+  const [coVoChong, setCoVoChong] = useState(false);
   const [tenVoChong, setTenVoChong] = useState("");
   const [diaChiVoChong, setDiaChiVoChong] = useState("");
   const [dienThoaiVoChong, setDienThoaiVoChong] = useState("");
@@ -49,6 +52,7 @@ const GiayThoaThuanTraCham = () => {
   // Contract and car fields
   const [soHopDong, setSoHopDong] = useState("");
   const [ngayHopDong, setNgayHopDong] = useState("");
+  const [ngayHopDongRaw, setNgayHopDongRaw] = useState("");
   const [modelXe, setModelXe] = useState("");
   const [soKhung, setSoKhung] = useState("");
   const [soMay, setSoMay] = useState("");
@@ -57,112 +61,6 @@ const GiayThoaThuanTraCham = () => {
   const [soTienTraChamBangChu, setSoTienTraChamBangChu] = useState("");
   const [ngayTraNo, setNgayTraNo] = useState("");
   const [thoiHanThanhToan, setThoiHanThanhToan] = useState("60");
-
-  // Helper function to convert number to Vietnamese words
-  const numberToWords = (amount) => {
-    if (!amount) return "";
-    const numericAmount =
-      typeof amount === "string" ? amount.replace(/\D/g, "") : String(amount);
-    const num = parseInt(numericAmount, 10);
-    if (isNaN(num) || num === 0) return "";
-
-    const ones = [
-      "",
-      "một",
-      "hai",
-      "ba",
-      "bốn",
-      "năm",
-      "sáu",
-      "bảy",
-      "tám",
-      "chín",
-    ];
-    const tens = [
-      "",
-      "mười",
-      "hai mươi",
-      "ba mươi",
-      "bốn mươi",
-      "năm mươi",
-      "sáu mươi",
-      "bảy mươi",
-      "tám mươi",
-      "chín mươi",
-    ];
-    const hundreds = [
-      "",
-      "một trăm",
-      "hai trăm",
-      "ba trăm",
-      "bốn trăm",
-      "năm trăm",
-      "sáu trăm",
-      "bảy trăm",
-      "tám trăm",
-      "chín trăm",
-    ];
-
-    const readGroup = (n) => {
-      if (n === 0) return "";
-      let result = "";
-      const hundred = Math.floor(n / 100);
-      const ten = Math.floor((n % 100) / 10);
-      const one = n % 10;
-
-      if (hundred > 0) {
-        result += hundreds[hundred] + " ";
-      }
-
-      if (ten > 0) {
-        if (ten === 1) {
-          result += "mười ";
-          if (one > 0) {
-            result += one === 5 ? "lăm " : ones[one] + " ";
-          }
-        } else {
-          result += tens[ten] + " ";
-          if (one > 0) {
-            if (one === 5 && ten > 0) {
-              result += "lăm ";
-            } else if (one === 1 && ten > 1) {
-              result += "mốt ";
-            } else {
-              result += ones[one] + " ";
-            }
-          }
-        }
-      } else if (one > 0) {
-        if (hundred > 0 && one === 5) {
-          result += "lăm ";
-        } else {
-          result += ones[one] + " ";
-        }
-      }
-      return result.trim();
-    };
-
-    const billion = Math.floor(num / 1000000000);
-    const million = Math.floor((num % 1000000000) / 1000000);
-    const thousand = Math.floor((num % 1000000) / 1000);
-    const remainder = num % 1000;
-
-    let result = "";
-    if (billion > 0) {
-      result += readGroup(billion) + " tỷ ";
-    }
-    if (million > 0) {
-      result += readGroup(million) + " triệu ";
-    }
-    if (thousand > 0) {
-      result += readGroup(thousand) + " nghìn ";
-    }
-    if (remainder > 0) {
-      result += readGroup(remainder);
-    }
-
-    return result.trim() + " đồng";
-  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -183,6 +81,28 @@ const GiayThoaThuanTraCham = () => {
         } catch (err) {
           console.error("Error loading showroom from contracts:", err);
         }
+
+        // Thử load từ exportedContracts nếu chưa có showroom
+        if (!showroomName || showroomName === "Chi Nhánh Trường Chinh") {
+          try {
+            const contractRef = ref(
+              database,
+              `exportedContracts/${location.state.firebaseKey}`
+            );
+            const snapshot = await get(contractRef);
+            if (snapshot.exists()) {
+              const contractData = snapshot.val();
+              if (contractData.showroom) {
+                showroomName = contractData.showroom;
+              }
+            }
+          } catch (err) {
+            console.error(
+              "Error loading showroom from exportedContracts:",
+              err
+            );
+          }
+        }
       }
 
       // Lấy thông tin chi nhánh
@@ -199,11 +119,25 @@ const GiayThoaThuanTraCham = () => {
         setThangKy(String(today.getMonth() + 1).padStart(2, "0"));
         setNamKy(String(today.getFullYear()));
 
-        // Company info
-        setCongTy(incoming.congTy || incoming["Công Ty"] || "");
-        setMaSoDN(branchInfo?.taxCode || "");
-        setDaiDien(branchInfo?.representativeName || "");
-        setChucVu(branchInfo?.position || "");
+        // Company info - tự động điền từ showroom nếu chưa có
+        const congTyFromIncoming = incoming.congTy || incoming["Công Ty"] || "";
+        if (!congTyFromIncoming && branchInfo) {
+          setCongTy(`${branchInfo.name.toUpperCase()}`);
+        } else {
+          setCongTy(congTyFromIncoming);
+        }
+        setMaSoDN(
+          incoming.maSoDN || incoming["Mã Số DN"] || branchInfo?.taxCode || ""
+        );
+        setDaiDien(
+          incoming.daiDien ||
+            incoming["Đại Diện"] ||
+            branchInfo?.representativeName ||
+            ""
+        );
+        setChucVu(
+          incoming.chucVu || incoming["Chức Vụ"] || branchInfo?.position || ""
+        );
 
         // Customer info
         setTenKH(
@@ -231,6 +165,14 @@ const GiayThoaThuanTraCham = () => {
         );
 
         // Spouse info (if available)
+        const hasSpouseData =
+          incoming.tenVoChong ||
+          incoming["Tên Vợ/Chồng"] ||
+          incoming.diaChiVoChong ||
+          incoming["Địa Chỉ Vợ/Chồng"] ||
+          incoming.cccdVoChong ||
+          incoming["CCCD Vợ/Chồng"];
+        setCoVoChong(!!hasSpouseData);
         setTenVoChong(incoming.tenVoChong || incoming["Tên Vợ/Chồng"] || "");
         setDiaChiVoChong(
           incoming.diaChiVoChong || incoming["Địa Chỉ Vợ/Chồng"] || ""
@@ -256,11 +198,30 @@ const GiayThoaThuanTraCham = () => {
           incoming.vso || incoming["VSO"] || incoming.soHopDong || ""
         );
         const contractDate =
-          incoming.contractDate ||
-          incoming.createdAt ||
-          incoming.createdDate ||
-          "";
-        setNgayHopDong(contractDate);
+          incoming.ngayXhd || incoming.createdAt || incoming.createdDate || "";
+        // Parse và set cả raw và formatted
+        if (contractDate) {
+          let dateObj;
+          if (contractDate.includes("/")) {
+            const [day, month, year] = contractDate.split("/");
+            dateObj = new Date(year, month - 1, day);
+          } else {
+            dateObj = new Date(contractDate);
+          }
+          if (!isNaN(dateObj.getTime())) {
+            const year = dateObj.getFullYear();
+            const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+            const day = String(dateObj.getDate()).padStart(2, "0");
+            setNgayHopDongRaw(`${year}-${month}-${day}`);
+            setNgayHopDong(formatDateForDisplay(`${year}-${month}-${day}`));
+          } else {
+            setNgayHopDongRaw("");
+            setNgayHopDong(contractDate);
+          }
+        } else {
+          setNgayHopDongRaw("");
+          setNgayHopDong("");
+        }
         setModelXe(
           incoming.model || incoming.dongXe || incoming["Dòng xe"] || ""
         );
@@ -282,7 +243,7 @@ const GiayThoaThuanTraCham = () => {
         const soTien = incoming.soTienTraCham || "";
         setSoTienTraCham(soTien);
         if (soTien) {
-          setSoTienTraChamBangChu(numberToWords(soTien));
+          setSoTienTraChamBangChu(vndToWords(soTien));
         }
         setThoiHanThanhToan(incoming.thoiHanThanhToan || "60");
 
@@ -296,7 +257,14 @@ const GiayThoaThuanTraCham = () => {
         setThangKy(String(today.getMonth() + 1).padStart(2, "0"));
         setNamKy(String(today.getFullYear()));
 
-        setCongTy("");
+        // Tự động điền từ branchInfo
+        if (branchInfo) {
+          setCongTy(
+            `CÔNG TY CỔ PHẦN ĐẦU TƯ THƯƠNG MẠI VÀ DỊCH VỤ Ô TÔ ĐÔNG SÀI GÒN - CHI NHÁNH ${branchInfo.shortName.toUpperCase()}`
+          );
+        } else {
+          setCongTy("");
+        }
         setMaSoDN(branchInfo?.taxCode || "0316801817-002");
         setDaiDien(branchInfo?.representativeName || "Nguyễn Thành Trai");
         setChucVu(branchInfo?.position || "Tổng Giám Đốc");
@@ -311,6 +279,7 @@ const GiayThoaThuanTraCham = () => {
 
         setModelXe("VINFAST VF 5");
         setSoHopDong("S00901-VSO-24-10-0042");
+        setNgayHopDongRaw("2024-10-08");
         setNgayHopDong("08/10/2024");
         setSoKhung("");
         setSoMay("");
@@ -326,6 +295,16 @@ const GiayThoaThuanTraCham = () => {
 
     loadData();
   }, [location.state]);
+
+  const pad = (num) => String(num).padStart(2, "0");
+
+  // Helper function to format date as dd/mm/yyyy
+  const formatDateForDisplay = (dateStr) => {
+    if (!dateStr) return "";
+    const d = new Date(dateStr);
+    if (isNaN(d)) return "";
+    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+  };
 
   const formatDate = (dateStr) => {
     if (!dateStr) return "";
@@ -443,7 +422,7 @@ const GiayThoaThuanTraCham = () => {
                   value={ngayKy}
                   onChange={(e) => setNgayKy(e.target.value)}
                   className="border-b border-gray-400 px-1 py-0 text-sm w-12 text-center focus:outline-none focus:border-blue-500"
-                  placeholder="__"
+                  placeholder=""
                 />
               </span>
               <span className="hidden print:inline mx-1">
@@ -456,7 +435,7 @@ const GiayThoaThuanTraCham = () => {
                   value={thangKy}
                   onChange={(e) => setThangKy(e.target.value)}
                   className="border-b border-gray-400 px-1 py-0 text-sm w-12 text-center focus:outline-none focus:border-blue-500"
-                  placeholder="__"
+                  placeholder=""
                 />
               </span>
               <span className="hidden print:inline mx-1">
@@ -469,7 +448,7 @@ const GiayThoaThuanTraCham = () => {
                   value={namKy}
                   onChange={(e) => setNamKy(e.target.value)}
                   className="border-b border-gray-400 px-1 py-0 text-sm w-16 text-center focus:outline-none focus:border-blue-500"
-                  placeholder="____"
+                  placeholder=""
                 />
               </span>
               <span className="hidden print:inline mx-1">
@@ -480,25 +459,22 @@ const GiayThoaThuanTraCham = () => {
           </div>
 
           {/* Company Section */}
-          <div className="mb-6">
-            <h2 className="text-base font-bold uppercase mb-3">
-              CÔNG TY
+          <div className="mb-3">
+            <h2 className="text-base font-bold uppercase mb-2">
               <span className="print:hidden">
                 <input
                   type="text"
                   value={congTy}
                   onChange={(e) => setCongTy(e.target.value)}
-                  className="border-b border-gray-400 px-2 py-1 text-sm w-full max-w-md ml-2 focus:outline-none focus:border-blue-500"
+                  className="border-b border-gray-400 px-2 py-1 w-[90%] focus:outline-none focus:border-blue-500"
                   placeholder="Nhập tên công ty"
                 />
               </span>
-              <span className="hidden print:inline ml-2">
-                {congTy || ""}
-              </span>
+              <span className="hidden print:inline">{congTy || ""}</span>
             </h2>
             <div className="text-sm space-y-2">
               <div>
-                <span className="font-semibold">Địa chỉ trụ sở chính:</span>
+                <span className="">Địa chỉ trụ sở chính:</span>
                 <span className="print:hidden">
                   <input
                     type="text"
@@ -513,7 +489,7 @@ const GiayThoaThuanTraCham = () => {
                 </span>
               </div>
               <div>
-                <span className="font-semibold">Mã số doanh nghiệp:</span>
+                <span className="">Mã số doanh nghiệp:</span>
                 <span className="print:hidden">
                   <input
                     type="text"
@@ -528,7 +504,7 @@ const GiayThoaThuanTraCham = () => {
                 </span>
               </div>
               <div>
-                <span className="font-semibold">Đại diện:</span>
+                <span className="">Đại diện:</span>
                 <span className="print:hidden">
                   <input
                     type="text"
@@ -543,7 +519,7 @@ const GiayThoaThuanTraCham = () => {
                 </span>
               </div>
               <div>
-                <span className="font-semibold">Chức vụ:</span>
+                <span className="">Chức vụ:</span>
                 <span className="print:hidden">
                   <input
                     type="text"
@@ -565,7 +541,7 @@ const GiayThoaThuanTraCham = () => {
                     value={soGiayUyQuyen}
                     onChange={(e) => setSoGiayUyQuyen(e.target.value)}
                     className="border-b border-gray-400 px-1 py-0 text-xs w-24 focus:outline-none focus:border-blue-500"
-                    placeholder="____"
+                    placeholder=""
                   />
                 </span>
                 <span className="hidden print:inline mx-1">
@@ -574,11 +550,17 @@ const GiayThoaThuanTraCham = () => {
                 ngày
                 <span className="print:hidden">
                   <input
-                    type="text"
-                    value={ngayUyQuyen}
-                    onChange={(e) => setNgayUyQuyen(e.target.value)}
+                    type="date"
+                    value={ngayUyQuyenRaw}
+                    onChange={(e) => {
+                      setNgayUyQuyenRaw(e.target.value);
+                      if (e.target.value) {
+                        setNgayUyQuyen(formatDateForDisplay(e.target.value));
+                      } else {
+                        setNgayUyQuyen("");
+                      }
+                    }}
                     className="border-b border-gray-400 px-1 py-0 text-xs w-24 focus:outline-none focus:border-blue-500"
-                    placeholder="____"
                   />
                 </span>
                 <span className="hidden print:inline mx-1">
@@ -586,13 +568,13 @@ const GiayThoaThuanTraCham = () => {
                 </span>
                 )
               </div>
-              <p className="font-bold">(Bên Bán)</p>
+              <p className="font-bold">("Bên Bán")</p>
             </div>
           </div>
 
           {/* Separator */}
-          <div className="text-center mb-6">
-            <p className="text-base font-bold">VÀ</p>
+          <div className="mb-3">
+            <p className="font-bold">VÀ</p>
           </div>
 
           {/* Customer Section */}
@@ -604,7 +586,7 @@ const GiayThoaThuanTraCham = () => {
                   type="text"
                   value={tenKH}
                   onChange={(e) => setTenKH(e.target.value)}
-                  className="border-b border-gray-400 px-2 py-1 text-sm w-64 ml-2 focus:outline-none focus:border-blue-500"
+                  className="border-b border-gray-400 px-2 py-1 text-sm w-[90%] ml-2 focus:outline-none focus:border-blue-500"
                   placeholder="Nhập tên khách hàng"
                 />
               </span>
@@ -614,13 +596,13 @@ const GiayThoaThuanTraCham = () => {
             </h2>
             <div className="text-sm space-y-2">
               <div>
-                <span className="font-semibold">Địa chỉ:</span>
+                <span className="">Địa chỉ:</span>
                 <span className="print:hidden">
                   <input
                     type="text"
                     value={diaChiKH}
                     onChange={(e) => setDiaChiKH(e.target.value)}
-                    className="border-b border-gray-400 px-2 py-1 text-sm w-full max-w-md focus:outline-none focus:border-blue-500"
+                    className="border-b border-gray-400 px-2 py-1 text-sm w-[90%] focus:outline-none focus:border-blue-500"
                     placeholder="Nhập địa chỉ"
                   />
                 </span>
@@ -629,7 +611,7 @@ const GiayThoaThuanTraCham = () => {
                 </span>
               </div>
               <div>
-                <span className="font-semibold">Điện thoại:</span>
+                <span className="">Điện thoại:</span>
                 <span className="print:hidden">
                   <input
                     type="text"
@@ -644,7 +626,7 @@ const GiayThoaThuanTraCham = () => {
                 </span>
               </div>
               <div>
-                <span className="font-semibold">Mã số thuế:</span>
+                <span className="">Mã số thuế:</span>
                 <span className="print:hidden">
                   <input
                     type="text"
@@ -659,8 +641,7 @@ const GiayThoaThuanTraCham = () => {
                 </span>
               </div>
               <div>
-                <span className="font-semibold">Căn cước/CCCD/Hộ chiếu:</span>{" "}
-                Số
+                <span className="">Căn cước/CCCD/Hộ chiếu:</span> Số
                 <span className="print:hidden">
                   <input
                     type="text"
@@ -673,20 +654,7 @@ const GiayThoaThuanTraCham = () => {
                 <span className="hidden print:inline mx-1">
                   {soCCCDKH || "______"}
                 </span>
-                cấp ngày
-                <span className="print:hidden">
-                  <input
-                    type="text"
-                    value={ngayCapKH}
-                    onChange={(e) => setNgayCapKH(e.target.value)}
-                    className="border-b border-gray-400 px-1 py-0 text-sm w-24 focus:outline-none focus:border-blue-500"
-                    placeholder="____"
-                  />
-                </span>
-                <span className="hidden print:inline mx-1">
-                  {ngayCapKH || "____"}
-                </span>
-                bởi
+                cấp ngày {formatDateForDisplay(ngayCapKH)} bởi
                 <span className="print:hidden">
                   <input
                     type="text"
@@ -703,13 +671,25 @@ const GiayThoaThuanTraCham = () => {
             </div>
           </div>
 
+          {/* Checkbox for spouse */}
+          <div className="print:hidden mb-2">
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={coVoChong}
+                onChange={(e) => setCoVoChong(e.target.checked)}
+                className="mr-2"
+              />
+              Có vợ/chồng
+            </label>
+          </div>
+
           {/* Spouse Section */}
-          {(tenVoChong ||
-            diaChiVoChong ||
-            dienThoaiVoChong ||
-            soCCCDVoChong) && (
+          {coVoChong && (
             <div className="mb-6">
-              <h2 className="text-base font-bold mb-3">Có vợ/chồng là</h2>
+              <h2 className="text-base font-bold italic mb-3">
+                Có vợ/chồng là
+              </h2>
               <div className="text-sm space-y-2">
                 <div>
                   <span className="font-semibold">Ông/Bà</span>
@@ -718,7 +698,7 @@ const GiayThoaThuanTraCham = () => {
                       type="text"
                       value={tenVoChong}
                       onChange={(e) => setTenVoChong(e.target.value)}
-                      className="border-b border-gray-400 px-2 py-1 text-sm w-48 focus:outline-none focus:border-blue-500"
+                      className="border-b border-gray-400 px-2 py-1 text-sm w-[90%] focus:outline-none focus:border-blue-500"
                       placeholder="Nhập tên vợ/chồng"
                     />
                   </span>
@@ -727,13 +707,13 @@ const GiayThoaThuanTraCham = () => {
                   </span>
                 </div>
                 <div>
-                  <span className="font-semibold">Địa chỉ:</span>
+                  <span className="">Địa chỉ:</span>
                   <span className="print:hidden">
                     <input
                       type="text"
                       value={diaChiVoChong}
                       onChange={(e) => setDiaChiVoChong(e.target.value)}
-                      className="border-b border-gray-400 px-2 py-1 text-sm w-full max-w-md focus:outline-none focus:border-blue-500"
+                      className="border-b border-gray-400 px-2 py-1 text-sm w-[90%] focus:outline-none focus:border-blue-500"
                       placeholder="Nhập địa chỉ"
                     />
                   </span>
@@ -742,7 +722,7 @@ const GiayThoaThuanTraCham = () => {
                   </span>
                 </div>
                 <div>
-                  <span className="font-semibold">Điện thoại:</span>
+                  <span className="">Điện thoại:</span>
                   <span className="print:hidden">
                     <input
                       type="text"
@@ -757,7 +737,7 @@ const GiayThoaThuanTraCham = () => {
                   </span>
                 </div>
                 <div>
-                  <span className="font-semibold">Mã số thuế:</span>
+                  <span className="">Mã số thuế:</span>
                   <span className="print:hidden">
                     <input
                       type="text"
@@ -772,8 +752,7 @@ const GiayThoaThuanTraCham = () => {
                   </span>
                 </div>
                 <div>
-                  <span className="font-semibold">Căn cước/CCCD/Hộ chiếu:</span>{" "}
-                  Số
+                  <span className="">Căn cước/CCCD/Hộ chiếu:</span> Số
                   <span className="print:hidden">
                     <input
                       type="text"
@@ -789,11 +768,20 @@ const GiayThoaThuanTraCham = () => {
                   cấp ngày
                   <span className="print:hidden">
                     <input
-                      type="text"
-                      value={ngayCapVoChong}
-                      onChange={(e) => setNgayCapVoChong(e.target.value)}
+                      type="date"
+                      value={formatDate(ngayCapVoChong)}
+                      onChange={(e) => {
+                        setNgayCapVoChongRaw(e.target.value);
+                        if (e.target.value) {
+                          setNgayCapVoChong(
+                            formatDateForDisplay(e.target.value)
+                          );
+                        } else {
+                          setNgayCapVoChong("");
+                        }
+                      }}
                       className="border-b border-gray-400 px-1 py-0 text-sm w-24 focus:outline-none focus:border-blue-500"
-                      placeholder="____"
+                      placeholder=""
                     />
                   </span>
                   <span className="hidden print:inline mx-1">
@@ -817,12 +805,13 @@ const GiayThoaThuanTraCham = () => {
             </div>
           )}
 
-          <p className="text-sm mb-6 font-bold">(Khách Hàng)</p>
+          <p className="text-sm mb-3 font-bold">("Khách Hàng")</p>
 
           {/* Parties Definition */}
-          <p className="text-sm mb-6">
-            Bên Bán và Khách Hàng sau đây được gọi riêng là "Bên" và gọi chung
-            là "Các Bên"
+          <p className="text-sm mb-3">
+            <strong>Bên Bán</strong> và <strong>Khách Hàng</strong> sau đây được
+            gọi riêng là <strong>"Bên"</strong> và gọi chung là{" "}
+            <strong>"Các Bên"</strong>
           </p>
 
           {/* WHEREAS Section */}
@@ -940,38 +929,39 @@ const GiayThoaThuanTraCham = () => {
             {/* Section 2 */}
             <div className="space-y-2">
               <p>
-                2. Khách Hàng mua xe theo Chương trình mua xe 0 đồng ("Chương
-                Trình"), thuộc trường hợp được Bên Bán áp dụng chính sách thúc
-                đẩy bán hàng theo đó Bên Bán sẽ cho Khách Hàng thanh toán chậm
-                một khoản tiền tương đương tối đa Giá Trị Thanh Toán trừ đi
-                khoản tiền Khách Hàng vay tổ chức tín dụng để mua xe, và đảm bảo
-                không cao hơn 10% Giá Trị Thanh Toán trong thời hạn tối đa 60
-                tháng ("Khoản Trả Chậm"). Chương Trình áp dụng cho (các) khách
-                hàng thỏa mãn đầy đủ các điều kiện sau:
+                2. Khách Hàng mua xe theo Chương trình mua xe 0 đồng (“
+                <strong>Chương Trình</strong>”), thuộc trường hợp được Bên Bán
+                áp dụng chính sách thúc đẩy bán hàng theo đó Bên Bán sẽ cho
+                Khách Hàng thanh toán chậm một khoản tiền tương đương tối đa Giá
+                Trị Thanh Toán trừ đi khoản tiền Khách Hàng vay tổ chức tín dụng
+                để mua xe, và đảm bảo không cao hơn 10% Giá Trị Thanh Toán trong
+                thời hạn tối đa 60 tháng (“<strong>Khoản Trả Chậm</strong>”).
+                Chương Trình áp dụng cho (các) khách hàng thỏa mãn đầy đủ các
+                điều kiện sau:
               </p>
-              <ul className="list-disc ml-6 space-y-1">
-                <li>
-                  Mua xe Herio Green hoặc VF5 và được xuất hóa đơn từ ngày
+              <div className="ml-6 space-y-1">
+                <p>
+                  - Mua xe Herio Green hoặc VF5 và được xuất hóa đơn từ ngày
                   13/09/2025 đến hết ngày 31/12/2025.
-                </li>
-                <li>
-                  Đã được tổ chức tín dụng đối tác thuộc danh sách do VinFast
+                </p>
+                <p>
+                  - Đã được tổ chức tín dụng đối tác thuộc danh sách do VinFast
                   thông báo theo từng thời kỳ ra thông báo cho vay để mua xe
                   ("Ngân Hàng Cho Vay").
-                </li>
-                <li>
-                  Các điều kiện khác của Chương Trình đã được VinFast công bố
+                </p>
+                <p>
+                  - Các điều kiện khác của Chương Trình đã được VinFast công bố
                   tại thời điểm ký kết Thỏa Thuận này bao gồm nhưng không giới
                   hạn thông báo triển khai Chương Trình tại Phụ lục 01 đính kèm
                   Thỏa Thuận này.
-                </li>
-                <li>
-                  Không được áp dụng đồng thời mức hỗ trợ lãi suất của "Chương
+                </p>
+                <p>
+                  - Không được áp dụng đồng thời mức hỗ trợ lãi suất của "Chương
                   trình ưu đãi chuyển đổi xanh", ưu đãi chính sách "Vì Thủ Đô
                   trong xanh" và "Sài Gòn xanh" và các chương trình hỗ trợ lãi
                   vay khác do VinFast thông báo theo từng thời kỳ.
-                </li>
-              </ul>
+                </p>
+              </div>
             </div>
 
             {/* Section 3 */}
@@ -987,7 +977,7 @@ const GiayThoaThuanTraCham = () => {
             </div>
 
             {/* Section 4 */}
-            <div>
+            <div className="mb-3">
               <p>
                 4. VinFast có thể ủy quyền cho tổ chức tín dụng thực hiện một
                 phần hoặc toàn bộ công việc nêu tại Mục 3 trên đây để thu Khoản
@@ -998,9 +988,9 @@ const GiayThoaThuanTraCham = () => {
 
             {/* DO VẬY Section */}
             <div>
-              <p className="font-bold mb-3">
-                DO VẬY, để thực hiện Chương Trình nêu trên, Các Bên thống nhất
-                ký kết Thỏa Thuận này với những nội dung như sau:
+              <p className="mb-3">
+                <strong>DO VẬY</strong>, để thực hiện Chương Trình nêu trên, Các
+                Bên thống nhất ký kết Thỏa Thuận này với những nội dung như sau:
               </p>
             </div>
 
@@ -1013,9 +1003,9 @@ const GiayThoaThuanTraCham = () => {
               </p>
 
               {/* 1.1 */}
-              <div className="ml-4 space-y-2">
+              <div className="space-y-2">
                 <span className="">1.1. Chính sách trả chậm:</span>
-                <div className="space-y-2">
+                <div className="space-y-2 ml-8">
                   <p>
                     <span>a) Số tiền Khách Hàng được trả chậm:</span>
                     <span className="print:hidden">
@@ -1025,7 +1015,7 @@ const GiayThoaThuanTraCham = () => {
                         onChange={(e) => {
                           const val = e.target.value.replace(/\D/g, "");
                           setSoTienTraCham(val);
-                          setSoTienTraChamBangChu(numberToWords(val));
+                          setSoTienTraChamBangChu(vndToWords(val));
                         }}
                         className="border-b border-gray-400 px-2 py-1 text-sm w-48 ml-2 focus:outline-none focus:border-blue-500"
                         placeholder="Nhập số tiền"
@@ -1069,8 +1059,8 @@ const GiayThoaThuanTraCham = () => {
                     </span>
                     <span className="hidden print:inline ml-2">
                       {thoiHanThanhToan || "60"}
-                    </span>
-                    {" "}tháng.
+                    </span>{" "}
+                    tháng.
                   </p>
                   <p>
                     <span>d) Kỳ hạn thanh toán:</span> Ngày
@@ -1087,17 +1077,14 @@ const GiayThoaThuanTraCham = () => {
                       {ngayTraNo || "____"}
                     </span>
                     hàng tháng cho đến khi Khách Hàng hoàn tất nghĩa vụ thanh
-                    toán.<sup>3</sup>
-                  </p>
-                  <p className="mt-2">
-                    Kỳ thanh toán đầu tiên là tháng T+1 trong đó: tháng T là
-                    tháng mà Bên Bán bàn giao xe cho Khách Hàng.
+                    toán. Kỳ thanh toán đầu tiên là tháng T+1 trong đó: tháng T
+                    là tháng mà Bên Bán bàn giao xe cho Khách Hàng.
                   </p>
                 </div>
               </div>
 
               {/* 1.2 */}
-              <div className="ml-4 mt-4">
+              <div className="mt-4">
                 <span>
                   1.2. Trong trường hợp đến kỳ hạn thanh toán theo quy định tại
                   Thỏa Thuận này mà Khách Hàng thanh toán chậm và/hoặc không đầy
@@ -1110,29 +1097,28 @@ const GiayThoaThuanTraCham = () => {
               </div>
 
               {/* 1.3 */}
-              <div className="ml-4 mt-4">
+              <div className="mt-4">
                 <span className="">1.3. Hình thức thanh toán: </span>
                 <span className="mb-2">
-                  Khách Hàng có thể lựa chọn một trong các hình thức thanh toán
-                  sau đây hoặc các hình thức khác do VinFast thông báo theo từng
-                  thời kỳ:
+                  Khách Hàng có thể lựa chọn các hình thức thanh toán bên dưới
+                  hoặc các hình thức khác (nếu có) được VinFast thông báo tùy
+                  từng thời kỳ.
                 </span>
-                <div className="ml-4 space-y-2">
+                <div className="ml-8 space-y-2">
                   <p>
                     a) Thanh toán tự động qua dịch vụ thu hộ định kỳ hàng tháng
                     của Ngân Hàng Thu Hộ được quy định tại Phụ lục 02 đính kèm
                     Thỏa Thuận này.
                   </p>
-                  <p className="ml-4">
-                    Trong trường hợp Khách Hàng lựa chọn hình thức thanh toán
-                    tại điểm a) nêu trên, Khách Hàng đồng ý cho phép VinFast
-                    cung cấp dữ liệu cá nhân của Khách Hàng (bao gồm hình ảnh
-                    hoặc thông tin từ căn cước/CCCD, hộ chiếu hoặc một phần
-                    thông tin định danh điện tử của Khách Hàng) cho Ngân Hàng
-                    Thu Hộ. Mục đích của việc cung cấp dữ liệu cá nhân này là để
-                    thực hiện yêu cầu của Khách Hàng và VinFast sẽ xử lý yêu cầu
-                    này phù hợp với quy định của pháp luật hiện hành về bảo vệ
-                    dữ liệu cá nhân.
+                  <p className="">
+                    Trong trường hợp Khách Hàng chọn hình thức thanh toán tại
+                    điểm a) này, Khách Hàng theo đây đồng ý để VinFast cung cấp
+                    dữ liệu cá nhân của Khách Hàng, bao gồm hình ảnh hoặc thông
+                    tin căn cước công dân, hộ chiếu hoặc một phần của danh tính
+                    điện tử của cá nhân, cho Ngân Hàng Thu Hộ nhằm mục đích thực
+                    hiện yêu cầu của Khách Hàng tại điểm a) này. VinFast theo đó
+                    sẽ thực hiện yêu cầu của Khách Hàng phù hợp với quy định
+                    pháp luật về bảo vệ dữ liệu cá nhân hiện hành.
                   </p>
                   <p>
                     b) Khách Hàng thanh toán trực tiếp vào tài khoản của VinFast
@@ -1146,18 +1132,18 @@ const GiayThoaThuanTraCham = () => {
             </div>
 
             {/* Điều 2 */}
-            <div className="mt-6 space-y-4">
+            <div className="mt-3 space-y-4">
               <h3 className="font-bold">
                 Điều 2. Quyền và nghĩa vụ của các Bên
               </h3>
 
               {/* 2.1 */}
-              <div className="ml-4 space-y-2">
+              <div className="space-y-2">
                 <h4 className="">2.1. Quyền và nghĩa vụ của Bên Bán:</h4>
-                <div className="ml-4 space-y-1">
+                <div className="ml-8 space-y-1">
                   <p>
-                    a) Hỗ trợ Khách Hàng thanh toán chậm theo Chương Trình và
-                    các điều khoản của Thỏa Thuận này.
+                    a) Hỗ trợ Khách Hàng được trả chậm theo Chương Trình và theo
+                    điều khoản và điều kiện của Thỏa Thuận này.
                   </p>
                   <p>
                     b) Yêu cầu Khách Hàng thanh toán đầy đủ và đúng hạn Khoản
@@ -1166,8 +1152,8 @@ const GiayThoaThuanTraCham = () => {
                     Thỏa Thuận này và các văn bản khác có liên quan.
                   </p>
                   <p>
-                    c) Ủy quyền vô điều kiện và không hủy ngang cho VinFast thực
-                    hiện các biện pháp phù hợp để yêu cầu Khách Hàng thanh toán
+                    c) Ủy quyền vô điều kiện, không hủy ngang cho VinFast, thực
+                    hiện các biện pháp yêu cầu Khách Hàng thanh toán phù hợp
                     theo quy định của pháp luật và Thỏa Thuận này trong trường
                     hợp Khách Hàng vi phạm nghĩa vụ thanh toán.
                   </p>
@@ -1179,57 +1165,55 @@ const GiayThoaThuanTraCham = () => {
                 <h4 className="">2.2. Quyền và nghĩa vụ của Khách Hàng:</h4>
                 <div className="ml-4">
                   <p>
-                    a) Được hưởng chính sách thanh toán chậm một phần Giá Trị
-                    Thanh Toán theo quy định của Chương Trình và Thỏa Thuận này
-                    khi đáp ứng đầy đủ các điều kiện.
+                    a) Được trả chậm một phần Giá Trị Thanh Toán theo quy định
+                    của Chương Trình và Thỏa Thuận này khi đáp ứng đủ điều kiện.
                   </p>
                   <p>
-                    b) Hiểu rõ và đồng ý thanh toán đầy đủ và đúng hạn Khoản Trả
-                    Chậm và các khoản phí, lãi suất phạt, chi phí phát sinh khác
-                    (nếu có) cho VinFast hoặc Ngân Hàng Thu Hộ do VinFast chỉ
-                    định theo Thỏa Thuận này.
+                    b) Hiểu và chấp thuận việc thanh toán đầy đủ và đúng hạn
+                    Khoản Trả Chậm và/hoặc các khoản phí, lãi phạt và chi phí
+                    phát sinh khác liên quan (nếu có) cho VinFast hoặc Ngân Hàng
+                    Thu Hộ do VinFast chỉ định theo quy định của Thỏa Thuận này.
                   </p>
                   <p>
-                    c) Có quyền thanh toán trước hạn một phần hoặc toàn bộ Khoản
-                    Trả Chậm.
+                    c) Khách Hàng được quyền thanh toán trước hạn một phần/toàn
+                    bộ Khoản Trả Chậm.
                   </p>
                   <p>
-                    d) Phải thanh toán trước hạn và thanh toán đầy đủ Khoản Trả
-                    Chậm trước khi ký kết bất kỳ văn bản chuyển nhượng nào đối
-                    với Hợp Đồng Mua Bán Xe và/hoặc trước khi xe là đối tượng
-                    của hợp đồng mua bán/chuyển nhượng với bất kỳ bên thứ ba nào
-                    khác.
+                    d) Khách Hàng phải thanh toán trước hạn và tất toán Khoản
+                    Trả Chậm trước khi Khách Hàng ký Văn bản chuyển nhượng Hợp
+                    Đồng Mua Bán Xe và/hoặc xe ô tô là đối tượng của hợp đồng
+                    mua bán/chuyển nhượng với bất kỳ bên thứ ba nào khác.
                   </p>
                   <p>
-                    e) Trong trường hợp Khách Hàng vi phạm các điều kiện của
-                    Chương Trình hoặc các nghĩa vụ khác theo Thỏa Thuận này,
-                    toàn bộ Khoản Trả Chậm còn lại và/hoặc các khoản phí, lãi
-                    phạt và chi phí phát sinh khác liên quan sẽ trở thành khoản
-                    nợ đến hạn ngay lập tức. VinFast có quyền áp dụng các chương
-                    trình hỗ trợ lãi suất hoặc chương trình hỗ trợ thanh toán
-                    cho Khách Hàng khi Khách Hàng vay vốn để mua xe tại Ngân
-                    Hàng Cho Vay (nếu có).
+                    e) Khi Khách Hàng vi phạm các điều kiện tham gia Chương
+                    Trình quy định tại mục 2 phần Xét Rằng và/hoặc các điều
+                    kiện, nghĩa vụ khác theo quy định tại Thỏa Thuận này, tất cả
+                    các Khoản Trả Chậm còn lại và/hoặc các khoản phí, lãi phạt
+                    và chi phí phát sinh khác liên quan (nếu có) theo Thỏa Thuận
+                    này sẽ ngay lập tức đến hạn và VinFast có quyền dừng áp dụng
+                    các chương trình hỗ trợ lãi vay, hỗ trợ trả thay cho Khách
+                    Hàng khi vay vốn mua xe tại Ngân Hàng Cho Vay (nếu có).
                   </p>
                   <p>
-                    f) Bằng việc ký kết Thỏa Thuận này, Khách Hàng đồng ý cho
-                    phép VinFast và Bên Bán xử lý thông tin và dữ liệu cá nhân
-                    của Khách Hàng theo "Chính Sách Bảo Vệ Dữ Liệu Cá Nhân" của
-                    VinFast được công bố tại{" "}
+                    f)Bằng việc ký vào Thỏa Thuận này, Khách Hàng theo đây đồng
+                    ý cho phép VinFast và Bên Bán xử lý thông tin, dữ liệu cá
+                    nhân của mình theo Chính Sách Bảo Vệ Dữ Liệu Cá Nhân của
+                    VinFast công bố tại{" "}
                     <span className="text-blue-600 underline">
                       https://vinfastauto.com/vn_vi/privacy-policy
                     </span>{" "}
-                    và pháp luật hiện hành về bảo vệ dữ liệu cá nhân.
+                    và quy định pháp luật hiện hành về bảo vệ dữ liệu cá nhân.
                   </p>
                 </div>
               </div>
             </div>
 
             {/* Điều 3 */}
-            <div className="mt-6 space-y-4">
+            <div className="mt-3 space-y-4">
               <h3 className="font-bold">Điều 3. Biện pháp can thiệp</h3>
 
               {/* 3.1 */}
-              <div className="ml-4 space-y-2">
+              <div className="space-y-2">
                 <span className="">
                   3.1. Để phục vụ hoạt động VinFast yêu cầu thanh toán và/hoặc
                   yêu cầu Khách Hàng thực hiện nghĩa vụ khác theo Thỏa Thuận
@@ -1238,7 +1222,7 @@ const GiayThoaThuanTraCham = () => {
                   <strong>Đơn Vị Hỗ Trợ Kỹ Thuật</strong>”) thực hiện các công
                   việc sau:
                 </span>{" "}
-                <div className="ml-4 space-y-2">
+                <div className="ml-8 space-y-2">
                   <p>
                     a) Thu thập, xử lý và sử dụng thông tin về xe, dữ liệu trong
                     xe và dữ liệu định vị xe của Khách Hàng trong suốt thời hạn
@@ -1262,12 +1246,11 @@ const GiayThoaThuanTraCham = () => {
               </div>
 
               {/* 3.2 */}
-              <div className="ml-4 space-y-2">
-                <span className="">3.2. </span>
-                <span>
-                  Khách Hàng đồng ý phối hợp, không cản trở và không có ý kiến
-                  gì khác khi VinFast/Đơn Vị Hỗ Trợ Kỹ Thuật và bất kỳ cán bộ
-                  nhân viên liên quan của các Bên thực hiện các nội dung quy
+              <div className="space-y-2">
+                <span className="">
+                  3.2. Khách Hàng đồng ý phối hợp, không cản trở và không có ý
+                  kiến gì khác khi VinFast/Đơn Vị Hỗ Trợ Kỹ Thuật và bất kỳ cán
+                  bộ nhân viên liên quan của các Bên thực hiện các nội dung quy
                   định tại Điều 3.1 trên đây và tự mình chịu trách nhiệm đối với
                   bất kỳ tổn thất, thiệt hại phát sinh từ hoặc liên quan đến
                   việc thực hiện Điều 3 này, ngay cả sau khi Thỏa Thuận đã chấm
@@ -1277,94 +1260,88 @@ const GiayThoaThuanTraCham = () => {
             </div>
 
             {/* Điều 4 */}
-            <div className="mt-6 space-y-4">
+            <div className="mt-3 space-y-4">
               <h3 className="font-bold">Điều 4. Cam kết của Khách Hàng</h3>
 
               {/* 4.1 */}
-              <div className="ml-4 space-y-2">
-                <span className="">4.1. </span>
-                <span>
-                  Khách Hàng cam kết hoàn tất toàn bộ hồ sơ vay vốn với Ngân
-                  Hàng Cho Vay trong thời hạn tối đa 30 ngày kể từ ngày Khách
-                  Hàng được cấp đăng ký xe (cà vẹt) từ cơ quan có thẩm quyền. Để
-                  làm rõ “<span className="italic">hoàn tất hồ sơ vay vốn</span>
-                  ” được hiểu là việc Khách Hàng đã ký kết đầy đủ hợp đồng tín
-                  dụng, hợp đồng thế chấp (nếu có), và thực hiện toàn bộ nghĩa
-                  vụ cung cấp giấy tờ, ký nhận, cũng như các thủ tục cần thiết
-                  khác theo yêu cầu của Ngân Hàng để khoản vay mua xe của Khách
-                  Hàng được giải ngân cho Bên Bán.
+              <div className="space-y-2">
+                <span className="">
+                  4.1. Khách Hàng cam kết hoàn tất toàn bộ hồ sơ vay vốn với
+                  Ngân Hàng Cho Vay trong thời hạn tối đa 30 ngày kể từ ngày
+                  Khách Hàng được cấp đăng ký xe (cà vẹt) từ cơ quan có thẩm
+                  quyền. Để làm rõ <em>“hoàn tất hồ sơ vay vốn”</em> được hiểu
+                  là việc Khách Hàng đã ký kết đầy đủ hợp đồng tín dụng, hợp
+                  đồng thế chấp (nếu có), và thực hiện toàn bộ nghĩa vụ cung cấp
+                  giấy tờ, ký nhận, cũng như các thủ tục cần thiết khác theo yêu
+                  cầu của Ngân Hàng để khoản vay mua xe của Khách Hàng được giải
+                  ngân cho Bên Bán.
                 </span>
               </div>
 
               {/* 4.2 */}
-              <div className="ml-4 space-y-2">
-                <span className="">4.2. </span>
-                <span>
-                  Trường hợp Khách Hàng không hoàn thành nghĩa vụ nêu trên hoặc
-                  giao dịch với Ngân Hàng Cho Vay bị từ chối/đình chỉ do lỗi của
-                  Khách Hàng, thì Khách Hàng cam kết bồi thường cho Bên Bán toàn
-                  bộ các chi phí, tổn thất và nghĩa vụ tài chính mà Bên Bán phải
-                  gánh chịu phát sinh từ việc Khách Hàng không hoàn thành hồ sơ
-                  vay vốn, bao gồm nhưng không giới hạn ở: chi phí quản lý, xử
-                  lý hành chính; các khoản phạt, phí phát sinh với cơ quan Nhà
-                  nước hoặc đối tác thứ ba; các khoản thiệt hại khác có liên
-                  quan trực tiếp.
+              <div className="space-y-2">
+                <span className="">
+                  4.2. Trường hợp Khách Hàng không hoàn thành nghĩa vụ nêu trên
+                  hoặc giao dịch với Ngân Hàng Cho Vay bị từ chối/đình chỉ do
+                  lỗi của Khách Hàng, thì Khách Hàng cam kết bồi thường cho Bên
+                  Bán toàn bộ các chi phí, tổn thất và nghĩa vụ tài chính mà Bên
+                  Bán phải gánh chịu phát sinh từ việc Khách Hàng không hoàn
+                  thành hồ sơ vay vốn, bao gồm nhưng không giới hạn ở: chi phí
+                  quản lý, xử lý hành chính; các khoản phạt, phí phát sinh với
+                  cơ quan Nhà nước hoặc đối tác thứ ba; các khoản thiệt hại khác
+                  có liên quan trực tiếp.
                 </span>
               </div>
             </div>
 
             {/* Điều 5 */}
-            <div className="mt-6 space-y-4">
+            <div className="mt-3 space-y-4">
               <h3 className="font-bold">Điều 5. Hiệu lực của Thỏa Thuận</h3>
 
               {/* 5.1 */}
-              <div className="ml-4 space-y-2">
-                <span className="">5.1. </span>
-                <span>
-                  Thỏa Thuận này có hiệu lực kể từ ngày ký kết và có hiệu lực
-                  cho đến khi các Bên đã thực hiện đầy đủ các nghĩa vụ của mình
-                  theo Thỏa Thuận này.
+              <div className="space-y-2">
+                <span className="">
+                  5.1. Thỏa Thuận này có hiệu lực kể từ ngày ký cho đến khi Các
+                  Bên hoàn thành nghĩa vụ theo Thỏa Thuận này.
                 </span>
               </div>
 
               {/* 5.2 */}
-              <div className="ml-4 space-y-2">
-                <span className="">5.2. </span>
-                <span>
-                  Bên Bán và Khách Hàng đồng ý không được chuyển nhượng hoặc
-                  chuyển giao quyền và nghĩa vụ của mình cho bất kỳ bên thứ ba
-                  nào mà không có sự đồng ý trước bằng văn bản của VinFast.
+              <div className="space-y-2">
+                <span className="">
+                  5.2. Bên Bán và Khách Hàng đồng ý và cam kết không chuyển
+                  nhượng, chuyển giao quyền và nghĩa vụ của mình theo Thỏa Thuận
+                  này cho bất kỳ bên thứ ba nào nếu không được chấp thuận trước
+                  bằng văn bản của VinFast.
                 </span>
               </div>
 
               {/* 5.3 */}
-              <div className="ml-4 space-y-2">
-                <span className="">5.3. </span>
-                <span>
-                  Mọi sửa đổi, bổ sung của Thỏa Thuận này phải được VinFast chấp
-                  thuận, được lập thành văn bản và được ký kết bởi người đại
-                  diện hợp pháp của các Bên. Các sửa đổi, bổ sung không được
-                  VinFast chấp thuận sẽ không có hiệu lực.
+              <div className="space-y-2">
+                <span className="">
+                  5.3. Mọi sửa đổi, bổ sung Thỏa Thuận này phải được VinFast
+                  chấp thuận và lập thành văn bản và được ký bởi người đại diện
+                  hợp pháp của mỗi Bên. Các thay đổi không được VinFast chấp
+                  thuận theo quy định này sẽ bị xem là vô hiệu và không có giá
+                  trị pháp lý.
                 </span>
               </div>
 
               {/* 5.4 */}
-              <div className="ml-4 space-y-2">
-                <span className="">5.4. </span>
-                <span>
-                  Thỏa Thuận này được điều chỉnh bởi pháp luật Việt Nam. Mọi
-                  tranh chấp phát sinh từ hoặc liên quan đến Thỏa Thuận này mà
-                  không thể giải quyết thông qua thương lượng hoặc hòa giải sẽ
-                  được giải quyết bởi Tòa án có thẩm quyền.
+              <div className="space-y-2">
+                <span className="">
+                  5.4. Thỏa Thuận này được điều chỉnh theo các quy định của pháp
+                  luật Việt Nam. Mọi tranh chấp phát sinh từ Thỏa Thuận này nếu
+                  không được giải quyết bằng thương lượng và hòa giải giữa Các
+                  Bên, thì sẽ được giải quyết tại Tòa án có thẩm quyền.
                 </span>
               </div>
 
               {/* 5.5 */}
-              <div className="ml-4 space-y-2">
-                <span className="">5.5. </span>
-                <span>
-                  Thỏa Thuận này được lập thành 04 (bốn) bản có giá trị pháp lý
-                  như nhau, mỗi Bên giữ 02 (hai) bản.
+              <div className="space-y-2">
+                <span className="">
+                  5.5. Thỏa Thuận này được lập thành 04 (bốn) bản có giá trị như
+                  nhau, mỗi Bên giữ 02 (hai) bản để thực hiện.
                 </span>
               </div>
             </div>

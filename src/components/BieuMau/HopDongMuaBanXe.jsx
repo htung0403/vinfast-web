@@ -10,6 +10,7 @@ import {
   uniqueNgoaiThatColors,
   uniqueNoiThatColors,
 } from "../../data/calculatorData";
+import { vndToWords } from "../../utils/vndToWords";
 
 const HopDongMuaBanXe = () => {
   const location = useLocation();
@@ -21,6 +22,7 @@ const HopDongMuaBanXe = () => {
   // Input fields for [---] placeholders
   const [giayUyQuyen1, setGiayUyQuyen1] = useState("");
   const [giayUyQuyen1Ngay, setGiayUyQuyen1Ngay] = useState("");
+  const [giayUyQuyen1NgayRaw, setGiayUyQuyen1NgayRaw] = useState("");
   const [giayUyQuyen2, setGiayUyQuyen2] = useState("");
   const [giayUyQuyen2Ngay, setGiayUyQuyen2Ngay] = useState("");
   const [giayUyQuyen2NgayRaw, setGiayUyQuyen2NgayRaw] = useState("");
@@ -35,6 +37,8 @@ const HopDongMuaBanXe = () => {
   const [diaDiemGiaoXe, setDiaDiemGiaoXe] = useState("");
   const [thoiGianGiaoXe, setThoiGianGiaoXe] = useState("");
   const [thoiGianGiaoXeRaw, setThoiGianGiaoXeRaw] = useState("");
+  const [bankAccount, setBankAccount] = useState("");
+  const [bankName, setBankName] = useState("");
   const [uuDai, setUuDai] = useState("");
   const [isEditingUuDai, setIsEditingUuDai] = useState(false);
   const [taxCodeOrg, setTaxCodeOrg] = useState("");
@@ -154,6 +158,9 @@ const HopDongMuaBanXe = () => {
         setCompanyName(branchInfo.name || "");
         setCompanyAddress(branchInfo.address || "");
         setCompanyTaxCode(branchInfo.taxCode || "");
+        // Initialize bank fields from branch
+        setBankAccount(branchInfo.bankAccount || "");
+        setBankName(branchInfo.bankName || "");
         // Initialize customer fields from processed data
         setCustomerName(processedData.customerName || "");
         setCustomerAddress(processedData.customerAddress || "");
@@ -195,9 +202,14 @@ const HopDongMuaBanXe = () => {
         setCompanyName(branchInfo.name || "");
         setCompanyAddress(branchInfo.address || "");
         setCompanyTaxCode(branchInfo.taxCode || "");
+        // Initialize bank fields from branch
+        setBankAccount(branchInfo.bankAccount || "");
+        setBankName(branchInfo.bankName || "");
         // Initialize customer fields from default data
         setCustomerName("NGÔ NGUYỄN HOÀI NAM");
-        setCustomerAddress("Số 72/14 Đường tỉnh lộ 7, Ấp Bình Hạ, Thái Mỹ, Củ Chi, Tp Hồ Chí Minh");
+        setCustomerAddress(
+          "Số 72/14 Đường tỉnh lộ 7, Ấp Bình Hạ, Thái Mỹ, Củ Chi, Tp Hồ Chí Minh"
+        );
         setCustomerPhone("0901234567");
         setCustomerEmail("example@email.com");
       }
@@ -206,6 +218,26 @@ const HopDongMuaBanXe = () => {
 
     loadData();
   }, [location.state]);
+
+  // Tự động điền tên showroom vào địa điểm giao xe khi branch được load
+  // Chỉ điền khi diaDiemGiaoXe chưa có giá trị để không ghi đè giá trị người dùng đã nhập
+  useEffect(() => {
+    if (branch && branch.name && !diaDiemGiaoXe) {
+      setDiaDiemGiaoXe(branch.name);
+    }
+  }, [branch, diaDiemGiaoXe]);
+
+  // Tự động điền thông tin ngân hàng khi branch được load
+  useEffect(() => {
+    if (branch) {
+      if (branch.bankAccount && !bankAccount) {
+        setBankAccount(branch.bankAccount);
+      }
+      if (branch.bankName && !bankName) {
+        setBankName(branch.bankName);
+      }
+    }
+  }, [branch, bankAccount, bankName]);
 
   const handleBack = () => {
     navigate(-1);
@@ -225,12 +257,15 @@ const HopDongMuaBanXe = () => {
     // Ensure text is a string
     const textStr = String(text);
     if (!textStr.trim()) return "[---]";
-    
+
     let lines = [];
-    
+
     // First, try splitting by newlines
-    const newlineSplit = textStr.split("\n").map((line) => line.trim()).filter((line) => line !== "");
-    
+    const newlineSplit = textStr
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line !== "");
+
     if (newlineSplit.length > 1) {
       // If there are multiple lines, use them
       lines = newlineSplit;
@@ -238,8 +273,11 @@ const HopDongMuaBanXe = () => {
       // If single line, try splitting by commas
       const singleLine = textStr.trim();
       // Split by comma (with optional space after)
-      const commaSplit = singleLine.split(/,\s*/).map((item) => item.trim()).filter((item) => item !== "");
-      
+      const commaSplit = singleLine
+        .split(/,\s*/)
+        .map((item) => item.trim())
+        .filter((item) => item !== "");
+
       if (commaSplit.length > 1) {
         lines = commaSplit;
       } else {
@@ -247,9 +285,9 @@ const HopDongMuaBanXe = () => {
         lines = [singleLine];
       }
     }
-    
+
     if (lines.length === 0) return "[---]";
-    
+
     return (
       <div className="mt-2 space-y-1">
         {lines.map((line, index) => (
@@ -267,130 +305,6 @@ const HopDongMuaBanXe = () => {
       (color) => color.code.toLowerCase() === colorCode.toLowerCase()
     );
     return found ? found.name : colorCode;
-  };
-
-  // Helper function to convert number to Vietnamese words
-  const numberToWords = (amount) => {
-    if (!amount) return "";
-
-    const numericAmount =
-      typeof amount === "string" ? amount.replace(/\D/g, "") : String(amount);
-    const num = parseInt(numericAmount, 10);
-
-    if (isNaN(num) || num === 0) return "Không đồng";
-
-    const ones = [
-      "",
-      "một",
-      "hai",
-      "ba",
-      "bốn",
-      "năm",
-      "sáu",
-      "bảy",
-      "tám",
-      "chín",
-    ];
-    const tens = [
-      "",
-      "mười",
-      "hai mươi",
-      "ba mươi",
-      "bốn mươi",
-      "năm mươi",
-      "sáu mươi",
-      "bảy mươi",
-      "tám mươi",
-      "chín mươi",
-    ];
-    const hundreds = [
-      "",
-      "một trăm",
-      "hai trăm",
-      "ba trăm",
-      "bốn trăm",
-      "năm trăm",
-      "sáu trăm",
-      "bảy trăm",
-      "tám trăm",
-      "chín trăm",
-    ];
-
-    const readGroup = (n, showZeroHundred = false) => {
-      if (n === 0) return "";
-
-      let result = "";
-      const hundred = Math.floor(n / 100);
-      const ten = Math.floor((n % 100) / 10);
-      const one = n % 10;
-
-      if (hundred > 0) {
-        result += hundreds[hundred] + " ";
-      } else if (showZeroHundred && ten > 0 && one > 0) {
-        // Chỉ thêm "không trăm" khi có cả ten và one (ví dụ: 101, 102, ...)
-        // Không thêm cho các số tròn chục (10, 20, 30, ...)
-        result += "không trăm ";
-      }
-
-      if (ten > 0) {
-        if (ten === 1) {
-          result += "mười ";
-          if (one > 0) {
-            if (one === 5) {
-              result += "lăm ";
-            } else if (one === 1) {
-              result += "một ";
-            } else {
-              result += ones[one] + " ";
-            }
-          }
-        } else {
-          result += tens[ten] + " ";
-          if (one > 0) {
-            if (one === 5 && ten > 0) {
-              result += "lăm ";
-            } else if (one === 1 && ten > 1) {
-              result += "mốt ";
-            } else {
-              result += ones[one] + " ";
-            }
-          }
-        }
-      } else if (one > 0) {
-        if (hundred > 0 && one === 5) {
-          result += "lăm ";
-        } else {
-          result += ones[one] + " ";
-        }
-      }
-
-      return result.trim();
-    };
-
-    const billion = Math.floor(num / 1000000000);
-    const million = Math.floor((num % 1000000000) / 1000000);
-    const thousand = Math.floor((num % 1000000) / 1000);
-    const remainder = num % 1000;
-
-    let result = "";
-
-    if (billion > 0) {
-      result += readGroup(billion, true) + " tỷ ";
-    }
-    if (million > 0) {
-      result += readGroup(million, true) + " triệu ";
-    }
-    if (thousand > 0) {
-      result += readGroup(thousand, true) + " nghìn ";
-    }
-    if (remainder > 0) {
-      result += readGroup(remainder, false) + " ";
-    }
-
-    const trimmed = result.trim();
-    if (!trimmed) return "Không đồng";
-
-    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1) + " đồng";
   };
 
   if (loading) {
@@ -470,11 +384,11 @@ const HopDongMuaBanXe = () => {
                       type="text"
                       value={companyName}
                       onChange={(e) => setCompanyName(e.target.value)}
-                      className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-auto focus:outline-none focus:border-blue-500 uppercase"
+                      className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-full focus:outline-none focus:border-blue-500 uppercase"
                       placeholder=""
                     />
                   </span>
-                  <span className="hidden print:inline">
+                  <span className="hidden print:inline uppercase">
                     {companyName || "[---]"}
                   </span>
                 </p>
@@ -531,20 +445,53 @@ const HopDongMuaBanXe = () => {
                   ngày{" "}
                   <span className="print:hidden">
                     <input
-                      type="text"
-                      value={giayUyQuyen1Ngay}
-                      onChange={(e) => setGiayUyQuyen1Ngay(e.target.value)}
+                      type="date"
+                      value={giayUyQuyen1NgayRaw}
+                      onChange={(e) => {
+                        setGiayUyQuyen1NgayRaw(e.target.value);
+                        if (e.target.value) {
+                          setGiayUyQuyen1Ngay(
+                            formatDateForDisplay(e.target.value)
+                          );
+                        } else {
+                          setGiayUyQuyen1Ngay("");
+                        }
+                      }}
                       className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-auto focus:outline-none focus:border-blue-500"
                       placeholder=""
                     />
                   </span>
                   <span className="hidden print:inline">
-                    {giayUyQuyen1Ngay || "[---]"}
+                    {giayUyQuyen1Ngay || "[---/---/---]"}
                   </span>
                 </p>
                 <p>
-                  <strong>Tài khoản:</strong> {branch.bankAccount} -{" "}
-                  {branch.bankName}
+                  <strong>Tài khoản:</strong>{" "}
+                  <span className="print:hidden">
+                    <input
+                      type="text"
+                      value={bankAccount}
+                      onChange={(e) => setBankAccount(e.target.value)}
+                      className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-[35%] focus:outline-none focus:border-blue-500"
+                      placeholder=""
+                    />
+                  </span>
+                  <span className="hidden print:inline">
+                    {bankAccount || (branch?.bankAccount || "[---]")}
+                  </span>{" "}
+                  tại {" "}
+                  <span className="print:hidden">
+                    <input
+                      type="text"
+                      value={bankName}
+                      onChange={(e) => setBankName(e.target.value)}
+                      className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-[40%] focus:outline-none focus:border-blue-500"
+                      placeholder=""
+                    />
+                  </span>
+                  <span className="hidden print:inline">
+                    {bankName || (branch?.bankName || "[---]")}
+                  </span>
                 </p>
                 <p>
                   <strong>Chủ tài khoản:</strong> {branch.name}
@@ -695,7 +642,9 @@ const HopDongMuaBanXe = () => {
                         onChange={(e) => {
                           setGiayUyQuyen2NgayRaw(e.target.value);
                           if (e.target.value) {
-                            setGiayUyQuyen2Ngay(formatDateForDisplay(e.target.value));
+                            setGiayUyQuyen2Ngay(
+                              formatDateForDisplay(e.target.value)
+                            );
                           } else {
                             setGiayUyQuyen2Ngay("");
                           }
@@ -735,9 +684,7 @@ const HopDongMuaBanXe = () => {
 
             {/* 1.1 */}
             <div className="mb-2">
-              <h3 className="font-semibold">
-                1.1 Thông tin về xe và giá trị mua bán
-              </h3>
+              <h3 className="">1.1. Thông tin về xe và giá trị mua bán</h3>
 
               {/* Table */}
               <table className="w-full border border-gray-800 text-sm mb-4">
@@ -747,7 +694,7 @@ const HopDongMuaBanXe = () => {
                       className="border border-gray-800 p-2 text-center"
                       style={{ width: "5%" }}
                     >
-                      T/T
+                      TT
                     </th>
                     <th
                       className="border border-gray-800 p-2 text-left"
@@ -784,7 +731,7 @@ const HopDongMuaBanXe = () => {
                       <div className="space-y-1">
                         <p>
                           VinFast {data.model || "[---]"} - Phiên bản:{" "}
-                          {data.variant || "[---]"} Màu:{" "}
+                          {data.variant || "[---]"} - Màu:{" "}
                           {getColorName(data.exterior, true) ||
                             data.exterior ||
                             "[---]"}
@@ -856,25 +803,22 @@ const HopDongMuaBanXe = () => {
               </table>
 
               {/* Số tiền bằng chữ */}
-              <p className="mb-4">
+              <p className="italic">
                 <strong>Số tiền bằng chữ:</strong>{" "}
-                <strong>{numberToWords(data.contractPrice) || "[---]"}</strong>
+                <strong>{vndToWords(data.contractPrice) || "[---]"}</strong>
               </p>
 
               {/* Price Inclusion Clause */}
               <p className="mb-4 text-justify">
-                Giá xe nêu trên đã bao gồm thuế tiêu thụ đặc biệt, thuế giá trị
-                gia tăng (nếu có) nhưng chưa bao gồm: lệ phí đăng ký xe, lệ phí
-                trước bạ, phí bảo hiểm xe, phí dịch vụ thuê pin (nếu có) và các
-                chi phí khác (nếu có).
+                Giá Xe đã bao gồm thuế tiêu thụ đặc biệt, thuế giá trị gia tăng
+                (VAT), nhưng không bao gồm lệ phí trước bạ, chi phí đăng ký, lưu
+                hành, bảo hiểm xe, phí dịch vụ thuê pin và các chi phí khác.
               </p>
             </div>
 
             {/* 1.2 */}
             <div className="mb-4">
-              <h3 className="font-semibold">
-                1.2 Chính sách ưu đãi áp dụng:
-              </h3>
+              <h3 className="">1.2. Chính sách ưu đãi áp dụng:</h3>
               <div className="print:hidden mb-2">
                 {isEditingUuDai ? (
                   <textarea
@@ -896,22 +840,28 @@ const HopDongMuaBanXe = () => {
                         {(() => {
                           const textStr = String(uuDai);
                           if (!textStr.trim()) return null;
-                          
+
                           let lines = [];
-                          const newlineSplit = textStr.split("\n").map((line) => line.trim()).filter((line) => line !== "");
-                          
+                          const newlineSplit = textStr
+                            .split("\n")
+                            .map((line) => line.trim())
+                            .filter((line) => line !== "");
+
                           if (newlineSplit.length > 1) {
                             lines = newlineSplit;
                           } else {
                             const singleLine = textStr.trim();
-                            const commaSplit = singleLine.split(/,\s*/).map((item) => item.trim()).filter((item) => item !== "");
+                            const commaSplit = singleLine
+                              .split(/,\s*/)
+                              .map((item) => item.trim())
+                              .filter((item) => item !== "");
                             if (commaSplit.length > 1) {
                               lines = commaSplit;
                             } else {
                               lines = [singleLine];
                             }
                           }
-                          
+
                           return lines.map((line, index) => (
                             <div key={index}>- {line}</div>
                           ));
@@ -919,101 +869,67 @@ const HopDongMuaBanXe = () => {
                       </div>
                     ) : (
                       <span className="text-gray-400">
-                        Nhập các ưu đãi, phân cách bằng dấu phẩy (,) hoặc xuống dòng...
+                        Nhập các ưu đãi, phân cách bằng dấu phẩy (,) hoặc xuống
+                        dòng...
                       </span>
                     )}
                   </div>
                 )}
               </div>
-              <div className="hidden print:block">
-                {formatUuDaiList(uuDai)}
-              </div>
+              <div className="hidden print:block">{formatUuDaiList(uuDai)}</div>
               <p className="mb-2 text-justify">
-                Chi tiết về chính sách ưu đãi được công bố trên Website{" "}
+                Thông tin chi tiết được công bố tại website:{" "}
                 <span className="">https://vinfastauto.com</span> ("
                 <strong>Website</strong>").
               </p>
               <p className="text-justify">
-                Bên Bán có quyền điều chỉnh hoặc hủy bỏ chính sách ưu đãi nếu
-                Khách Hàng chậm thanh toán/nhận Xe hoặc vi phạm các điều khoản
-                của Hợp đồng này.
+                Trường hợp Khách Hàng chậm trễ thanh toán/nhận Xe hoặc vi phạm
+                bất kỳ nghĩa vụ nào trong Hợp Đồng, chính sách ưu đãi có thể
+                được điều chỉnh hoặc hủy bỏ tùy thuộc vào quyết định của Bên
+                Bán.
               </p>
             </div>
 
             {/* 1.3 */}
             <div className="mb-4">
-              <h3 className="font-semibold">1.3 Thanh toán tiền mua Xe</h3>
+              <h3 className="">1.3. Thanh toán tiền mua Xe</h3>
               <div className="space-y-2 text-justify">
                 <p>
-                  <strong>a) Đợt 1:</strong> Khách Hàng thanh toán số tiền đặt
-                  cọc là {formatCurrency(data.deposit) || "[---]"} VNĐ (bằng
-                  chữ: {numberToWords(data.deposit) || "[---]"}) trong thời hạn{" "}
-                  <span className="print:hidden">
-                    <input
-                      type="text"
-                      value={formatCurrency(thoiHanDatCoc)}
-                      onChange={(e) => {
-                        // Parse giá trị thô (loại bỏ dấu chấm)
-                        const rawValue = e.target.value.replace(/\./g, "");
-                        setThoiHanDatCoc(rawValue);
-                      }}
-                      className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-auto focus:outline-none focus:border-blue-500"
-                      placeholder=""
-                    />
-                  </span>
-                  <span className="hidden print:inline">
-                    {thoiHanDatCoc || "[---]"}
-                  </span>{" "}
-                  ngày kể từ ngày ký Hợp đồng này. Số tiền đặt cọc này sẽ được
-                  chuyển thành tiền mua Xe khi Khách Hàng thanh toán đợt cuối
-                  cùng.
+                  a) <strong>Đợt 1:</strong> Khách Hàng đặt cọc cho Bên Bán số
+                  tiền {formatCurrency(data.deposit) || "[---]"} VNĐ (bằng chữ:{" "}
+                  {vndToWords(data.deposit) || "[---]"}) trong thời hạn 03 (ba)
+                  ngày làm việc kể từ ngày ký Hợp Đồng nhưng không muộn hơn thời
+                  hạn áp dụng chính sách ưu đãi theo Điều 1.2. Tiền đặt cọc sẽ
+                  được chuyển thành khoản thanh toán mua Xe khi Bên Bán xuất hóa
+                  đơn. Nếu Khách Hàng đã đặt cọc theo Đơn đặt hàng và đặt cọc
+                  mua xe điện VinFast trước đó, tiền đặt cọc đó sẽ được trừ vào
+                  khoản đặt cọc Đợt 1 của Hợp Đồng này.
                 </p>
-                <p>
-                  <strong>
-                    b) Tiến độ các đợt thanh toán tiếp theo như sau:
-                  </strong>
+                <p>b) Tiến độ các đợt thanh toán tiếp theo như sau:</p>
+                <p className="pl-4 italic">
+                  Khách Hàng lựa chọn một trong hai hình thức thanh toán trả
+                  thẳng hoặc trả góp.
                 </p>
                 <p className="pl-4">
-                  Khách Hàng có thể lựa chọn một trong hai phương thức thanh
-                  toán: <strong>trả thẳng</strong> hoặc <strong>trả góp</strong>
-                  .
-                </p>
-                <p className="pl-4">
-                  <strong>Thanh toán trả thẳng:</strong>
+                  • <span className="underline">Thanh toán trả thẳng:</span>
                 </p>
                 <p className="pl-8">
-                  <strong>Đợt 2:</strong> Khách Hàng thanh toán số tiền còn lại
-                  là{" "}
-                  {data.contractPrice && data.deposit
-                    ? formatCurrency(
-                        (
-                          parseInt(
-                            String(data.contractPrice).replace(/\D/g, "")
-                          ) - parseInt(String(data.deposit).replace(/\D/g, ""))
-                        ).toString()
-                      )
-                    : "[---]"}{" "}
-                  VNĐ trong thời hạn{" "}
-                  <span className="print:hidden">
-                    <input
-                      type="text"
-                      value={thoiHanDot2}
-                      onChange={(e) => setThoiHanDot2(e.target.value)}
-                      className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-auto focus:outline-none focus:border-blue-500"
-                      placeholder=""
-                    />
-                  </span>
-                  <span className="hidden print:inline">
-                    {thoiHanDot2 || "[---]"}
+                  <strong>Đợt 2:</strong>{" "}
+                  {formatCurrency(data.contractPrice - data.deposit) || "[---]"}{" "}
+                  VNĐ{" "}
+                  <span className="italic">
+                    (bằng chữ:{" "}
+                    {vndToWords(data.contractPrice - data.deposit) || "[---]"})
                   </span>{" "}
-                  ngày kể từ ngày Bên Bán thông báo Xe sẵn sàng giao cho Khách
+                  Khách Hàng thanh toán trong vòng 07 (bảy) ngày làm việc kể từ
+                  ngày Bên Bán thông báo về việc Xe sẵn có để giao cho Khách
                   Hàng.
                 </p>
                 <p className="pl-4">
-                  <strong>Thanh toán trả góp:</strong>
+                  • <span className="underline">Thanh toán trả góp:</span>
                 </p>
                 <p className="pl-8">
-                  <strong>Đợt 2:</strong> Khách Hàng thanh toán số tiền{" "}
+                  <strong>Đợt 2:</strong>{" "}
                   <span className="print:hidden">
                     <input
                       type="text"
@@ -1024,7 +940,7 @@ const HopDongMuaBanXe = () => {
                         setSoTienDot2(rawValue);
                         // Tự động cập nhật bằng chữ
                         if (rawValue) {
-                          setSoTienDot2BangChu(numberToWords(rawValue));
+                          setSoTienDot2BangChu(vndToWords(rawValue));
                         } else {
                           setSoTienDot2BangChu("");
                         }
@@ -1036,23 +952,28 @@ const HopDongMuaBanXe = () => {
                   <span className="hidden print:inline">
                     {soTienDot2 ? formatCurrency(soTienDot2) : "[---]"}
                   </span>{" "}
-                  VNĐ (bằng chữ:{" "}
-                  <span className="print:hidden">
-                    <input
-                      type="text"
-                      value={soTienDot2BangChu}
-                      onChange={(e) => setSoTienDot2BangChu(e.target.value)}
-                      className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-auto focus:outline-none focus:border-blue-500"
-                      placeholder=""
-                    />
-                  </span>
-                  <span className="hidden print:inline">
-                    {soTienDot2BangChu || "[---]"}
-                  </span>
-                  ) trong thời hạn 07 (bảy) ngày làm việc kể từ ngày Bên Bán
-                  thông báo Xe sẵn sàng giao cho Khách Hàng hoặc theo thỏa thuận
-                  giữa các Bên. Đồng thời, Khách Hàng giao cho Bên Bán bản chính
-                  Thông báo giải ngân của Ngân hàng về số tiền vay{" "}
+                  VNĐ{" "}
+                  <span className="italic">
+                    (bằng chữ:{" "}
+                    <span className="print:hidden">
+                      <input
+                        type="text"
+                        value={soTienDot2BangChu}
+                        onChange={(e) => setSoTienDot2BangChu(e.target.value)}
+                        className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-auto focus:outline-none focus:border-blue-500"
+                        placeholder=""
+                      />
+                    </span>
+                    <span className="hidden print:inline">
+                      {soTienDot2BangChu || "[---]"}
+                    </span>
+                    )
+                  </span>{" "}
+                  Khách Hàng thanh toán trong vòng 07 (bảy) ngày làm việc kể từ
+                  ngày Bên Bán thông báo về việc Xe sẵn có để giao cho Khách
+                  Hàng hoặc thanh toán theo thỏa thuận khác giữa Các Bên, Khách
+                  Hàng đồng thời bàn giao cho Bên Bán bản gốc Thông Báo Tín Dụng
+                  của ngân hàng cam kết cho Khách Hàng vay số tiền{" "}
                   <span className="print:hidden">
                     <input
                       type="text"
@@ -1063,7 +984,7 @@ const HopDongMuaBanXe = () => {
                         setSoTienVay(rawValue);
                         // Tự động cập nhật bằng chữ
                         if (rawValue) {
-                          setSoTienVayBangChu(numberToWords(rawValue));
+                          setSoTienVayBangChu(vndToWords(rawValue));
                         } else {
                           setSoTienVayBangChu("");
                         }
@@ -1075,23 +996,27 @@ const HopDongMuaBanXe = () => {
                   <span className="hidden print:inline">
                     {soTienVay ? formatCurrency(soTienVay) : "[---]"}
                   </span>{" "}
-                  VNĐ (bằng chữ:{" "}
-                  <span className="print:hidden">
-                    <input
-                      type="text"
-                      value={soTienVayBangChu}
-                      onChange={(e) => setSoTienVayBangChu(e.target.value)}
-                      className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-auto focus:outline-none focus:border-blue-500"
-                      placeholder=""
-                    />
-                  </span>
-                  <span className="hidden print:inline">
-                    {soTienVayBangChu || "[---]"}
-                  </span>
-                  ) để mua Xe.
+                  VNĐ{" "}
+                  <span className="italic">
+                    (bằng chữ:{" "}
+                    <span className="print:hidden">
+                      <input
+                        type="text"
+                        value={soTienVayBangChu}
+                        onChange={(e) => setSoTienVayBangChu(e.target.value)}
+                        className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-auto focus:outline-none focus:border-blue-500"
+                        placeholder=""
+                      />
+                    </span>
+                    <span className="hidden print:inline">
+                      {soTienVayBangChu || "[---]"}
+                    </span>
+                    )
+                  </span>{" "}
+                  để mua Xe.
                 </p>
                 <p className="pl-8">
-                  <strong>Đợt 3:</strong> Ngân hàng phải giải ngân số tiền{" "}
+                  <strong>Đợt 3:</strong>{" "}
                   <span className="print:hidden">
                     <input
                       type="text"
@@ -1102,7 +1027,7 @@ const HopDongMuaBanXe = () => {
                         setSoTienDot3(rawValue);
                         // Tự động cập nhật bằng chữ
                         if (rawValue) {
-                          setSoTienDot3BangChu(numberToWords(rawValue));
+                          setSoTienDot3BangChu(vndToWords(rawValue));
                         } else {
                           setSoTienDot3BangChu("");
                         }
@@ -1114,53 +1039,46 @@ const HopDongMuaBanXe = () => {
                   <span className="hidden print:inline">
                     {soTienDot3 ? formatCurrency(soTienDot3) : "[---]"}
                   </span>{" "}
-                  VNĐ (bằng chữ:{" "}
-                  <span className="print:hidden">
-                    <input
-                      type="text"
-                      value={soTienDot3BangChu}
-                      onChange={(e) => setSoTienDot3BangChu(e.target.value)}
-                      className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-auto focus:outline-none focus:border-blue-500"
-                      placeholder=""
-                    />
-                  </span>
-                  <span className="hidden print:inline">
-                    {soTienDot3BangChu || "[---]"}
-                  </span>
-                  ) vào tài khoản của Bên Bán trong thời hạn 05 (năm) ngày làm
-                  việc kể từ ngày Bên Bán và Khách Hàng giao cho Ngân hàng phiếu
-                  hẹn đăng ký xe.
+                  VNĐ{" "}
+                  <span className="italic">
+                    (bằng chữ:{" "}
+                    <span className="print:hidden">
+                      <input
+                        type="text"
+                        value={soTienDot3BangChu}
+                        onChange={(e) => setSoTienDot3BangChu(e.target.value)}
+                        className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-auto focus:outline-none focus:border-blue-500"
+                        placeholder=""
+                      />
+                    </span>
+                    <span className="hidden print:inline">
+                      {soTienDot3BangChu || "[---]"}
+                    </span>
+                    )
+                  </span>{" "}
+                  Số tiền này phải được ngân hàng cấp Thông Báo Tín Dụng thanh
+                  toán vào tài khoản của Bên Bán trong vòng 05 (năm) ngày làm
+                  việc kể từ ngày Bên Bán và Khách Hàng bàn giao giấy hẹn trả
+                  kết quả đăng ký Xe cho ngân hàng này.
                 </p>
               </div>
             </div>
 
             {/* 1.4 */}
             <div className="mb-4">
-              <h3 className="font-semibold">1.4 Phương thức thanh toán</h3>
+              <h3 className="">1.4. Phương thức thanh toán</h3>
               <div className="space-y-2 text-justify">
-                <p>
-                  Khách Hàng thanh toán cho Bên Bán bằng một trong các phương
-                  thức sau:
-                </p>
-                <p className="pl-4">
-                  <strong>(i)</strong> Chuyển khoản vào tài khoản của Bên Bán
-                  (thông tin tài khoản ghi ở phần đầu Hợp đồng). Nội dung chuyển
-                  khoản theo cú pháp:{" "}
-                  <strong>
-                    Tên Khách Hàng Số điện thoại Số hợp đồng mua bán Số đơn hàng
-                    Model Xe
-                  </strong>
-                  . Phí chuyển khoản do Khách Hàng chịu.
-                </p>
-                <p className="pl-4">
-                  <strong>(ii)</strong> Thanh toán bằng tiền mặt (không áp dụng
-                  đối với mua hàng qua kênh trực tuyến).
-                </p>
-                <p className="pl-4">
-                  <strong>(iii)</strong> Thanh toán bằng thẻ ngân hàng (chỉ áp
-                  dụng đối với thanh toán tiền đặt cọc, phí giao dịch do Bên Bán
-                  chịu).
-                </p>
+                Khách Hàng có thể thanh toán cho Bên Bán bằng cách: (i) chuyển
+                khoản vào tài khoản của Bên Bán theo thông tin nêu tại phần đầu
+                Hợp Đồng. Nội dung chuyển khoản ghi theo cú pháp:{" "}
+                <strong>
+                  Tên Khách Hàng_Số điện thoại_Số hợp đồng mua bán/Số đơn
+                  hàng_Model Xe
+                </strong>
+                . Phí liên quan đến việc chuyển khoản do Khách Hàng chịu; (ii)
+                thanh toán bằng tiền mặt (không áp dụng với mua hàng trực
+                tuyến), (iii) thanh toán bằng thẻ ngân hàng (chỉ áp dụng khi
+                thanh toán tiền đặt cọc, phí giao dịch bằng thẻ Bên Bán chịu).
               </div>
             </div>
           </div>
@@ -1170,7 +1088,7 @@ const HopDongMuaBanXe = () => {
             <h2 className="font-bold">Điều 2. Thời gian và địa điểm giao Xe</h2>
             <div className="space-y-2 text-justify">
               <p>
-                <strong>2.1 Thời gian giao Xe:</strong>{" "}
+                2.1. Thời gian giao Xe:{" "}
                 <span className="print:hidden">
                   <input
                     type="date"
@@ -1193,13 +1111,13 @@ const HopDongMuaBanXe = () => {
                 với mua hàng qua kênh trực tuyến).
               </p>
               <p>
-                <strong>2.2 Địa điểm giao Xe tại:</strong>{" "}
+                2.2. Địa điểm giao Xe tại:{" "}
                 <span className="print:hidden">
                   <input
                     type="text"
                     value={diaDiemGiaoXe}
                     onChange={(e) => setDiaDiemGiaoXe(e.target.value)}
-                    className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-auto focus:outline-none focus:border-blue-500"
+                    className="border-b border-gray-400 px-2 py-1 text-sm font-normal w-[80%] focus:outline-none focus:border-blue-500"
                     placeholder=""
                   />
                 </span>
@@ -1208,10 +1126,9 @@ const HopDongMuaBanXe = () => {
                 </span>
               </p>
               <p>
-                <strong>2.3</strong> Trừ trường hợp quy định tại Điều 3, Bên Bán
-                sẽ giao Xe kèm theo hóa đơn và đầy đủ giấy tờ cho Khách Hàng sau
-                khi nhận được 100% tổng giá trị mua bán quy định tại Điều 01 của
-                Hợp đồng.
+                2.3. Trừ trường hợp nêu tại Điều 3, Bên Bán sẽ giao Xe cùng với
+                hóa đơn và đầy đủ giấy tờ cho Khách Hàng sau khi nhận đủ 100%
+                Tổng giá trị mua bán nêu tại Điều 01 Hợp Đồng.
               </p>
             </div>
           </div>
@@ -1224,39 +1141,36 @@ const HopDongMuaBanXe = () => {
             </h2>
             <div className="space-y-2 text-justify">
               <p>
-                <strong>3.1.</strong> Sau khi nhận được Đợt thanh toán 2 và tiếp
-                nhận Thông báo giải ngân, Bên Bán sẽ xuất hóa đơn cho Khách
-                Hàng. Khách Hàng phải hoàn tất thủ tục đăng ký xe trong thời hạn
-                05 (năm) ngày làm việc kể từ ngày được thông báo. Việc đăng ký
-                xe phải có sự tham gia của nhân viên Bên Bán, Khách Hàng phải
-                tuân thủ hướng dẫn của Bên Bán. Khách Hàng ủy quyền cho Bên Bán
-                giữ phiếu hẹn để nhận kết quả trong quá trình thực hiện tại cơ
-                quan nhà nước có thẩm quyền.
+                3.1. Khi nhận được thanh toán Đợt 2 và chấp nhận Thông Báo Tín
+                Dụng, Bên Bán sẽ xuất hoá đơn cho Khách Hàng. Khách Hàng phải
+                làm thủ tục đăng ký Xe trong vòng 05 (năm) ngày làm việc kể từ
+                ngày được thông báo. Việc đăng ký Xe phải có sự tham gia của
+                nhân sự Bên Bán và Khách Hàng phải tuân thủ hướng dẫn của Bên
+                Bán. Khách Hàng ủy quyền cho Bên Bán giữ các giấy hẹn trả kết
+                quả trong quá trình thực hiện thủ tục tại cơ quan nhà nước có
+                thẩm quyền.
               </p>
               <p>
-                <strong>3.2.</strong> Trong trường hợp vì bất kỳ lý do nào, Ngân
-                hàng phát hành Thông báo giải ngân không giải ngân đầy đủ và
-                đúng hạn số tiền còn lại của Đợt thanh toán 3 cho Bên Bán, thì:
+                3.2. Nếu vì bất cứ lý do gì mà ngân hàng cấp Thông Báo Tín Dụng
+                không giải ngân đầy đủ và đúng hạn số tiền còn lại của Đợt 3 cho
+                Bên Bán thì:
               </p>
-              <p className="pl-4">
-                <strong>a)</strong> Trong thời hạn 10 (mười) ngày làm việc kể từ
-                ngày Bên Bán yêu cầu, Khách Hàng phải thanh toán đầy đủ toàn bộ
-                số tiền còn lại cho Bên Bán.
+              <p className="">
+                a) Trong vòng 10 (mười) ngày làm việc kể từ ngày Bên Bán yêu
+                cầu, Khách Hàng sẽ tự mình thanh toán đầy đủ cho Bên Bán toàn bộ
+                số tiền còn lại.
               </p>
-              <p className="pl-4">
-                <strong>b)</strong> Sau thời hạn quy định tại Điều 3.2.(a), nếu
-                Bên Bán không nhận được số tiền còn lại của Đợt thanh toán 3,
-                Bên Bán có quyền yêu cầu Khách Hàng thực hiện theo phương án do
-                Bên Bán đề xuất. Khách Hàng đồng ý ủy quyền cho Bên Bán toàn
-                quyền quyết định đối với Xe, bao gồm{" "}
-                <strong>
-                  thanh lý xe để thu hồi các khoản tiền mà Khách Hàng còn nợ
-                </strong>
-                . Số tiền thu được từ việc thanh lý Xe sẽ được ưu tiên thanh
-                toán các khoản nợ của Khách Hàng đối với Bên Bán. Khách Hàng
-                chịu mọi chi phí và thiệt hại phát sinh từ việc thanh lý Xe và
-                phải trả cho Bên Bán phí ủy quyền bằng 10% giá trị Xe tại thời
-                điểm thanh lý.
+              <p className="">
+                b) Sau thời hạn nêu tại Điều 3.2.(a), nếu Bên Bán không nhận
+                được số tiền còn lại của Đợt 3 thì Bên Bán có quyền yêu cầu
+                Khách Hàng thực hiện theo phương án do Bên Bán đưa ra. Khách
+                Hàng đồng ý ủy quyền cho Bên Bán toàn quyền quyết định đối với
+                Xe bao gồm cả thanh lý xe để thu hồi các khoản tiền mà Khách
+                Hàng còn nợ. Khoản tiền thu được khi xử lý Xe sẽ ưu tiên thanh
+                toán các khoản nợ của Khách Hàng đối với Bên Bán. Khách Hàng sẽ
+                chịu mọi chi phí và thiệt hại phát sinh để xử lý Xe, và thanh
+                toán cho Bên Bán thù lao ủy quyền bằng 10% giá trị Xe tại thời
+                điểm xử lý.
               </p>
             </div>
           </div>
@@ -1266,12 +1180,12 @@ const HopDongMuaBanXe = () => {
             <h2 className="font-bold">Điều 4. Bảo hành</h2>
             <div className="space-y-2 text-justify">
               <p>
-                <strong>4.1. Chính sách bảo hành:</strong> quy định tại sổ bảo
-                hành do Bên Bán cung cấp cho Khách Hàng.
+                4.1. Chính sách bảo hành: quy định tại sổ bảo hành do Bên Bán
+                cung cấp cho Khách Hàng.
               </p>
               <p>
-                <strong>4.2. Địa điểm bảo hành:</strong> tại các Trung tâm dịch
-                vụ sửa chữa xe điện VinFast.
+                4.2. Địa điểm bảo hành: tại các Trung tâm dịch vụ sửa chữa xe
+                điện VinFast.
               </p>
             </div>
           </div>
@@ -1281,49 +1195,51 @@ const HopDongMuaBanXe = () => {
             <h2 className="font-bold">Điều 5. Trách nhiệm của Các Bên</h2>
             <div className="space-y-2 text-justify">
               <p>
-                <strong>5.1.</strong> Bên Bán có nghĩa vụ cung cấp đầy đủ hóa
-                đơn, chứng từ, tài liệu hợp lệ cho Khách Hàng.
+                5.1. Bên Bán có nghĩa vụ cung cấp đầy đủ hóa đơn, chứng từ, tài
+                liệu hợp lệ cho Khách Hàng.
               </p>
               <p>
-                <strong>5.2.</strong> Việc thông báo của Bên Bán phải bằng văn
-                bản, email, ứng dụng VinFast Trading, cuộc gọi hoặc tin nhắn.
+                5.2. Việc thông báo của Bên Bán phải bằng văn bản, email, ứng
+                dụng VinFast Trading, cuộc gọi hoặc tin nhắn.
               </p>
               <p>
-                <strong>5.3.</strong> Khách Hàng có trách nhiệm thanh toán và
-                nhận Xe theo đúng thời gian đã quy định.
+                5.3. Khách Hàng có trách nhiệm thanh toán và nhận Xe theo đúng
+                thời gian đã quy định.
               </p>
               <p>
-                <strong>5.4.</strong> Việc giao nhận Xe và giấy tờ phải do Khách
-                Hàng trực tiếp thực hiện. Nếu Khách Hàng ủy quyền cho người khác
-                thực hiện, phải có giấy ủy quyền hợp lệ và thông báo cho Bên Bán
-                trước ít nhất 03 (ba) ngày làm việc.
+                5.4. Việc giao/nhận Xe và giấy tờ phải do Khách Hàng trực tiếp
+                thực hiện. Nếu Khách Hàng ủy quyền cho người khác, người đó phải
+                xuất trình giấy tờ tùy thân kèm giấy ủy quyền hợp lệ
               </p>
               <p>
-                <strong>5.5.</strong> Trong trường hợp Khách Hàng chậm nhận Xe
-                sau khi đã thanh toán 100% giá trị Hợp đồng, Khách Hàng phải trả
-                phí lưu kho cho Bên Bán. Nếu Khách Hàng chậm nhận Xe quá 30 (ba
-                mươi) ngày kể từ ngày Bên Bán thông báo Xe sẵn sàng giao, Bên
-                Bán có quyền thanh lý Xe để thu hồi các khoản tiền mà Khách Hàng
-                còn nợ.
+                5.5. Nếu Khách Hàng chậm nhận Xe, Khách Hàng phải trả cho Bên
+                Bán chi phí lưu giữ Xe theo đơn giá Bên Bán thông báo. Nếu Khách
+                Hàng đã thanh toán 100% giá trị Hợp Đồng mà chậm nhận Xe quá 30
+                (ba mươi) ngày, Khách Hàng đồng ý Bên Bán có toàn quyền định
+                đoạt Xe.
               </p>
               <p>
-                <strong>5.6.</strong> Trong trường hợp Khách Hàng chậm thanh
-                toán, Khách Hàng phải trả lãi suất chậm thanh toán là 15%/năm
-                tính trên số tiền chậm thanh toán.
+                5.6. Khách Hàng chậm thanh toán sẽ phải trả lãi suất quá hạn
+                15%/năm tương ứng với số tiền và số ngày chậm trả.
               </p>
               <p>
-                <strong>5.7.</strong> Khách Hàng hiểu và đồng ý rằng Xe hoạt
-                động tối ưu khi sử dụng pin chính hãng và thiết bị sạc theo đúng
-                hướng dẫn sử dụng và sổ bảo hành. VinFast Trading và VinFast
-                được miễn trừ trách nhiệm đối với mọi thiệt hại phát sinh nếu
-                Khách Hàng không sử dụng Xe theo đúng hướng dẫn.
+                5.7. Khách Hàng hiểu và đồng ý rằng Xe chỉ hoạt động tốt khi
+                được sử dụng với pin và thiết bị sạc chính hãng và được sử dụng
+                đúng theo tài liệu/hướng dẫn sử dụng và Sổ bảo hành được cung
+                cấp tới Khách Hàng và/hoặc đăng tải lên Website. Nếu Khách Hàng
+                sử dụng Xe không đúng hướng dẫn, Bên Bán, Công ty TNHH Thương
+                mại và Dịch vụ VinFast (<strong>“VinFast Trading”</strong>) và
+                Công ty Cổ phần Sản xuất và Kinh doanh VinFast (
+                <strong>“Nhà sản xuất”</strong> hay <strong>“VinFast”</strong>)
+                được miễn trừ trách nhiệm đối với mọi tổn thất và thiệt hại (nếu
+                có) có liên quan.
               </p>
               <p>
-                <strong>5.8.</strong> Xe được tích hợp eSIM (nếu có) để cung cấp
-                các dịch vụ và tính năng thông minh cho Khách Hàng. Để sử dụng
-                các dịch vụ này, Khách Hàng phải duy trì eSIM. Thông tin chi
-                tiết được quy định trong E-brochure trên Website hoặc ứng dụng
-                VinFast.
+                5.8. Xe được tích hợp sẵn chip eSIM (trong trường hợp Xe có chip
+                eSIM) nhằm cung cấp các dịch vụ và tính năng thông minh tới
+                Khách Hàng. Để sử dụng các dịch vụ này, Khách Hàng cần duy trì
+                eSIM. Mọi thông tin tham khảo tại E-brochure trên Website hoặc
+                Ứng dụng VinFast.
               </p>
             </div>
           </div>
@@ -1333,13 +1249,13 @@ const HopDongMuaBanXe = () => {
             <h2 className="font-bold">Điều 6. Chuyển rủi ro và quyền sở hữu</h2>
             <div className="space-y-2 text-justify">
               <p>
-                Trừ khi có quy định khác trong Hợp đồng, toàn bộ quyền sở hữu,
-                rủi ro và lợi ích liên quan đến Xe được chuyển giao cho Khách
-                Hàng vào thời điểm sớm nhất trong các thời điểm sau: (i) khi Xe
-                được giao cho Khách Hàng hoặc người đại diện hợp pháp của Khách
-                Hàng; (ii) khi Khách Hàng thanh toán 100% giá trị Hợp đồng; hoặc
-                (iii) khi Bên Bán xuất hóa đơn GTGT cho Khách Hàng (đối với
-                trường hợp thanh toán trả góp).
+                Trừ trường hợp Hợp Đồng có quy định khác, toàn bộ quyền sở hữu
+                đối với Xe, rủi ro và lợi ích liên quan đến Xe sẽ được chuyển
+                giao sang cho Khách Hàng khi, tùy thời điểm nào đến trước: (i)
+                Xe được bàn giao cho Khách Hàng hoặc người đại diện hợp pháp
+                hoặc; (ii) Khách Hàng thanh toán 100% giá trị Hợp Đồng hoặc;
+                (iii) Bên Bán xuất hóa đơn VAT cho Khách Hàng khi thanh toán trả
+                góp.
               </p>
             </div>
           </div>
@@ -1349,36 +1265,31 @@ const HopDongMuaBanXe = () => {
             <h2 className="font-bold">Điều 7. Bảo vệ dữ liệu cá nhân</h2>
             <div className="space-y-2 text-justify">
               <p>
-                <strong>7.1.</strong> VinFast Trading và VinFast có thể xử lý dữ
-                liệu cá nhân của Khách Hàng liên quan đến Hợp đồng này, bao gồm
-                dữ liệu liên quan đến các tính năng dịch vụ thông minh (thông số
-                Xe, lịch sử di chuyển, trạng thái pin, cập nhật phần mềm từ xa,
-                cảnh báo pin yếu, ước tính mức sử dụng pin, tìm kiếm, định vị và
-                điều hướng đến trạm sạc gần nhất, chẩn đoán Xe và các dữ liệu
-                khác được phân loại là dữ liệu cá nhân theo quy định pháp luật
-                hiện hành).
+                7.1. Cùng với việc thực hiện Hợp Đồng này, VinFast Trading và
+                VinFast có thể xử lý dữ liệu cá nhân của Khách Hàng, như các dữ
+                liệu về tính năng dịch vụ thông minh giúp Khách Hàng nắm được
+                thông số, hành trình, lịch sử hoạt động của Xe cũng như pin,
+                tình trạng sạc pin; tính năng cập nhật phần mềm Xe từ xa; tính
+                năng cảnh báo mức pin, ước tính thời lượng sử dụng pin; tính
+                năng tìm kiếm, định vị và dẫn đường đến trạm sạc gần nhất; chẩn
+                đoán, cảnh báo các vấn đề của Xe, và các dữ liệu khác được phân
+                loại là dữ liệu cá nhân theo quy định pháp luật hiện hành.
               </p>
               <p>
-                <strong>7.2. Đối với Khách Hàng là cá nhân:</strong> Bằng việc
-                ký Hợp đồng này, Khách Hàng là cá nhân thừa nhận, hiểu và cho
-                phép VinFast Trading và VinFast xử lý dữ liệu cá nhân của mình
-                cho các mục đích và phương thức được mô tả trong Chính sách Bảo
-                vệ Dữ liệu Cá nhân được công bố trên Website và được điều chỉnh
-                theo thời gian.
+                7.2. <strong>Đối với Khách Hàng là cá nhân:</strong> Bằng cách
+                ký Hợp Đồng, Khách Hàng xác nhận đã đọc, hiểu và cho phép
+                VinFast Trading, VinFast xử lý dữ liệu cá nhân của mình cho mục
+                đích và phương thức mô tả tại Chính Sách Bảo Vệ Dữ Liệu Cá Nhân
+                được công bố tại Website và được điều chỉnh tại từng thời điểm.
               </p>
               <p>
-                <strong>7.3. Đối với Khách Hàng là tổ chức:</strong>
-              </p>
-              <p className="pl-4">
-                <strong>(a)</strong> Mỗi Bên chịu trách nhiệm thu thập sự đồng ý
-                cần thiết từ chủ thể dữ liệu cá nhân liên quan đến Hợp đồng này
-                và chịu trách nhiệm về dữ liệu cá nhân mà mình xử lý.
-              </p>
-              <p className="pl-4">
-                <strong>(b)</strong> Các Bên cam kết thực hiện: (i) các quy
-                trình bảo mật để bảo vệ dữ liệu cá nhân thu được theo Hợp đồng;
-                và (ii) tuân thủ các quy định pháp luật về bảo vệ dữ liệu cá
-                nhân.
+                7.3. <strong>Đối với Khách Hàng là tổ chức:</strong>
+                (a) Mỗi Bên sẽ chịu trách nhiệm thu thập sự đồng ý cần thiết từ
+                chủ thể dữ liệu cá nhân liên quan đến Hợp Đồng này và tự chịu
+                trách nhiệm đối với dữ liệu cá nhân do mình xử lý, (b) Các Bên
+                cam kết đưa ra và thực hiện: (i) các quy trình bảo mật để đảm
+                bảo bảo vệ Dữ liệu Cá nhân thu được theo Hợp Đồng; và (ii) tuân
+                thủ luật về bảo vệ dữ liệu cá nhân.
               </p>
             </div>
           </div>
@@ -1388,8 +1299,8 @@ const HopDongMuaBanXe = () => {
             <h2 className="font-bold">Điều 8. Bất khả kháng</h2>
             <div className="space-y-2 text-justify">
               <p>
-                Các sự kiện bất khả kháng sẽ được các Bên xử lý theo quy định
-                pháp luật.
+                Nếu xảy ra sự kiện bất khả kháng sẽ được Các Bên xử lý theo quy
+                định của pháp luật.
               </p>
             </div>
           </div>
@@ -1399,23 +1310,21 @@ const HopDongMuaBanXe = () => {
             <h2 className="font-bold">Điều 9. Hiệu lực và Chấm dứt Hợp Đồng</h2>
             <div className="space-y-2 text-justify">
               <p>
-                Hợp đồng này có hiệu lực kể từ ngày ký tại phần đầu Hợp đồng và
-                chấm dứt trong các trường hợp sau:
+                Hợp Đồng có hiệu lực kể từ ngày ký tại phần đầu của Hợp Đồng và
+                chấm dứt trong trường hợp sau:
               </p>
+              <p>9.1. Các Bên có thỏa thuận chấm dứt Hợp Đồng;</p>
               <p>
-                <strong>9.1.</strong> Các Bên thỏa thuận chấm dứt Hợp đồng.
-              </p>
-              <p>
-                <strong>9.2.</strong> Bên Bán có quyền đơn phương chấm dứt Hợp
-                đồng nếu Khách Hàng vi phạm bất kỳ nghĩa vụ nào và không khắc
-                phục hoặc không thể khắc phục trong thời hạn 10 (mười) ngày kể
-                từ ngày đến hạn hoặc thông báo, và Khách Hàng sẽ không được hoàn
-                lại tiền đặt cọc. Bên Bán, theo quyết định của mình, có quyền
-                đơn phương chấm dứt Hợp đồng mà không phải chịu bất kỳ khoản phí
-                phạt nào, với điều kiện thông báo cho Khách Hàng trước ít nhất
-                07 (bảy) ngày. Để làm rõ, trong trường hợp chấm dứt như vậy, Bên
-                Bán sẽ hoàn lại tiền đặt cọc cho Khách Hàng và sẽ không phải
-                chịu trách nhiệm về bất kỳ khoản thanh toán nào khác.
+                9.2. Bên Bán có quyền đơn phương chấm dứt Hợp Đồng nếu Khách
+                Hàng vi phạm bất kỳ nghĩa vụ nào mà không khắc phục hoặc không
+                thể khắc phục toàn bộ trong 10 (mười) ngày kể từ ngày đến hạn
+                hoặc được thông báo và Khách Hàng sẽ không được nhận lại khoản
+                tiền đặt cọc. Bên Bán, tùy theo quyết định của mình, có quyền
+                đơn phương chấm dứt Hợp Đồng mà không phải chịu bất kỳ chế tài
+                nào với điều kiện phải thông báo cho Khách Hàng trước ít nhất 07
+                (bảy) ngày. Để làm rõ, trong trường hợp chấm dứt như vậy, Bên
+                Bán sẽ trả lại khoản tiền đặt cọc cho Khách Hàng và không phải
+                trả thêm bất cứ khoản tiền nào khác;
               </p>
             </div>
           </div>
@@ -1425,34 +1334,31 @@ const HopDongMuaBanXe = () => {
             <h2 className="font-bold">Điều 10. Các điều khoản khác</h2>
             <div className="space-y-2 text-justify">
               <p>
-                <strong>10.1.</strong> Trong trường hợp các Bên không thể thương
-                lượng giải quyết, mọi tranh chấp liên quan đến Hợp đồng này sẽ
-                được giải quyết tại Tòa án có thẩm quyền.
+                10.1. Nếu không thương lượng được, các tranh chấp về Hợp Đồng sẽ
+                được giải quyết tại tòa án có thẩm quyền.
               </p>
               <p>
-                <strong>10.2.</strong> Bằng văn bản thông báo trước 5 (năm) ngày
-                làm việc mà không nhận được phản hồi của Khách Hàng trong 5
-                (năm) ngày làm việc kể từ ngày thông báo, Bên Bán hiểu rằng
-                Khách Hàng đồng ý cho Bên Bán chuyển giao Hợp Đồng này cho công
-                ty con/liên kết của mình hoặc công ty mới thành lập do tái cơ
-                cấu với điều kiện không ảnh hưởng đến quyền lợi của Khách Hàng.
+                10.2. Bằng văn bản thông báo trước 5 (năm) ngày làm việc mà
+                không nhận được phản hồi của Khách Hàng trong 5 (năm) ngày làm
+                việc kể từ ngày thông báo, Bên Bán hiểu rằng Khách Hàng đồng ý
+                cho Bên Bán chuyển giao Hợp Đồng này cho công ty con/liên kết
+                của mình hoặc công ty mới thành lập do tái cơ cấu với điều kiện
+                không ảnh hưởng đến quyền lợi của Khách Hàng.
               </p>
               <p>
-                <strong>10.3.</strong> Hợp Đồng được lập thành{" "}
-                <span className="bg-gray-200 px-1">04 (bốn)</span> bản có giá
-                trị như nhau, mỗi Bên giữ{" "}
-                <span className="bg-gray-200 px-1">02 (hai)</span> bản.
+                10.3.Hợp Đồng được lập thành 04 (bốn) bản có giá trị như nhau,
+                mỗi Bên giữ 02 (hai) bản.
               </p>
             </div>
           </div>
 
           {/* Signature Section */}
           <div className="mt-8 mb-6">
-            <div className="flex justify-between text-sm">
-              <div>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="text-center">
                 <p className="font-bold">KHÁCH HÀNG</p>
               </div>
-              <div className="text-right">
+              <div className="text-center">
                 <p className="font-bold">BÊN BÁN</p>
               </div>
             </div>

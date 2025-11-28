@@ -6,6 +6,7 @@ import { X, Check, ArrowLeft, ChevronDown } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { carPriceData, uniqueNgoaiThatColors, uniqueNoiThatColors } from '../data/calculatorData';
 import { getAllBranches, getBranchByShowroomName } from '../data/branchData';
+import { loadPromotionsFromFirebase, defaultPromotions } from '../data/promotionsData';
 
 export default function ContractFormPage() {
   const navigate = useNavigate();
@@ -55,13 +56,27 @@ export default function ContractFormPage() {
     loadEmployees();
   }, []);
 
-  // List of available promotions
-  const availablePromotions = [
-    "Chính sách MLTTVN 3: Giảm 4% Tiền mặt",
-    "Miễn phí sạc tới 30/06/2027",
-    "Chính Sách Sài Gòn Xanh: Ví VinClub 35.000.000 vnđ",
-    "Thu cũ đổi mới xe xăng VinFast: 50.000.000 vnđ"
-  ];
+  // List of available promotions - loaded from Firebase
+  const [availablePromotions, setAvailablePromotions] = useState(defaultPromotions);
+
+  // Load promotions from Firebase on component mount
+  useEffect(() => {
+    const loadPromotions = async () => {
+      try {
+        const promotionsList = await loadPromotionsFromFirebase();
+        if (promotionsList && promotionsList.length > 0) {
+          // Use promotions from Firebase, extract names
+          const promotionNames = promotionsList.map(p => p.name || '').filter(Boolean);
+          setAvailablePromotions(promotionNames);
+        }
+        // If Firebase is empty, use defaultPromotions (already set in useState)
+      } catch (err) {
+        console.error('Error loading promotions:', err);
+        // Keep defaultPromotions if loading fails
+      }
+    };
+    loadPromotions();
+  }, []);
 
   const [contract, setContract] = useState({
     id: null,
@@ -90,6 +105,7 @@ export default function ContractFormPage() {
 
   // State for dropdown visibility
   const [isUuDaiDropdownOpen, setIsUuDaiDropdownOpen] = useState(false);
+  const [dropdownDirection, setDropdownDirection] = useState('down'); // 'down' or 'up'
 
   useEffect(() => {
     if (contractData) {
@@ -149,10 +165,8 @@ export default function ContractFormPage() {
             if (value.includes(',')) {
               return value.split(',').map(v => v.trim()).filter(Boolean);
             }
-            // Check if it matches any of the available promotions
-            if (availablePromotions.includes(value)) {
-              return [value];
-            }
+            // Return as single item array if it's a single string value
+            return [value];
           }
         }
         return [];
@@ -188,6 +202,8 @@ export default function ContractFormPage() {
 
   // Close dropdown when clicking outside
   const dropdownRef = useRef(null);
+  const dropdownButtonRef = useRef(null);
+  
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -197,6 +213,21 @@ export default function ContractFormPage() {
 
     if (isUuDaiDropdownOpen) {
       document.addEventListener('mousedown', handleClickOutside);
+      
+      // Calculate dropdown direction based on available space
+      if (dropdownButtonRef.current) {
+        const buttonRect = dropdownButtonRef.current.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - buttonRect.bottom;
+        const spaceAbove = buttonRect.top;
+        const estimatedDropdownHeight = 240; // max-h-60 = 240px
+        
+        // Show dropdown above if not enough space below but enough space above
+        if (spaceBelow < estimatedDropdownHeight && spaceAbove > spaceBelow) {
+          setDropdownDirection('up');
+        } else {
+          setDropdownDirection('down');
+        }
+      }
     }
 
     return () => {
@@ -845,6 +876,7 @@ export default function ContractFormPage() {
                   </label>
                   <div className="relative" ref={dropdownRef}>
                     <button
+                      ref={dropdownButtonRef}
                       type="button"
                       onClick={() => !isDetailsMode && setIsUuDaiDropdownOpen(!isUuDaiDropdownOpen)}
                       disabled={isDetailsMode}
@@ -862,7 +894,13 @@ export default function ContractFormPage() {
                       />
                     </button>
                     {isUuDaiDropdownOpen && !isDetailsMode && (
-                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      <div
+                        className={`absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto ${
+                          dropdownDirection === 'up'
+                            ? 'bottom-full mb-1'
+                            : 'top-full mt-1'
+                        }`}
+                      >
                         {availablePromotions.map((promotion) => {
                           const isSelected = contract.uuDai && contract.uuDai.includes(promotion);
                           return (

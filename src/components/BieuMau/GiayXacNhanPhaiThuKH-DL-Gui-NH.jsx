@@ -6,6 +6,7 @@ import {
   getBranchByShowroomName,
   getDefaultBranch,
 } from "../../data/branchData";
+import { vndToWords } from "../../utils/vndToWords";
 
 const GiayXacNhanPhaiThuKH_DL_Gui_NH = () => {
   const location = useLocation();
@@ -43,6 +44,8 @@ const GiayXacNhanPhaiThuKH_DL_Gui_NH = () => {
   const [soTienConLai, setSoTienConLai] = useState("");
   const [soTienBangChu, setSoTienBangChu] = useState("");
   const [giaTriHopDongBangChu, setGiaTriHopDongBangChu] = useState("");
+  const [soTienVay, setSoTienVay] = useState("");
+  const [soTienVayBangChu, setSoTienVayBangChu] = useState("");
 
   // Bank info
   const [soTaiKhoan, setSoTaiKhoan] = useState("");
@@ -55,112 +58,6 @@ const GiayXacNhanPhaiThuKH_DL_Gui_NH = () => {
     if (!value) return "";
     const number = value.replace(/[^\d]/g, "");
     return number.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  };
-
-  // Helper function to convert number to Vietnamese words
-  const numberToWords = (amount) => {
-    if (!amount) return "";
-    const numericAmount =
-      typeof amount === "string" ? amount.replace(/\D/g, "") : String(amount);
-    const num = parseInt(numericAmount, 10);
-    if (isNaN(num) || num === 0) return "";
-
-    const ones = [
-      "",
-      "một",
-      "hai",
-      "ba",
-      "bốn",
-      "năm",
-      "sáu",
-      "bảy",
-      "tám",
-      "chín",
-    ];
-    const tens = [
-      "",
-      "mười",
-      "hai mươi",
-      "ba mươi",
-      "bốn mươi",
-      "năm mươi",
-      "sáu mươi",
-      "bảy mươi",
-      "tám mươi",
-      "chín mươi",
-    ];
-    const hundreds = [
-      "",
-      "một trăm",
-      "hai trăm",
-      "ba trăm",
-      "bốn trăm",
-      "năm trăm",
-      "sáu trăm",
-      "bảy trăm",
-      "tám trăm",
-      "chín trăm",
-    ];
-
-    const readGroup = (n) => {
-      if (n === 0) return "";
-      let result = "";
-      const hundred = Math.floor(n / 100);
-      const ten = Math.floor((n % 100) / 10);
-      const one = n % 10;
-
-      if (hundred > 0) {
-        result += hundreds[hundred] + " ";
-      }
-
-      if (ten > 0) {
-        if (ten === 1) {
-          result += "mười ";
-          if (one > 0) {
-            result += one === 5 ? "lăm " : ones[one] + " ";
-          }
-        } else {
-          result += tens[ten] + " ";
-          if (one > 0) {
-            if (one === 5 && ten > 0) {
-              result += "lăm ";
-            } else if (one === 1 && ten > 1) {
-              result += "mốt ";
-            } else {
-              result += ones[one] + " ";
-            }
-          }
-        }
-      } else if (one > 0) {
-        if (hundred > 0 && one === 5) {
-          result += "lăm ";
-        } else {
-          result += ones[one] + " ";
-        }
-      }
-      return result.trim();
-    };
-
-    const billion = Math.floor(num / 1000000000);
-    const million = Math.floor((num % 1000000000) / 1000000);
-    const thousand = Math.floor((num % 1000000) / 1000);
-    const remainder = num % 1000;
-
-    let result = "";
-    if (billion > 0) {
-      result += readGroup(billion) + " tỷ ";
-    }
-    if (million > 0) {
-      result += readGroup(million) + " triệu ";
-    }
-    if (thousand > 0) {
-      result += readGroup(thousand) + " nghìn ";
-    }
-    if (remainder > 0) {
-      result += readGroup(remainder);
-    }
-
-    return result.trim() + " đồng";
   };
 
   const formatDate = (dateStr) => {
@@ -216,9 +113,7 @@ const GiayXacNhanPhaiThuKH_DL_Gui_NH = () => {
 
       // Auto-fill thông tin công ty từ branch
       if (branchInfo) {
-        setCongTy(
-          `Công ty Cổ phần Đầu tư Thương mại và Dịch vụ Ô tô Đông Sài Gòn - Chi nhánh ${branchInfo.shortName.toUpperCase()}`
-        );
+        setCongTy(`${branchInfo.name.toUpperCase()}`);
         setDiaChiTruSo(branchInfo.address);
         setMaSoDN(branchInfo.taxCode || "");
         setDaiDien(branchInfo.representativeName || "");
@@ -281,7 +176,7 @@ const GiayXacNhanPhaiThuKH_DL_Gui_NH = () => {
               ? contractPrice.replace(/\D/g, "")
               : String(contractPrice);
           setGiaTriHopDong(formatCurrency(priceValue));
-          setGiaTriHopDongBangChu(numberToWords(priceValue));
+          setGiaTriHopDongBangChu(vndToWords(priceValue));
         }
 
         // Số tiền còn lại (nếu có)
@@ -296,7 +191,22 @@ const GiayXacNhanPhaiThuKH_DL_Gui_NH = () => {
               ? remainingAmount.replace(/\D/g, "")
               : String(remainingAmount);
           setSoTienConLai(formatCurrency(amountValue));
-          setSoTienBangChu(numberToWords(amountValue));
+          setSoTienBangChu(vndToWords(amountValue));
+        }
+
+        // Số tiền Khách Hàng vay Ngân hàng (nếu có)
+        const loanAmount =
+          dataSource.soTienVay ||
+          dataSource["Số Tiền Vay"] ||
+          dataSource.loanAmount ||
+          "";
+        if (loanAmount) {
+          const loanValue =
+            typeof loanAmount === "string"
+              ? loanAmount.replace(/\D/g, "")
+              : String(loanAmount);
+          setSoTienVay(formatCurrency(loanValue));
+          setSoTienVayBangChu(vndToWords(loanValue));
         }
 
         // Thông tin ngân hàng (nếu có)
@@ -340,9 +250,9 @@ const GiayXacNhanPhaiThuKH_DL_Gui_NH = () => {
       style={{ fontFamily: "Times New Roman" }}
     >
       <div className="max-w-4xl mx-auto print:max-w-3xl print:mx-auto">
-        <div className="bg-white p-12 print:p-8" id="printable-content">
+        <div className="bg-white p-12 print:p-8 text-[14px]" id="printable-content">
           {/* Header */}
-          <div className="text-center mb-6">
+          <div className="text-center mb-2">
             <p className="font-bold">
               Cộng Hòa – Xã Hội – Chủ Nghĩa – Việt Nam
             </p>
@@ -350,7 +260,7 @@ const GiayXacNhanPhaiThuKH_DL_Gui_NH = () => {
             <p className="mt-2">**********</p>
           </div>
 
-          <div className="text-right mb-8 italic">
+          <div className="text-right mb-4 italic">
             <span className="print:hidden">
               <input
                 type="text"
@@ -390,12 +300,12 @@ const GiayXacNhanPhaiThuKH_DL_Gui_NH = () => {
           </div>
 
           {/* Title */}
-          <h1 className="text-center text-xl font-bold mb-8">
+          <h1 className="text-center text-[20px] font-bold mb-8">
             GIẤY XÁC NHẬN CÔNG NỢ
           </h1>
 
           {/* Company Info */}
-          <div className="mb-6 space-y-2">
+          <div className="mb-3 space-y-1">
             <p>
               <span className="print:hidden">
                 <input
@@ -405,7 +315,7 @@ const GiayXacNhanPhaiThuKH_DL_Gui_NH = () => {
                   className="border-b border-gray-400 font-bold uppercase px-1 w-full focus:outline-none focus:border-blue-500"
                 />
               </span>
-              <span className="hidden print:inline">{congTy}</span>
+              <span className="hidden print:inline font-bold">{congTy}</span>
             </p>
             <p>
               Địa chỉ trụ sở chính:{" "}
@@ -519,7 +429,7 @@ const GiayXacNhanPhaiThuKH_DL_Gui_NH = () => {
               >
                 {congTy || "Công ty"}
               </span>{" "}
-              <span className="hidden print:inline">{giaTriHopDong}</span> và{" "}
+              và{" "}
               <strong>Ông/Bà</strong>{" "}
               <span className="print:hidden">
                 <input
@@ -549,22 +459,23 @@ const GiayXacNhanPhaiThuKH_DL_Gui_NH = () => {
                   onChange={(e) => {
                     const val = e.target.value.replace(/\D/g, "");
                     setGiaTriHopDong(formatCurrency(val));
-                    setGiaTriHopDongBangChu(numberToWords(val));
+                    setGiaTriHopDongBangChu(vndToWords(val));
                   }}
-                  className="border-b border-gray-400 px-1 w-48 focus:outline-none focus:border-blue-500"
+                  className="border-b border-gray-400 font-bold px-1 w-48 focus:outline-none focus:border-blue-500"
                 />
               </span>
-              <strong>VNĐ (Bằng chữ:</strong>{" "}
+              <span className="hidden print:inline font-bold">{giaTriHopDong}</span>
+              <strong>{" "}VNĐ</strong> <em className="font-bold">(Bằng chữ:</em>{" "}
               <span className="print:hidden">
                 <input
                   type="text"
                   value={giaTriHopDongBangChu}
                   onChange={(e) => setGiaTriHopDongBangChu(e.target.value)}
-                  className="border-b border-gray-400 px-1 w-full focus:outline-none focus:border-blue-500"
+                  className="border-b border-gray-400 px-1 w-full font-bold italic focus:outline-none focus:border-blue-500"
                   placeholder="Nhập bằng chữ"
                 />
               </span>
-              <span className="hidden print:inline">
+              <span className="hidden print:inline font-bold italic">
                 {giaTriHopDongBangChu || "______"}
               </span>
               <strong>)</strong>. Bằng văn bản này:{" "}
@@ -602,7 +513,7 @@ const GiayXacNhanPhaiThuKH_DL_Gui_NH = () => {
                   onChange={(e) => {
                     const val = e.target.value.replace(/\D/g, "");
                     setSoTienConLai(formatCurrency(val));
-                    setSoTienBangChu(numberToWords(val));
+                    setSoTienBangChu(vndToWords(val));
                   }}
                   className="border-b border-gray-400 px-1 w-48 focus:outline-none focus:border-blue-500"
                   placeholder="Nhập số tiền"
@@ -611,27 +522,69 @@ const GiayXacNhanPhaiThuKH_DL_Gui_NH = () => {
               <span className="hidden print:inline">
                 {soTienConLai || "______"} VNĐ
               </span>{" "}
-              <strong>(Bằng chữ:</strong>{" "}
+              <em className="font-bold">(Bằng chữ:</em>{" "}
               <span className="print:hidden">
                 <input
                   type="text"
                   value={soTienBangChu}
                   onChange={(e) => setSoTienBangChu(e.target.value)}
-                  className="border-b border-gray-400 px-1 w-full focus:outline-none focus:border-blue-500"
+                  className="border-b border-gray-400 px-1 w-full font-bold italic focus:outline-none focus:border-blue-500"
                   placeholder="Nhập bằng chữ"
                 />
               </span>
-              <span className="hidden print:inline">
+              <span className="hidden print:inline font-bold italic">
                 {soTienBangChu || "______"}
               </span>
-              <strong>)</strong> dựa theo thông báo cho vay đã phê duyệt, kính
+              <strong>)</strong>. Số tiền Khách Hàng vay Ngân hàng để thanh
+              toán:{" "}
+              <span className="print:hidden">
+                <input
+                  type="text"
+                  value={soTienVay}
+                  onChange={(e) => {
+                    const rawValue = e.target.value;
+                    const val = rawValue.replace(/\D/g, "");
+                    setSoTienVay(formatCurrency(val));
+                    // Tự động chuyển số tiền sang chữ khi nhập
+                    if (val && val.length > 0) {
+                      const numValue = parseInt(val, 10);
+                      if (!isNaN(numValue) && numValue > 0) {
+                        setSoTienVayBangChu(vndToWords(val));
+                      } else {
+                        setSoTienVayBangChu("");
+                      }
+                    } else {
+                      setSoTienVayBangChu("");
+                    }
+                  }}
+                  className="border-b border-gray-400 px-1 w-48 focus:outline-none focus:border-blue-500"
+                  placeholder="Nhập số tiền vay"
+                />
+              </span>
+              <span className="hidden print:inline">
+                {soTienVay || "______"} VNĐ
+              </span>{" "}
+              <em className="font-bold">(Bằng chữ:</em>{" "}
+              <span className="print:hidden">
+                <input
+                  type="text"
+                  value={soTienVayBangChu}
+                  onChange={(e) => setSoTienVayBangChu(e.target.value)}
+                  className="border-b border-gray-400 px-1 w-full font-bold italic focus:outline-none focus:border-blue-500"
+                  placeholder="Nhập bằng chữ"
+                />
+              </span>
+              <span className="hidden print:inline font-bold italic">
+                {soTienVayBangChu || "______"}
+              </span>
+              <strong>)</strong>. Dựa theo thông báo cho vay đã phê duyệt, kính
               đề nghị quý ngân hàng giải ngân số tiền còn lại theo thông báo cho
               vay theo thông tin số tài khoản dưới đây
             </p>
           </div>
 
           {/* Bank Info */}
-          <div className="mb-8 space-y-2">
+          <div className="mb-6 space-y-2">
             <p>
               Số tài khoản:{" "}
               <span className="print:hidden">
@@ -675,23 +628,28 @@ const GiayXacNhanPhaiThuKH_DL_Gui_NH = () => {
               <span className="print:hidden">
                 <input
                   type="text"
-                  value={"Công ty Cổ phần Đầu tư Thương mại và Dịch vụ Ô tô Đông Sài Gòn"}
+                  value={
+                    "Công ty Cổ phần Đầu tư Thương mại và Dịch vụ Ô tô Đông Sài Gòn"
+                  }
                   onChange={(e) => setCongTyTaiKhoan(e.target.value)}
                   className="border-b border-gray-400 px-1 w-[70%] focus:outline-none focus:border-blue-500"
                 />
               </span>
               <span className="hidden print:inline">
-                {chuTaiKhoan || "______"}
+                {congTyTaiKhoan || "______"}
               </span>
             </p>
           </div>
 
-          <p className="mb-16">Xin chân thành cảm ơn!</p>
+          <p className="mb-3">Xin chân thành cảm ơn!</p>
 
           {/* Signature */}
-          <div className="text-center">
-            <p className="font-bold mb-1">CÔNG TY XÁC NHẬN</p>
-            <p className="italic mb-20">(Ký tên, Đóng dấu)</p>
+          <div className="flex w-full">
+            <div className="w-1/2"></div>
+            <div className="w-1/2">
+              <p className="font-bold mb-1 text-center">CÔNG TY XÁC NHẬN</p>
+              <p className="italic mb-20 text-center">(Ký tên, Đóng dấu)</p>
+            </div>
           </div>
         </div>
       </div>
