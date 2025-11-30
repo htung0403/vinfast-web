@@ -12,6 +12,9 @@ const GiayXacNhanTangBaoHiem = () => {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [nganHangName, setNganHangName] = useState(
+    "NGÂN HÀNG TMCP VIỆT NAM THỊNH VƯỢNG"
+  );
   const [recipientInfo, setRecipientInfo] = useState(
     "TRUNG TÂM THẾ CHẤP VÙNG 9"
   );
@@ -174,6 +177,9 @@ const GiayXacNhanTangBaoHiem = () => {
         setInsuranceEnd(convertToDateInput(processedData.insuranceEnd));
         if (incoming.recipientInfo) {
           setRecipientInfo(incoming.recipientInfo);
+        }
+        if (incoming.nganHangName) {
+          setNganHangName(incoming.nganHangName);
         }
       } else {
         // Sử dụng chi nhánh mặc định
@@ -350,7 +356,16 @@ const GiayXacNhanTangBaoHiem = () => {
             <p className="font-bold mb-1 text-center">
               <strong>Kính gởi:</strong>{" "}
               <strong>
-                NGÂN HÀNG TMCP VIỆT NAM THỊNH VƯỢNG
+                <span className="print:hidden">
+                  <input
+                    type="text"
+                    value={nganHangName}
+                    onChange={(e) => setNganHangName(e.target.value)}
+                    className="border-b border-gray-400 px-2 py-1 text-sm font-bold w-full max-w-lg focus:outline-none focus:border-blue-500"
+                    placeholder="NGÂN HÀNG TMCP VIỆT NAM THỊNH VƯỢNG"
+                  />
+                </span>
+                <span className="hidden print:inline">{nganHangName}</span>
                 <br /> –{" "}
                 <span className="print:hidden">
                   <input

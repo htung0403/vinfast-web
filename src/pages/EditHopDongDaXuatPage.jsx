@@ -82,6 +82,9 @@ export default function EditHopDongDaXuatPage() {
     soMay: "",
     tinhTrang: "",
     nganHang: "",
+    quaTang: "",
+    quaTangKhac: "",
+    giamGia: "",
   });
 
   // Load contract data
@@ -150,6 +153,9 @@ export default function EditHopDongDaXuatPage() {
           soMay: contractData.soMay || contractData["Số Máy"] || contractData.engineNumber || "",
           tinhTrang: contractData.tinhTrang || contractData["Tình Trạng"] || contractData.status || "",
           nganHang: contractData.nganHang || contractData["ngân hàng"] || contractData.bank || "",
+          quaTang: contractData.quaTang || contractData["Quà tặng"] || contractData["quà tặng"] || "",
+          quaTangKhac: contractData.quaTangKhac || contractData["Quà tặng khác"] || contractData["quà tặng khác"] || "",
+          giamGia: contractData.giamGia || contractData["Giảm giá"] || contractData["giảm giá"] || "",
         };
 
         setContract(mapped);
@@ -399,6 +405,15 @@ export default function EditHopDongDaXuatPage() {
         "Số Máy": safeValue(contract.soMay),
         "Tình Trạng": safeValue(contract.tinhTrang),
         "ngân hàng": safeValue(contract.nganHang),
+        "quà tặng theo xe": safeValue(contract.quaTang),
+        "Quà tặng": safeValue(contract.quaTang),
+        "Quà tặng khác": safeValue(contract.quaTangKhac),
+        "quà tặng khác": safeValue(contract.quaTangKhac),
+        "giảm giá theo xe": safeValue(contract.giamGia),
+        "Giảm giá": safeValue(contract.giamGia),
+        quaTang: safeValue(contract.quaTang),
+        quaTangKhac: safeValue(contract.quaTangKhac),
+        giamGia: safeValue(contract.giamGia),
         "Ảnh chụp hình đặt cọc": safeValue(depositImage),
         "Ảnh chụp đối ứng": safeValue(counterpartImage),
         depositImage: safeValue(depositImage),
@@ -838,6 +853,48 @@ export default function EditHopDongDaXuatPage() {
                     onChange={(e) => handleChange("nganHang", e.target.value)}
                     className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm"
                     placeholder="Ngân hàng"
+                  />
+                </div>
+
+                {/* Quà tặng theo xe */}
+                <div className="sm:col-span-2 lg:col-span-1">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
+                    Quà tặng theo xe
+                  </label>
+                  <input
+                    type="text"
+                    value={contract.quaTang || ""}
+                    onChange={(e) => handleChange("quaTang", e.target.value)}
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm"
+                    placeholder="Áo trùm, bao tay lái, sáp thơm, bình chữa cháy."
+                  />
+                </div>
+
+                {/* Quà tặng khác */}
+                <div className="sm:col-span-2 lg:col-span-1">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
+                    Quà tặng khác
+                  </label>
+                  <input
+                    type="text"
+                    value={contract.quaTangKhac || ""}
+                    onChange={(e) => handleChange("quaTangKhac", e.target.value)}
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm"
+                    placeholder="Bảo Hiểm Vật Chất Kinh Doanh, Cam, Film, Sàn"
+                  />
+                </div>
+
+                {/* Bên A đồng ý giảm cho Bên B số tiền */}
+                <div className="sm:col-span-2 lg:col-span-1">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
+                    Bên A đồng ý giảm cho Bên B số tiền
+                  </label>
+                  <input
+                    type="text"
+                    value={formatCurrency(contract.giamGia)}
+                    onChange={(e) => handleCurrencyChange("giamGia", e.target.value)}
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm"
+                    placeholder="Nhập số tiền giảm"
                   />
                 </div>
               </div>

@@ -4,7 +4,7 @@ import { ref, get, push, update, remove } from 'firebase/database';
 import { database } from '../firebase/config';
 import { X, Trash2, Plus, Edit, Search, ArrowLeft, FileText, ChevronDown } from 'lucide-react';
 import { toast } from 'react-toastify';
-import { uniqueNgoaiThatColors, uniqueNoiThatColors } from '../data/calculatorData';
+import { uniqueNgoaiThatColors, uniqueNoiThatColors, danh_sach_xe, carPriceData } from '../data/calculatorData';
 import { getBranchByShowroomName } from '../data/branchData';
 import { provinces } from '../data/provincesData';
 
@@ -25,6 +25,7 @@ const TINH_TRANG_OPTIONS = [
 const THANH_TOAN_OPTIONS = ['Trả thẳng', 'Trả góp'];
 const NHU_CAU_OPTIONS = ['Kinh doanh', 'Không kinh doanh'];
 const NGUON_OPTIONS = ['Showroom', 'Facebook', 'Web', 'Giới thiệu', 'Sự kiện'];
+const KHACH_HANG_LA_OPTIONS = ['Cá nhân', 'Công ty'];
 
 export default function QuanLyKhachHangPage() {
   const navigate = useNavigate();
@@ -59,6 +60,7 @@ export default function QuanLyKhachHangPage() {
     ngay: new Date().toISOString().split('T')[0],
     tenKhachHang: '',
     soDienThoai: '',
+    khachHangLa: '',
     tinhThanh: '',
     dongXe: '',
     phienBan: '',
@@ -81,6 +83,28 @@ export default function QuanLyKhachHangPage() {
       (color) => color.code === colorCode || color.name.toLowerCase() === colorCode.toLowerCase()
     );
     return found ? found.name : colorCode;
+  };
+
+  // Get list of car models (dòng xe)
+  const getCarModels = () => {
+    return danh_sach_xe.map(xe => xe.ten_hien_thi);
+  };
+
+  // Get list of variants (phiên bản) based on selected car model
+  const getVariants = (selectedModel) => {
+    if (!selectedModel) return [];
+    const variants = new Set();
+    carPriceData.forEach(car => {
+      if (car.model === selectedModel && car.trim) {
+        variants.add(car.trim);
+      }
+    });
+    return Array.from(variants).sort();
+  };
+
+  // Get list of colors (màu sắc) - exterior colors
+  const getColors = () => {
+    return uniqueNgoaiThatColors.map(color => color.name);
   };
 
   // Helper function to get color classes for mucDo (level)
@@ -479,6 +503,7 @@ export default function QuanLyKhachHangPage() {
       ngay: new Date().toISOString().split('T')[0],
       tenKhachHang: '',
       soDienThoai: '',
+      khachHangLa: '',
       tinhThanh: '',
       dongXe: '',
       phienBan: '',
@@ -502,6 +527,7 @@ export default function QuanLyKhachHangPage() {
       ngay: customer.ngay || new Date().toISOString().split('T')[0],
       tenKhachHang: customer.tenKhachHang || '',
       soDienThoai: customer.soDienThoai || '',
+      khachHangLa: customer.khachHangLa || '',
       tinhThanh: customer.tinhThanh || '',
       dongXe: customer.dongXe || '',
       phienBan: customer.phienBan || '',
@@ -525,6 +551,7 @@ export default function QuanLyKhachHangPage() {
       ngay: new Date().toISOString().split('T')[0],
       tenKhachHang: '',
       soDienThoai: '',
+      khachHangLa: '',
       tinhThanh: '',
       dongXe: '',
       phienBan: '',
@@ -557,6 +584,7 @@ export default function QuanLyKhachHangPage() {
         ngay: formData.ngay,
         tenKhachHang: formData.tenKhachHang,
         soDienThoai: formData.soDienThoai,
+        khachHangLa: formData.khachHangLa || '',
         tinhThanh: formData.tinhThanh,
         dongXe: formData.dongXe,
         phienBan: formData.phienBan,
@@ -1610,6 +1638,24 @@ export default function QuanLyKhachHangPage() {
 
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
+                    Khách hàng là
+                  </label>
+                  <select
+                    value={formData.khachHangLa}
+                    onChange={(e) => handleInputChange('khachHangLa', e.target.value)}
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="">-- Chọn loại khách hàng --</option>
+                    {KHACH_HANG_LA_OPTIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Tỉnh Thành
                   </label>
                   <select
@@ -1630,36 +1676,79 @@ export default function QuanLyKhachHangPage() {
                   <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Dòng Xe
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={formData.dongXe}
-                    onChange={(e) => handleInputChange('dongXe', e.target.value)}
+                    onChange={(e) => {
+                      handleInputChange('dongXe', e.target.value);
+                      // Reset phiên bản when dòng xe changes
+                      if (e.target.value !== formData.dongXe) {
+                        handleInputChange('phienBan', '');
+                      }
+                    }}
                     className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
+                  >
+                    <option value="">-- Chọn dòng xe --</option>
+                    {getCarModels().map((model) => (
+                      <option key={model} value={model}>
+                        {model}
+                      </option>
+                    ))}
+                    {/* Show current value if it doesn't match any option (for editing existing customers or contract selection) */}
+                    {formData.dongXe && !getCarModels().includes(formData.dongXe) && (
+                      <option value={formData.dongXe}>
+                        {formData.dongXe} (giá trị hiện tại)
+                      </option>
+                    )}
+                  </select>
                 </div>
 
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Phiên Bản
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={formData.phienBan}
                     onChange={(e) => handleInputChange('phienBan', e.target.value)}
-                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    disabled={!formData.dongXe}
+                  >
+                    <option value="">-- Chọn phiên bản --</option>
+                    {getVariants(formData.dongXe).map((variant) => (
+                      <option key={variant} value={variant}>
+                        {variant}
+                      </option>
+                    ))}
+                    {/* Show current value if it doesn't match any option (for editing existing customers or contract selection) */}
+                    {formData.phienBan && !getVariants(formData.dongXe).includes(formData.phienBan) && (
+                      <option value={formData.phienBan}>
+                        {formData.phienBan} (giá trị hiện tại)
+                      </option>
+                    )}
+                  </select>
                 </div>
 
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Màu Sắc
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={formData.mauSac}
                     onChange={(e) => handleInputChange('mauSac', e.target.value)}
                     className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
+                  >
+                    <option value="">-- Chọn màu sắc --</option>
+                    {getColors().map((color) => (
+                      <option key={color} value={color}>
+                        {color}
+                      </option>
+                    ))}
+                    {/* Show current value if it doesn't match any option (for editing existing customers or contract selection) */}
+                    {formData.mauSac && !getColors().includes(formData.mauSac) && (
+                      <option value={formData.mauSac}>
+                        {formData.mauSac} (giá trị hiện tại)
+                      </option>
+                    )}
+                  </select>
                 </div>
 
                 <div>
@@ -1860,6 +1949,24 @@ export default function QuanLyKhachHangPage() {
 
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
+                    Khách hàng là
+                  </label>
+                  <select
+                    value={formData.khachHangLa}
+                    onChange={(e) => handleInputChange('khachHangLa', e.target.value)}
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="">-- Chọn loại khách hàng --</option>
+                    {KHACH_HANG_LA_OPTIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Tỉnh Thành
                   </label>
                   <select
@@ -1880,36 +1987,79 @@ export default function QuanLyKhachHangPage() {
                   <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Dòng Xe
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={formData.dongXe}
-                    onChange={(e) => handleInputChange('dongXe', e.target.value)}
+                    onChange={(e) => {
+                      handleInputChange('dongXe', e.target.value);
+                      // Reset phiên bản when dòng xe changes
+                      if (e.target.value !== formData.dongXe) {
+                        handleInputChange('phienBan', '');
+                      }
+                    }}
                     className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
+                  >
+                    <option value="">-- Chọn dòng xe --</option>
+                    {getCarModels().map((model) => (
+                      <option key={model} value={model}>
+                        {model}
+                      </option>
+                    ))}
+                    {/* Show current value if it doesn't match any option (for editing existing customers or contract selection) */}
+                    {formData.dongXe && !getCarModels().includes(formData.dongXe) && (
+                      <option value={formData.dongXe}>
+                        {formData.dongXe} (giá trị hiện tại)
+                      </option>
+                    )}
+                  </select>
                 </div>
 
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Phiên Bản
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={formData.phienBan}
                     onChange={(e) => handleInputChange('phienBan', e.target.value)}
-                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    disabled={!formData.dongXe}
+                  >
+                    <option value="">-- Chọn phiên bản --</option>
+                    {getVariants(formData.dongXe).map((variant) => (
+                      <option key={variant} value={variant}>
+                        {variant}
+                      </option>
+                    ))}
+                    {/* Show current value if it doesn't match any option (for editing existing customers or contract selection) */}
+                    {formData.phienBan && !getVariants(formData.dongXe).includes(formData.phienBan) && (
+                      <option value={formData.phienBan}>
+                        {formData.phienBan} (giá trị hiện tại)
+                      </option>
+                    )}
+                  </select>
                 </div>
 
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                     Màu Sắc
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={formData.mauSac}
                     onChange={(e) => handleInputChange('mauSac', e.target.value)}
                     className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
+                  >
+                    <option value="">-- Chọn màu sắc --</option>
+                    {getColors().map((color) => (
+                      <option key={color} value={color}>
+                        {color}
+                      </option>
+                    ))}
+                    {/* Show current value if it doesn't match any option (for editing existing customers or contract selection) */}
+                    {formData.mauSac && !getColors().includes(formData.mauSac) && (
+                      <option value={formData.mauSac}>
+                        {formData.mauSac} (giá trị hiện tại)
+                      </option>
+                    )}
+                  </select>
                 </div>
 
                 <div>

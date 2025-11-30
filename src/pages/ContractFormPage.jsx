@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ref, update, push, get } from 'firebase/database';
+import { ref, update, push, get, set, remove } from 'firebase/database';
 import { database } from '../firebase/config';
 import { X, Check, ArrowLeft, ChevronDown } from 'lucide-react';
 import { toast } from 'react-toastify';
@@ -100,6 +100,9 @@ export default function ContractFormPage() {
     payment: "",
     bank: "",
     uuDai: [],
+    quaTang: "",
+    quaTangKhac: "",
+    giamGia: "",
     status: "mới",
   });
 
@@ -195,6 +198,9 @@ export default function ContractFormPage() {
         payment: contractData.payment || contractData.thanhToan || "",
         bank: contractData.bank || contractData.nganHang || "",
         uuDai: parseUuDai(contractData.uuDai || contractData["Ưu đãi"] || contractData["ưu đãi"] || ""),
+        quaTang: contractData.quaTang || contractData["Quà tặng"] || contractData["quà tặng"] || "",
+        quaTangKhac: contractData.quaTangKhac || contractData["Quà tặng khác"] || contractData["quà tặng khác"] || "",
+        giamGia: contractData.giamGia || contractData["Giảm giá"] || contractData["giảm giá"] || "",
         status: contractData.status || contractData.trangThai || "mới",
       });
     }
@@ -380,6 +386,12 @@ export default function ContractFormPage() {
       const safeValue = (val) => val !== undefined && val !== null ? val : "";
 
       if (isEditMode && contractData.firebaseKey) {
+        // Get old status to check if we need to sync with exportedContracts
+        const oldStatus = contractData.status || contractData.trangThai || "";
+        const newStatus = safeValue(contract.status) || "mới";
+        const oldStatusLower = oldStatus.toLowerCase();
+        const newStatusLower = newStatus.toLowerCase();
+
         // Update existing contract
         const contractRef = ref(database, `contracts/${contractData.firebaseKey}`);
         await update(contractRef, {
@@ -404,8 +416,69 @@ export default function ContractFormPage() {
           thanhToan: safeValue(contract.payment),
           nganHang: safeValue(contract.bank),
           uuDai: Array.isArray(contract.uuDai) ? contract.uuDai : [],
-          trangThai: safeValue(contract.status) || "mới",
+          quaTang: safeValue(contract.quaTang),
+          quaTangKhac: safeValue(contract.quaTangKhac),
+          giamGia: safeValue(contract.giamGia),
+          trangThai: newStatus,
         });
+
+        // Sync with exportedContracts based on status change
+        const exportKey = contractData.firebaseKey;
+        const exportedContractRef = ref(database, `exportedContracts/${exportKey}`);
+
+        // If changing from non-"xuất" to "xuất": add to exportedContracts
+        if (oldStatusLower !== "xuất" && newStatusLower === "xuất") {
+          // Get current date/time in format YYYY-MM-DD
+          const now = new Date();
+          const ngayXhd = now.toISOString().split("T")[0];
+
+          // Map contract data to exported format (matching HopDongDaXuat format)
+          const exportedData = {
+            id: safeValue(contract.id),
+            stt: safeValue(contractData.stt),
+            "ngày xhd": ngayXhd, // Export date - now
+            tvbh: safeValue(contract.tvbh),
+            VSO: safeValue(contract.vso),
+            "Tên Kh": safeValue(contract.customerName),
+            "Số Điện Thoại": safeValue(contract.phone),
+            Email: safeValue(contract.email || ""),
+            "Địa Chỉ": safeValue(contract.address || ""),
+            CCCD: safeValue(contract.cccd),
+            "Ngày Cấp": safeValue(contract.issueDate),
+            "Nơi Cấp": safeValue(contract.issuePlace),
+            "Dòng xe": safeValue(contract.model),
+            "Phiên Bản": safeValue(contract.variant),
+            "Ngoại Thất": safeValue(contract.exterior),
+            "Nội Thất": safeValue(contract.interior),
+            "Giá Niêm Yết": safeValue(contract.contractPrice),
+            "Giá Giảm": safeValue(contract.deposit),
+            "Giá Hợp Đồng": safeValue(contract.contractPrice),
+            "Số Khung": safeValue(contractData.soKhung || contractData.chassisNumber || contractData["Số Khung"] || ""),
+            "Số Máy": safeValue(contractData.soMay || contractData.engineNumber || contractData["Số Máy"] || ""),
+            "Tình Trạng": safeValue(contractData.tinhTrangXe || contractData.vehicleStatus || contractData["Tình Trạng Xe"] || ""),
+            "ngân hàng": safeValue(contract.bank || ""),
+            "ưu đãi": (() => {
+              const uuDaiValue = contract.uuDai || "";
+              if (Array.isArray(uuDaiValue)) {
+                return uuDaiValue.length > 0 ? uuDaiValue.join(", ") : "";
+              }
+              return safeValue(uuDaiValue);
+            })(),
+            "Quà tặng": safeValue(contract.quaTang),
+            "Quà tặng khác": safeValue(contract.quaTangKhac),
+            "Giảm giá": safeValue(contract.giamGia),
+            quaTang: safeValue(contract.quaTang),
+            quaTangKhac: safeValue(contract.quaTangKhac),
+            giamGia: safeValue(contract.giamGia),
+          };
+
+          await set(exportedContractRef, exportedData);
+        }
+        // If changing from "xuất" to non-"xuất": remove from exportedContracts
+        else if (oldStatusLower === "xuất" && newStatusLower !== "xuất") {
+          await remove(exportedContractRef);
+        }
+
         toast.success("Cập nhật hợp đồng thành công!");
       } else {
         // Create new contract
@@ -433,8 +506,66 @@ export default function ContractFormPage() {
           thanhToan: safeValue(contract.payment),
           nganHang: safeValue(contract.bank),
           uuDai: Array.isArray(contract.uuDai) ? contract.uuDai : [],
+          quaTang: safeValue(contract.quaTang),
+          quaTangKhac: safeValue(contract.quaTangKhac),
+          giamGia: safeValue(contract.giamGia),
           trangThai: safeValue(contract.status) || "mới",
         });
+
+        // If new contract status is "xuất", also add to exportedContracts
+        const newStatus = safeValue(contract.status) || "mới";
+        if (newStatus.toLowerCase() === "xuất") {
+          const exportKey = newRef.key;
+          if (exportKey) {
+            // Get current date/time in format YYYY-MM-DD
+            const now = new Date();
+            const ngayXhd = now.toISOString().split("T")[0];
+
+            // Map contract data to exported format
+            const exportedData = {
+              id: id || "",
+              stt: "",
+              "ngày xhd": ngayXhd,
+              tvbh: safeValue(contract.tvbh),
+              VSO: safeValue(contract.vso),
+              "Tên Kh": safeValue(contract.customerName),
+              "Số Điện Thoại": safeValue(contract.phone),
+              Email: safeValue(contract.email || ""),
+              "Địa Chỉ": safeValue(contract.address || ""),
+              CCCD: safeValue(contract.cccd),
+              "Ngày Cấp": safeValue(contract.issueDate),
+              "Nơi Cấp": safeValue(contract.issuePlace),
+              "Dòng xe": safeValue(contract.model),
+              "Phiên Bản": safeValue(contract.variant),
+              "Ngoại Thất": safeValue(contract.exterior),
+              "Nội Thất": safeValue(contract.interior),
+              "Giá Niêm Yết": safeValue(contract.contractPrice),
+              "Giá Giảm": safeValue(contract.deposit),
+              "Giá Hợp Đồng": safeValue(contract.contractPrice),
+              "Số Khung": "",
+              "Số Máy": "",
+              "Tình Trạng": "",
+              "ngân hàng": safeValue(contract.bank || ""),
+              "ưu đãi": (() => {
+                const uuDaiValue = contract.uuDai || "";
+                if (Array.isArray(uuDaiValue)) {
+                  return uuDaiValue.length > 0 ? uuDaiValue.join(", ") : "";
+                }
+                return safeValue(uuDaiValue);
+              })(),
+              "Quà tặng": safeValue(contract.quaTang),
+              "Quà tặng khác": safeValue(contract.quaTangKhac),
+              "Giảm giá": safeValue(contract.giamGia),
+              quaTang: safeValue(contract.quaTang),
+              quaTangKhac: safeValue(contract.quaTangKhac),
+              giamGia: safeValue(contract.giamGia),
+            };
+
+            const exportedContractRef = ref(database, `exportedContracts/${exportKey}`);
+            await set(exportedContractRef, exportedData);
+          }
+        }
+
         toast.success("Thêm hợp đồng thành công!");
       }
 
@@ -936,6 +1067,51 @@ export default function ContractFormPage() {
                       ))}
                     </div>
                   )}
+                </div>
+
+                {/* Quà tặng theo xe */}
+                <div className="sm:col-span-2 lg:col-span-1">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
+                    Quà tặng theo xe
+                  </label>
+                  <input
+                    type="text"
+                    value={contract.quaTang || ""}
+                    onChange={(e) => handleInputChange("quaTang", e.target.value)}
+                    disabled={isDetailsMode}
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    placeholder="Áo trùm, bao tay lái, sáp thơm, bình chữa cháy."
+                  />
+                </div>
+
+                {/* Quà tặng khác */}
+                <div className="sm:col-span-2 lg:col-span-1">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
+                    Quà tặng khác
+                  </label>
+                  <input
+                    type="text"
+                    value={contract.quaTangKhac || ""}
+                    onChange={(e) => handleInputChange("quaTangKhac", e.target.value)}
+                    disabled={isDetailsMode}
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    placeholder="Bảo Hiểm Vật Chất Kinh Doanh, Cam, Film, Sàn"
+                  />
+                </div>
+
+                {/* Bên A đồng ý giảm cho Bên B số tiền */}
+                <div className="sm:col-span-2 lg:col-span-1">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
+                    Bên A đồng ý giảm cho Bên B số tiền
+                  </label>
+                  <input
+                    type="text"
+                    value={formatCurrency(contract.giamGia)}
+                    onChange={(e) => handleCurrencyChange("giamGia", e.target.value)}
+                    disabled={isDetailsMode}
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    placeholder="Nhập số tiền giảm"
+                  />
                 </div>
 
                 {/* Status */}

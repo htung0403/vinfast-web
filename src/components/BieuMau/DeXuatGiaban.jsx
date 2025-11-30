@@ -390,6 +390,30 @@ const DeXuatGiaban = () => {
               );
             }
 
+            // Quà tặng theo xe - luôn set giá trị từ Firebase
+            const quaTangValue =
+              contractData.quaTang ||
+              contractData["Quà tặng"] ||
+              contractData["quà tặng"] ||
+              contractData.quaTangTheoXe ||
+              contractData["quà tặng theo xe"] ||
+              "";
+            // Chỉ dùng giá trị mặc định nếu không có dữ liệu nào trong Firebase
+            if (quaTangValue) {
+              setQuaTangTheoXe(quaTangValue);
+            } else {
+              // Nếu không có dữ liệu, để trống thay vì dùng giá trị mặc định
+              setQuaTangTheoXe("");
+            }
+
+            // Quà tặng khác - luôn set giá trị từ Firebase, không có giá trị mặc định
+            const quaTangKhacValue =
+              contractData.quaTangKhac ||
+              contractData["Quà tặng khác"] ||
+              contractData["quà tặng khác"] ||
+              "";
+            setQuaTangKhac(quaTangKhacValue);
+
             // Ưu đãi / Chính sách khuyến mãi
             const uuDaiValue =
               contractData.uuDai ||
@@ -984,7 +1008,7 @@ const DeXuatGiaban = () => {
                   >
                     QUÀ TẶNG
                   </td>
-                  <td className="border-r border-black p-1" colSpan={3}>
+                  <td className="border-r border-black p-1 font-bold" colSpan={3}>
                     <strong>Quà tặng theo xe:</strong>{" "}
                     <span className="print:hidden">
                       <input

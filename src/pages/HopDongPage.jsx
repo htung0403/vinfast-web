@@ -236,6 +236,9 @@ export default function HopDongPage() {
       payment: c.thanhToan || c["thanh toán"],
       bank: c.nganHang || c["ngân hàng"],
       uuDai: c.uuDai || c["Ưu đãi"] || c["ưu đãi"] || "",
+      quaTang: c.quaTang || c["Quà tặng"] || c["quà tặng"] || "",
+      quaTangKhac: c.quaTangKhac || c["Quà tặng khác"] || c["quà tặng khác"] || "",
+      giamGia: c.giamGia || c["Giảm giá"] || c["giảm giá"] || "",
       status: c.trangThai || c.status,
     });
     
@@ -361,6 +364,8 @@ export default function HopDongPage() {
         payment: c.thanhToan || c["thanh toán"],
         bank: c.nganHang || c["ngân hàng"],
         uuDai: c.uuDai || c["Ưu đãi"] || c["ưu đãi"] || "",
+        quaTang: c.quaTang || c["Quà tặng"] || c["quà tặng"] || "",
+        giamGia: c.giamGia || c["Giảm giá"] || c["giảm giá"] || "",
         status: c.trangThai || c.status,
       });
 
@@ -906,6 +911,12 @@ export default function HopDongPage() {
             }
             return safeValue(uuDaiValue);
           })(),
+          "Quà tặng": safeValue(contract.quaTang || contract["Quà tặng"] || contract["quà tặng"] || ""),
+          "Quà tặng khác": safeValue(contract.quaTangKhac || contract["Quà tặng khác"] || contract["quà tặng khác"] || ""),
+          "Giảm giá": safeValue(contract.giamGia || contract["Giảm giá"] || contract["giảm giá"] || ""),
+          quaTang: safeValue(contract.quaTang || contract["Quà tặng"] || contract["quà tặng"] || ""),
+          quaTangKhac: safeValue(contract.quaTangKhac || contract["Quà tặng khác"] || contract["quà tặng khác"] || ""),
+          giamGia: safeValue(contract.giamGia || contract["Giảm giá"] || contract["giảm giá"] || ""),
         };
 
         // Use firebaseKey as the key in exportedContracts, or generate new key
@@ -1404,6 +1415,12 @@ export default function HopDongPage() {
                                 chassisNumber: contract.soKhung || contract["Số Khung"] || contract.chassisNumber || contract.vin || "",
                                 engineNumber: contract.soMay || contract["Số Máy"] || contract.engineNumber || "",
                                 representativeName: contract.TVBH || contract.tvbh || "",
+                                quaTang: contract.quaTang || contract["Quà tặng"] || contract["quà tặng"] || "",
+                                quaTangKhac: contract.quaTangKhac || contract["Quà tặng khác"] || contract["quà tặng khác"] || "",
+                                giamGia: contract.giamGia || contract["Giảm giá"] || contract["giảm giá"] || "",
+                                "Quà tặng": contract.quaTang || contract["Quà tặng"] || contract["quà tặng"] || "",
+                                "Quà tặng khác": contract.quaTangKhac || contract["Quà tặng khác"] || contract["quà tặng khác"] || "",
+                                "Giảm giá": contract.giamGia || contract["Giảm giá"] || contract["giảm giá"] || "",
                               };
                               navigate("/hop-dong-mua-ban-xe", { state: printData });
                             }}

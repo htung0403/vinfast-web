@@ -314,6 +314,12 @@ export default function HopDongDaXuatPage() {
       bankLoanFile: c.bankLoanFile || c["File cho vay ngân hàng"] || "",
       "File cho vay ngân hàng":
         c.bankLoanFile || c["File cho vay ngân hàng"] || "",
+      quaTang: c.quaTang || c["Quà tặng"] || c["quà tặng"] || "",
+      quaTangKhac: c.quaTangKhac || c["Quà tặng khác"] || c["quà tặng khác"] || "",
+      giamGia: c.giamGia || c["Giảm giá"] || c["giảm giá"] || "",
+      "Quà tặng": c.quaTang || c["Quà tặng"] || c["quà tặng"] || "",
+      "Quà tặng khác": c.quaTangKhac || c["Quà tặng khác"] || c["quà tặng khác"] || "",
+      "Giảm giá": c.giamGia || c["Giảm giá"] || c["giảm giá"] || "",
     });
 
     const loadFromFirebase = async () => {
@@ -775,8 +781,17 @@ export default function HopDongDaXuatPage() {
       }
 
       if (keyToRemove) {
-        const contractRef = ref(database, `exportedContracts/${keyToRemove}`);
-        await remove(contractRef);
+        // Remove from exportedContracts
+        const exportedContractRef = ref(database, `exportedContracts/${keyToRemove}`);
+        await remove(exportedContractRef);
+
+        // Update status in contracts to "hủy"
+        const contractRef = ref(database, `contracts/${keyToRemove}`);
+        await update(contractRef, {
+          trangThai: "hủy",
+        });
+
+        // Update local state
         setContracts((prev) =>
           prev.filter((contract) => contract.firebaseKey !== keyToRemove)
         );
@@ -786,7 +801,7 @@ export default function HopDongDaXuatPage() {
       }
 
       closeDeleteConfirm();
-      toast.success("Xóa hợp đồng thành công!");
+      toast.success("Xóa hợp đồng thành công! Trạng thái hợp đồng đã được chuyển sang 'hủy'.");
     } catch (err) {
       console.error("Error deleting contract:", err);
       toast.error("Lỗi khi xóa hợp đồng");
@@ -1355,6 +1370,12 @@ export default function HopDongDaXuatPage() {
                                     chassisNumber: contract.soKhung,
                                     engineNumber: contract.soMay,
                                     representativeName: contract.tvbh,
+                                    quaTang: contract.quaTang || contract["Quà tặng"] || "",
+                                    quaTangKhac: contract.quaTangKhac || contract["Quà tặng khác"] || "",
+                                    giamGia: contract.giamGia || contract["Giảm giá"] || "",
+                                    "Quà tặng": contract.quaTang || contract["Quà tặng"] || "",
+                                    "Quà tặng khác": contract.quaTangKhac || contract["Quà tặng khác"] || "",
+                                    "Giảm giá": contract.giamGia || contract["Giảm giá"] || "",
                                   };
                                   setPrintContract(printData);
                                   // Load bankLoanFile from contract if exists

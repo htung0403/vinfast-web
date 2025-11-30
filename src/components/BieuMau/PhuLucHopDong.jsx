@@ -95,7 +95,22 @@ const PhuLucHopDong = () => {
       setData(processedData);
       // Load values for agreement section
       setQuaTang(incoming.quaTang || incoming["Quà tặng"] || "Áo trùm, bao tay lái, sáp thơm, bình chữa cháy.");
-      setGiamGia(incoming.giamGia || incoming["Giảm giá"] || "Bảo hiểm vật chất kinh doanh, cam HT, Film CN, Lót sàn");
+      // Format giamGia if it's a number (for currency display)
+      const giamGiaValue = incoming.giamGia || incoming["Giảm giá"] || "";
+      if (giamGiaValue) {
+        // Extract numeric value (remove all non-digits)
+        const numericValue = String(giamGiaValue).replace(/\D/g, "");
+        if (numericValue) {
+          // Format with thousand separators
+          setGiamGia(numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, "."));
+        } else {
+          // No numeric value found, use original text
+          setGiamGia(giamGiaValue);
+        }
+      } else {
+        // Empty, use default placeholder
+        setGiamGia("Bảo hiểm vật chất kinh doanh, cam HT, Film CN, Lót sàn");
+      }
       setBangChu(incoming.bangChu || incoming["Bằng chữ"] || "");
     } else {
       // Dữ liệu mẫu
@@ -414,9 +429,18 @@ const PhuLucHopDong = () => {
                     <input
                       type="text"
                       value={giamGia}
-                      onChange={(e) => setGiamGia(e.target.value)}
+                      onChange={(e) => {
+                        // Format input as user types (only numbers with thousand separators)
+                        const inputValue = e.target.value;
+                        const numericValue = inputValue.replace(/\D/g, "");
+                        if (numericValue) {
+                          setGiamGia(numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, "."));
+                        } else {
+                          setGiamGia("");
+                        }
+                      }}
                       className="border-b border-gray-400 px-2 py-1 text-sm font-bold italic w-full max-w-md focus:outline-none focus:border-blue-500"
-                      placeholder="Bảo hiểm vật chất kinh doanh, cam HT, Film CN, Lót sàn"
+                      placeholder="Nhập số tiền giảm"
                     />
                   </span>
                   <span className="hidden print:inline italic">{giamGia}</span>
