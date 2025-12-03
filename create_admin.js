@@ -9,14 +9,14 @@ import bcrypt from 'bcryptjs';
 
 // Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyBKajnty6kaDBAHldn-BGu-qja5Jo9R0ks",
-  authDomain: "report-867c2.firebaseapp.com",
-  databaseURL: "https://report-867c2-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "report-867c2",
-  storageBucket: "report-867c2.firebasestorage.app",
-  messagingSenderId: "911588040639",
-  appId: "1:911588040639:web:60b5380acd25ba85c8cb0a",
-  measurementId: "G-SFM9W6K1NT"
+  apiKey: "AIzaSyB_vAEz_pxfNWKtrgUbt4sgoj0CfaGQSas",
+  authDomain: "vinfast-d5bd8.firebaseapp.com",
+  databaseURL: "https://vinfast-d5bd8-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "vinfast-d5bd8",
+  storageBucket: "vinfast-d5bd8.firebasestorage.app",
+  messagingSenderId: "629544926555",
+  appId: "1:629544926555:web:edcbfc14cc02dc6b832e7e",
+  measurementId: "G-BWFGVBRLR5"
 };
 
 // Khởi tạo Firebase
@@ -27,15 +27,14 @@ const database = getDatabase(app);
 const ADMIN_UID = 'admin-001';
 const adminUser = {
   username: 'admin',
-  password: 'Admin@123456',
-  email: 'admin@marketing.com',
+  password: '123456',
+  email: 'admin@vinfast.com',
   name: 'Administrator',
   role: 'admin',
   id_ns: 'admin001',
   department: 'Admin',
   position: 'Admin',
   team: 'Admin',
-  shift: 'Ca Ngày',
   branch: 'Hà Nội'
 };
 
@@ -53,7 +52,7 @@ async function createAdmin() {
 
     // Bước 1: Tạo user record trong users
     console.log('📝 Đang tạo admin user trong users...');
-    const usersRef = ref(database, `users/${ADMIN_UID}`);
+    const usersRef = ref(database, `employees/${ADMIN_UID}`);
     const userData = {
       username: adminUser.username,
       password: hashedPassword,
@@ -64,7 +63,6 @@ async function createAdmin() {
       department: adminUser.department,
       position: adminUser.position,
       team: adminUser.team,
-      shift: adminUser.shift,
       branch: adminUser.branch,
       createdAt: new Date().toISOString(),
       createdBy: 'auto-script'
@@ -80,7 +78,6 @@ async function createAdmin() {
       name: adminUser.name,
       email: adminUser.email,
       role: adminUser.role,
-      Ca: adminUser.shift,
       Team: adminUser.team,
       'Thị trường': adminUser.branch,
       'Ngày vào làm': new Date().toISOString().split('T')[0],
@@ -115,61 +112,7 @@ async function createAdmin() {
   process.exit(0);
 }
 
-async function listAllUsers() {
-  try {
-    console.log('\n📋 Danh sách users trong bảng "users":');
-    console.log('-'.repeat(100));
-    
-    const usersRef = ref(database, 'users');
-    const snapshot = await get(usersRef);
 
-    if (snapshot.exists()) {
-      const users = snapshot.val();
-      console.log('ID         | Username       | Name                | Email                          | Role  | Team');
-      console.log('-'.repeat(100));
-      
-      for (const [userId, userData] of Object.entries(users)) {
-        console.log(
-          `${userId.substring(0, 10).padEnd(10)} | ${(userData.username || 'N/A').padEnd(14)} | ${(userData.name || 'N/A').padEnd(19)} | ${(userData.email || 'N/A').padEnd(30)} | ${(userData.role || 'user').padEnd(5)} | ${userData.team || 'N/A'}`
-        );
-      }
-      console.log('-'.repeat(100));
-      console.log(`Tổng số: ${Object.keys(users).length} users`);
-    } else {
-      console.log('❌ Không có users nào trong bảng "users"');
-    }
-  } catch (error) {
-    console.error('❌ Lỗi khi lấy danh sách users:', error.message);
-  }
-}
-
-async function listHumanResources() {
-  try {
-    console.log('\n📋 Danh sách users trong bảng "human_resources":');
-    console.log('-'.repeat(80));
-    
-    const hrRef = ref(database, 'human_resources');
-    const snapshot = await get(hrRef);
-
-    if (snapshot.exists()) {
-      const users = snapshot.val();
-      console.log('ID         | Name                | Email                          | Role  | Team');
-      console.log('-'.repeat(80));
-      
-      for (const [userId, userData] of Object.entries(users)) {
-        console.log(
-          `${userId.substring(0, 10).padEnd(10)} | ${(userData.name || 'N/A').padEnd(19)} | ${(userData.email || 'N/A').padEnd(30)} | ${(userData.role || 'user').padEnd(5)} | ${userData.Team || 'N/A'}`
-        );
-      }
-      console.log('-'.repeat(80));
-      console.log(`Tổng số: ${Object.keys(users).length} users`);
-    } else {
-      console.log('❌ Không có users nào trong bảng "human_resources"');
-    }
-  } catch (error) {
-    console.error('❌ Lỗi khi lấy danh sách human_resources:', error.message);
-  }
-}
 
 // Chạy script
 createAdmin();
