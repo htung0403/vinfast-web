@@ -1138,8 +1138,8 @@ export default function HopDongDaXuatPage() {
                         <tr
                           key={contract.firebaseKey || contract.id}
                           className={`hover:bg-secondary-50 ${isMissingData
-                              ? "bg-yellow-50 border-l-4 border-yellow-400"
-                              : ""
+                            ? "bg-yellow-50 border-l-4 border-yellow-400"
+                            : ""
                             }`}
                         >
                           <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm font-semibold text-black border border-secondary-400">
@@ -1354,7 +1354,7 @@ export default function HopDongDaXuatPage() {
                                     exterior: contract.ngoaiThat,
                                     interior: contract.noiThat,
                                     contractPrice: contract.giaHopDong,
-                                    deposit: contract.giaGiam,
+                                    deposit: contract.tienDatCoc,
                                     payment: "",
                                     bank: contract.nganHang || "",
                                     status: contract.tinhTrang,
@@ -1386,8 +1386,8 @@ export default function HopDongDaXuatPage() {
                                 }}
                                 disabled={isMissingData}
                                 className={`px-1.5 sm:px-3 py-1 rounded-md transition-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-sm ${isMissingData
-                                    ? "bg-gray-400 text-gray-200 cursor-not-allowed"
-                                    : "bg-green-600 text-white hover:bg-green-700"
+                                  ? "bg-gray-400 text-gray-200 cursor-not-allowed"
+                                  : "bg-green-600 text-white hover:bg-green-700"
                                   }`}
                                 title={
                                   isMissingData
@@ -1701,8 +1701,8 @@ export default function HopDongDaXuatPage() {
                             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                               <label
                                 className={`flex-1 px-3 sm:px-4 py-2 border border-gray-300 rounded-md transition-colors text-xs sm:text-sm text-center ${uploadingBankLoanFile
-                                    ? "bg-gray-200 cursor-not-allowed opacity-50"
-                                    : "cursor-pointer hover:bg-gray-50"
+                                  ? "bg-gray-200 cursor-not-allowed opacity-50"
+                                  : "cursor-pointer hover:bg-gray-50"
                                   }`}
                               >
                                 <span className="text-gray-700">
@@ -2033,8 +2033,8 @@ export default function HopDongDaXuatPage() {
                       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                         <label
                           className={`flex-1 px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg transition-colors text-xs sm:text-sm text-center ${uploadingImage && uploadingImageType === "deposit"
-                              ? "bg-gray-200 cursor-not-allowed opacity-50"
-                              : "cursor-pointer hover:bg-gray-50"
+                            ? "bg-gray-200 cursor-not-allowed opacity-50"
+                            : "cursor-pointer hover:bg-gray-50"
                             }`}
                         >
                           <span className="text-gray-700">
@@ -2098,9 +2098,9 @@ export default function HopDongDaXuatPage() {
                       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                         <label
                           className={`flex-1 px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg transition-colors text-xs sm:text-sm text-center ${uploadingImage &&
-                              uploadingImageType === "counterpart"
-                              ? "bg-gray-200 cursor-not-allowed opacity-50"
-                              : "cursor-pointer hover:bg-gray-50"
+                            uploadingImageType === "counterpart"
+                            ? "bg-gray-200 cursor-not-allowed opacity-50"
+                            : "cursor-pointer hover:bg-gray-50"
                             }`}
                         >
                           <span className="text-gray-700">
@@ -2177,7 +2177,8 @@ export default function HopDongDaXuatPage() {
             </div>
           )}
         </div>
-      )}
-    </div>
+      )
+      }
+    </div >
   );
 }

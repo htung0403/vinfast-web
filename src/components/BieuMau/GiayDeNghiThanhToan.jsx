@@ -125,9 +125,8 @@ const GiayDeNghiThanhToan = () => {
         };
         setData(processedData);
         // Initialize vehicleInfo from data
-        const defaultVehicleInfo = `Mua 01 chiếc xe ô tô con, chỗ, Nhãn hiệu: ${
-          processedData.model
-        }, màu ${getColorName(processedData.exterior)}, số tự động, mới 100%.`;
+        const defaultVehicleInfo = `Mua 01 chiếc xe ô tô con, chỗ, Nhãn hiệu: ${processedData.model
+          }, màu ${getColorName(processedData.exterior)}, số tự động, mới 100%.`;
         setVehicleInfo(incoming.vehicleInfo || defaultVehicleInfo);
         if (incoming.recipientInfo) {
           setRecipientInfo(incoming.recipientInfo);
@@ -154,9 +153,8 @@ const GiayDeNghiThanhToan = () => {
 
   // Current date formatted for header: "TP.HCM, Ngày D Tháng M năm YYYY"
   const today = new Date();
-  const headerDate = `TP.HCM, Ngày ${today.getDate()} Tháng ${
-    today.getMonth() + 1
-  } năm ${today.getFullYear()}`;
+  const headerDate = `TP.HCM, Ngày ${today.getDate()} Tháng ${today.getMonth() + 1
+    } năm ${today.getFullYear()}`;
 
   if (loading) {
     return (
@@ -292,9 +290,8 @@ const GiayDeNghiThanhToan = () => {
                     value={vehicleInfo}
                     onChange={(e) => setVehicleInfo(e.target.value)}
                     className="border-b border-gray-400 px-2 py-1 text-sm font-normal italic w-full max-w-lg focus:outline-none focus:border-blue-500"
-                    placeholder={`Mua 01 chiếc xe ô tô con, chỗ, Nhãn hiệu: ${
-                      data.model
-                    }, màu ${getColorName(data.exterior)} mới 100%.`}
+                    placeholder={`Mua 01 chiếc xe ô tô con, chỗ, Nhãn hiệu: ${data.model
+                      }, màu ${getColorName(data.exterior)} mới 100%.`}
                   />
                 </span>
               </em>

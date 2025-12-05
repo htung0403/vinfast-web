@@ -78,6 +78,7 @@ export default function EditHopDongDaXuatPage() {
     giaNiemYet: "",
     giaGiam: "",
     giaHopDong: "",
+    soTienCoc: "",
     soKhung: "",
     soMay: "",
     tinhTrang: "",
@@ -156,6 +157,7 @@ export default function EditHopDongDaXuatPage() {
           giaNiemYet: contractData.giaNiemYet || contractData["Giá Niêm Yết"] || contractData.listPrice || "",
           giaGiam: contractData.giaGiam || contractData["Giá Giảm"] || contractData.discountPrice || "",
           giaHopDong: contractData.giaHopDong || contractData["Giá Hợp Đồng"] || contractData.contractPrice || "",
+          soTienCoc: contractData.soTienCoc || contractData["Số tiền cọc"] || contractData.deposit || "",
           soKhung: contractData.soKhung || contractData["Số Khung"] || contractData.chassisNumber || "",
           soMay: contractData.soMay || contractData["Số Máy"] || contractData.engineNumber || "",
           tinhTrang: contractData.tinhTrang || contractData["Tình Trạng"] || contractData.status || "",
@@ -433,6 +435,8 @@ export default function EditHopDongDaXuatPage() {
         "Giá Niêm Yết": safeValue(contract.giaNiemYet),
         "Giá Giảm": safeValue(contract.giaGiam),
         "Giá Hợp Đồng": safeValue(contract.giaHopDong),
+        "Số tiền cọc": safeValue(contract.soTienCoc),
+        soTienCoc: safeValue(contract.soTienCoc),
         "Số Khung": safeValue(contract.soKhung),
         "Số Máy": safeValue(contract.soMay),
         "Tình Trạng": safeValue(contract.tinhTrang),
@@ -954,6 +958,20 @@ export default function EditHopDongDaXuatPage() {
                     onChange={(e) => handleCurrencyChange("giaHopDong", e.target.value)}
                     className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm"
                     placeholder="Nhập giá hợp đồng"
+                  />
+                </div>
+
+                {/* Deposit Amount */}
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
+                    Số tiền cọc
+                  </label>
+                  <input
+                    type="text"
+                    value={formatCurrency(contract.soTienCoc)}
+                    onChange={(e) => handleCurrencyChange("soTienCoc", e.target.value)}
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm"
+                    placeholder="Nhập số tiền cọc"
                   />
                 </div>
 
