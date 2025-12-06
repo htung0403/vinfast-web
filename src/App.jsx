@@ -43,6 +43,7 @@ import GiayThoaThuanHTLS_VPBank from './components/BieuMau/GiayThoaThuanHTLS_VPB
 import GiayThoaThuanHoTroVayLai from './components/BieuMau/GiayThoaThuanHoTroVayLai';
 import DeXuatGiaban from './components/BieuMau/DeXuatGiaban';
 import BIDV_ThoaThuanHoTroLaiVay from './components/BieuMau/BIDV_ThoaThuanHoTroLaiVay';
+import PhieuDeNghiLapPhuKien from './components/BieuMau/PhieuDeNghiLapPhuKien';
 
 function App() {
   return (
@@ -95,6 +96,7 @@ function App() {
             <Route path="/giay-thoa-thuan-ho-tro-vay-lai" element={<ProtectedRoute><GiayThoaThuanHoTroVayLai /></ProtectedRoute>} />
             <Route path="/de-xuat-gia-ban" element={<ProtectedRoute><DeXuatGiaban /></ProtectedRoute>} />
             <Route path="/bidv-thoa-thuan-ho-tro-lai-vay" element={<ProtectedRoute><BIDV_ThoaThuanHoTroLaiVay /></ProtectedRoute>} />
+            <Route path="/phieu-de-nghi-lap-phu-kien" element={<ProtectedRoute><PhieuDeNghiLapPhuKien /></ProtectedRoute>} />
           </Routes>
         </div>
 

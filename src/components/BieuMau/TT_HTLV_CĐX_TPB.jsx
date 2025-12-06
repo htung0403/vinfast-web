@@ -4,6 +4,7 @@ import { ref, get } from "firebase/database";
 import { database } from "../../firebase/config";
 import { getBranchByShowroomName } from "../../data/branchData";
 import { vndToWords } from "../../utils/vndToWords";
+import vinfastLogo from "../../assets/vinfast.svg";
 
 const TT_HTLV_CĐX_TPB = () => {
   const location = useLocation();
@@ -143,22 +144,22 @@ const TT_HTLV_CĐX_TPB = () => {
               );
               setDiaChiKH(
                 contractData.diaChiKhachHang ||
-                  contractData.diaChiKhachHang ||
-                  contractData.address ||
-                  ""
+                contractData.diaChiKhachHang ||
+                contractData.address ||
+                ""
               );
               setDienThoaiKH(
                 contractData.soDienThoaiKhachHang ||
-                  contractData.soDienThoaiKhachHang ||
-                  contractData.phone ||
-                  ""
+                contractData.soDienThoaiKhachHang ||
+                contractData.phone ||
+                ""
               );
               setCmtndKH(
                 contractData.soCccdKhachHang ||
-                  contractData.soCccdKhachHang ||
-                  contractData.cccd ||
-                  contractData.CCCD ||
-                  ""
+                contractData.soCccdKhachHang ||
+                contractData.cccd ||
+                contractData.CCCD ||
+                ""
               );
             }
 
@@ -170,31 +171,31 @@ const TT_HTLV_CĐX_TPB = () => {
             ) {
               setMauXe(
                 contractData.tenXe ||
-                  contractData.dongXe ||
-                  contractData.model ||
-                  contractData["Dòng xe"] ||
-                  ""
+                contractData.dongXe ||
+                contractData.model ||
+                contractData["Dòng xe"] ||
+                ""
               );
               setSoKhung(
                 contractData.soKhung ||
-                  contractData["Số Khung"] ||
-                  contractData.chassisNumber ||
-                  ""
+                contractData["Số Khung"] ||
+                contractData.chassisNumber ||
+                ""
               );
               setSoMay(
                 contractData.soMay ||
-                  contractData["Số Máy"] ||
-                  contractData.engineNumber ||
-                  ""
+                contractData["Số Máy"] ||
+                contractData.engineNumber ||
+                ""
               );
             }
 
             setSoHopDong(
               contractData.vso ||
-                contractData.VSO ||
-                contractData.soHopDong ||
-                contractData.contractNumber ||
-                ""
+              contractData.VSO ||
+              contractData.soHopDong ||
+              contractData.contractNumber ||
+              ""
             );
 
             // Ngày cấp CCCD
@@ -222,10 +223,10 @@ const TT_HTLV_CĐX_TPB = () => {
             ) {
               setNoiCapKH(
                 contractData.noiCap ||
-                  contractData.issuePlace ||
-                  contractData["Nơi Cấp"] ||
-                  contractData["Nơi cấp"] ||
-                  ""
+                contractData.issuePlace ||
+                contractData["Nơi Cấp"] ||
+                contractData["Nơi cấp"] ||
+                ""
               );
             }
 
@@ -237,9 +238,9 @@ const TT_HTLV_CĐX_TPB = () => {
             ) {
               setMaSoThueKH(
                 contractData.maSoThue ||
-                  contractData["Mã số thuế"] ||
-                  contractData["Mã Số Thuế"] ||
-                  ""
+                contractData["Mã số thuế"] ||
+                contractData["Mã Số Thuế"] ||
+                ""
               );
             }
 
@@ -264,8 +265,8 @@ const TT_HTLV_CĐX_TPB = () => {
               } else {
                 setSoTienVayBangChu(
                   contractData.soTienVayBangChu ||
-                    contractData["Số Tiền Vay Bằng Chữ"] ||
-                    ""
+                  contractData["Số Tiền Vay Bằng Chữ"] ||
+                  ""
                 );
               }
             }
@@ -315,9 +316,9 @@ const TT_HTLV_CĐX_TPB = () => {
             ) {
               setMauXe(
                 contractData.dongXe ||
-                  contractData.model ||
-                  contractData["Dòng xe"] ||
-                  ""
+                contractData.model ||
+                contractData["Dòng xe"] ||
+                ""
               );
             }
 
@@ -329,9 +330,9 @@ const TT_HTLV_CĐX_TPB = () => {
             ) {
               setSoKhung(
                 contractData.soKhung ||
-                  contractData["Số Khung"] ||
-                  contractData.chassisNumber ||
-                  ""
+                contractData["Số Khung"] ||
+                contractData.chassisNumber ||
+                ""
               );
             }
 
@@ -343,9 +344,9 @@ const TT_HTLV_CĐX_TPB = () => {
             ) {
               setSoMay(
                 contractData.soMay ||
-                  contractData["Số Máy"] ||
-                  contractData.engineNumber ||
-                  ""
+                contractData["Số Máy"] ||
+                contractData.engineNumber ||
+                ""
               );
             }
 
@@ -357,9 +358,9 @@ const TT_HTLV_CĐX_TPB = () => {
             ) {
               setTenKH(
                 contractData.customerName ||
-                  contractData["Tên KH"] ||
-                  contractData.khachHang ||
-                  ""
+                contractData["Tên KH"] ||
+                contractData.khachHang ||
+                ""
               );
             }
 
@@ -372,10 +373,10 @@ const TT_HTLV_CĐX_TPB = () => {
             ) {
               setDiaChiKH(
                 contractData.address ||
-                  contractData["Địa chỉ"] ||
-                  contractData["Địa Chỉ"] ||
-                  contractData.diaChiKhachHang ||
-                  ""
+                contractData["Địa chỉ"] ||
+                contractData["Địa Chỉ"] ||
+                contractData.diaChiKhachHang ||
+                ""
               );
             }
 
@@ -388,10 +389,10 @@ const TT_HTLV_CĐX_TPB = () => {
             ) {
               setDienThoaiKH(
                 contractData.phone ||
-                  contractData["Số Điện Thoại"] ||
-                  contractData["Số điện thoại"] ||
-                  contractData.soDienThoaiKhachHang ||
-                  ""
+                contractData["Số Điện Thoại"] ||
+                contractData["Số điện thoại"] ||
+                contractData.soDienThoaiKhachHang ||
+                ""
               );
             }
 
@@ -403,9 +404,9 @@ const TT_HTLV_CĐX_TPB = () => {
             ) {
               setMaSoThueKH(
                 contractData.maSoThue ||
-                  contractData["Mã số thuế"] ||
-                  contractData["Mã Số Thuế"] ||
-                  ""
+                contractData["Mã số thuế"] ||
+                contractData["Mã Số Thuế"] ||
+                ""
               );
             }
 
@@ -419,11 +420,11 @@ const TT_HTLV_CĐX_TPB = () => {
             ) {
               setCmtndKH(
                 contractData.cccd ||
-                  contractData.CCCD ||
-                  contractData["Căn cước"] ||
-                  contractData.customerCCCD ||
-                  contractData.soCccdKhachHang ||
-                  ""
+                contractData.CCCD ||
+                contractData["Căn cước"] ||
+                contractData.customerCCCD ||
+                contractData.soCccdKhachHang ||
+                ""
               );
             }
 
@@ -452,10 +453,10 @@ const TT_HTLV_CĐX_TPB = () => {
             ) {
               setNoiCapKH(
                 contractData.noiCap ||
-                  contractData.issuePlace ||
-                  contractData["Nơi Cấp"] ||
-                  contractData["Nơi cấp"] ||
-                  ""
+                contractData.issuePlace ||
+                contractData["Nơi Cấp"] ||
+                contractData["Nơi cấp"] ||
+                ""
               );
             }
 
@@ -469,11 +470,11 @@ const TT_HTLV_CĐX_TPB = () => {
             ) {
               setSoHopDong(
                 contractData.vso ||
-                  contractData.VSO ||
-                  contractData.soHopDong ||
-                  contractData.contractNumber ||
-                  contractData["Số Hợp Đồng"] ||
-                  ""
+                contractData.VSO ||
+                contractData.soHopDong ||
+                contractData.contractNumber ||
+                contractData["Số Hợp Đồng"] ||
+                ""
               );
             }
 
@@ -498,8 +499,8 @@ const TT_HTLV_CĐX_TPB = () => {
               } else {
                 setSoTienVayBangChu(
                   contractData.soTienVayBangChu ||
-                    contractData["Số Tiền Vay Bằng Chữ"] ||
-                    ""
+                  contractData["Số Tiền Vay Bằng Chữ"] ||
+                  ""
                 );
               }
             }
@@ -577,8 +578,8 @@ const TT_HTLV_CĐX_TPB = () => {
             } else {
               setSoTienVayBangChu(
                 stateData.soTienVayBangChu ||
-                  stateData["Số Tiền Vay Bằng Chữ"] ||
-                  ""
+                stateData["Số Tiền Vay Bằng Chữ"] ||
+                ""
               );
             }
           }
@@ -626,6 +627,9 @@ const TT_HTLV_CĐX_TPB = () => {
         >
           {/* Header with title */}
           <div className="text-center mb-6">
+            <div className="w-32 mx-auto mb-4">
+              <img src={vinfastLogo} alt="VinFast Logo" className="w-full" />
+            </div>
             <h1 className="text-xl font-bold uppercase">
               THỎA THUẬN HỖ TRỢ LÃI VAY
             </h1>

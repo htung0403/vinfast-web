@@ -423,19 +423,16 @@ export default function Dashboard() {
   }, [allCustomers, userRole, actualEmployeeName, userDepartment, teamEmployeeNames, employeesLoaded]);
 
   // Get unique list of employees from contracts (filtered by permissions)
+  // Get unique list of employees (filtered by permissions)
   const getUniqueEmployees = () => {
-    const employees = new Set();
-    contracts.forEach((contract) => {
-      if (contract.TVBH && contract.TVBH !== "Không xác định") {
-        // Additional permission check - only show employees user can see
-        if (userRole === "admin" ||
-          (userRole === "user" && contract.TVBH === username) ||
-          (userRole === "leader" && teamEmployeeNames.includes(contract.TVBH))) {
-          employees.add(contract.TVBH);
-        }
-      }
-    });
-    return Array.from(employees).sort();
+    if (userRole === "admin") {
+      return Object.keys(employeesMap).sort();
+    } else if (userRole === "leader") {
+      return teamEmployeeNames.sort();
+    } else if (userRole === "user") {
+      return actualEmployeeName ? [actualEmployeeName] : [];
+    }
+    return [];
   };
 
   // Generate report based on filters
@@ -695,6 +692,36 @@ export default function Dashboard() {
       const mucDo = (customer.mucDo || "").toLowerCase();
       return mucDo === "very hot" || mucDo === "hot";
     }).length;
+
+    // Initialize byEmployee with all relevant employees
+    let employeesToInit = [];
+    if (selectedEmployee !== "all") {
+      employeesToInit = [selectedEmployee];
+    } else {
+      if (userRole === "admin") {
+        employeesToInit = Object.keys(employeesMap);
+      } else if (userRole === "leader") {
+        employeesToInit = teamEmployeeNames;
+      } else if (userRole === "user") {
+        employeesToInit = actualEmployeeName ? [actualEmployeeName] : [];
+      }
+    }
+
+    employeesToInit.forEach((employeeName) => {
+      if (!employeeName) return;
+      byEmployee[employeeName] = {
+        employee: employeeName,
+        total: 0,
+        signed: 0,
+        exported: 0,
+        pending: 0,
+        cancelled: 0,
+        completed: 0,
+        transferred: 0,
+        models: new Set(),
+        pendingContracts: [],
+      };
+    });
 
     filteredContracts.forEach((contract) => {
       total++;

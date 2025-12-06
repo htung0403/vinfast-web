@@ -16,19 +16,21 @@ const PhieuRutCoc = () => {
 
   // Editable fields
   const [soPhieu, setSoPhieu] = useState("");
-  const [ngayDeNghi, setNgayDeNghi] = useState("18/11/2025");
-  const [nguoiDeNghi, setNguoiDeNghi] = useState("TẠ CÔNG TRÍ");
+  const [ngayDeNghi, setNgayDeNghi] = useState("");
+  const [nguoiDeNghi, setNguoiDeNghi] = useState("");
   const [boPhan, setBoPhan] = useState("P.KD");
-  const [phieuCLXX, setPhieuCLXX] = useState("PHIẾU CLXX");
+  const [phieuCLXX, setPhieuCLXX] = useState("");
+  const [thoiGianGiaoXe, setThoiGianGiaoXe] = useState("");
+
+  // Header fields
+  const [headerLeft, setHeaderLeft] = useState(
+    "CN TRƯỜNG CHINH -\nCÔNG TY CỔ PHẦN\nĐẦU TƯ TMDV Ô TÔ\nĐÔNG SÀI GÒN"
+  );
+  const [headerSuffix, setHeaderSuffix] = useState("PHIẾU CLXX");
 
   // Table rows (có thể có nhiều xe)
   const [tableRows, setTableRows] = useState([
-    {
-      stt: "1",
-      soKhung: "RLLVFPNT9SH858285",
-      soHopDong: "S00901-VSO-25-09-0039",
-      model: "LIMO GREEN",
-    },
+    { stt: "1", soKhung: "", soHopDong: "", model: "" },
     { stt: "", soKhung: "", soHopDong: "", model: "" },
     { stt: "", soKhung: "", soHopDong: "", model: "" },
     { stt: "", soKhung: "", soHopDong: "", model: "" },
@@ -73,17 +75,9 @@ const PhieuRutCoc = () => {
         const stateData = location.state;
         setData(stateData);
 
-        // Auto-fill first row với dữ liệu từ location.state
-        if (stateData.soKhung || stateData.contractNumber || stateData.hieuxe) {
-          const newRows = [...tableRows];
-          newRows[0] = {
-            stt: "1",
-            soKhung: stateData.soKhung || "RLLVFPNT9SH858285",
-            soHopDong: stateData.contractNumber || "S00901-VSO-25-09-0039",
-            model: stateData.hieuxe || "LIMO GREEN",
-          };
-          setTableRows(newRows);
-        }
+        if (stateData.tvbh) setNguoiDeNghi(stateData.tvbh);
+
+        // Removed auto-fill for table rows as requested
       } else {
         setData({
           contractNumber: "",
@@ -140,12 +134,16 @@ const PhieuRutCoc = () => {
                     className="border-r-2 border-black p-2 align-middle text-center font-bold text-sm"
                     style={{ width: "30%" }}
                   >
-                    CN TRƯỜNG CHINH -<br />
-                    CÔNG TY CỔ PHẦN
-                    <br />
-                    ĐẦU TƯ TMDV Ô TÔ
-                    <br />
-                    ĐÔNG SÀI GÒN
+                    <span className="print:hidden">
+                      <textarea
+                        value={headerLeft}
+                        onChange={(e) => setHeaderLeft(e.target.value)}
+                        className="w-full h-24 text-center font-bold text-sm resize-none focus:outline-none focus:border-blue-500"
+                      />
+                    </span>
+                    <span className="hidden print:inline whitespace-pre-line">
+                      {headerLeft}
+                    </span>
                   </td>
                   <td
                     className="border-r-2 border-black p-2 align-middle text-center font-bold text-lg"
@@ -153,7 +151,18 @@ const PhieuRutCoc = () => {
                   >
                     PHIẾU ĐỀ XUẤT
                     <br />
-                    <span className="text-base">RÚT PHIẾU CLXX</span>
+                    <span className="text-base flex items-center justify-center gap-1">
+                      RÚT
+                      <span className="print:hidden">
+                        <input
+                          type="text"
+                          value={headerSuffix}
+                          onChange={(e) => setHeaderSuffix(e.target.value)}
+                          className="border-b border-gray-400 px-1 w-32 text-center font-bold focus:outline-none focus:border-blue-500"
+                        />
+                      </span>
+                      <span className="hidden print:inline">{headerSuffix}</span>
+                    </span>
                   </td>
                   <td
                     className="p-2 align-middle text-sm"
@@ -239,7 +248,18 @@ const PhieuRutCoc = () => {
               </span>
               <span className="hidden print:inline">{phieuCLXX}</span> như sau:
             </p>
-            <p>Thời gian dự kiến giao xe:</p>
+            <p>
+              Thời gian dự kiến giao xe:{" "}
+              <span className="print:hidden">
+                <input
+                  type="text"
+                  value={thoiGianGiaoXe}
+                  onChange={(e) => setThoiGianGiaoXe(e.target.value)}
+                  className="border-b border-gray-400 px-2 py-1 text-sm w-64 focus:outline-none focus:border-blue-500"
+                />
+              </span>
+              <span className="hidden print:inline">{thoiGianGiaoXe}</span>
+            </p>
           </div>
 
           {/* Table */}
@@ -349,11 +369,6 @@ const PhieuRutCoc = () => {
                 </tr>
               </tbody>
             </table>
-          </div>
-
-          {/* Footer */}
-          <div className="mt-auto text-right text-sm italic">
-            <p>VinFast Đông Sài Gòn</p>
           </div>
         </div>
       </div>

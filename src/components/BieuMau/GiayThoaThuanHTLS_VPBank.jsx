@@ -4,6 +4,7 @@ import { ref, get } from "firebase/database";
 import { database } from "../../firebase/config";
 import { getBranchByShowroomName } from "../../data/branchData";
 import { vndToWords } from "../../utils/vndToWords";
+import vinfastLogo from "../../assets/vinfast.svg";
 
 const GiayThoaThuanHTLS_VPBank = () => {
   const location = useLocation();
@@ -220,9 +221,9 @@ const GiayThoaThuanHTLS_VPBank = () => {
             ) {
               setModel(
                 contractData.dongXe ||
-                  contractData.model ||
-                  contractData["Dòng xe"] ||
-                  ""
+                contractData.model ||
+                contractData["Dòng xe"] ||
+                ""
               );
             }
 
@@ -234,9 +235,9 @@ const GiayThoaThuanHTLS_VPBank = () => {
             ) {
               setSoKhung(
                 contractData.soKhung ||
-                  contractData["Số Khung"] ||
-                  contractData.chassisNumber ||
-                  ""
+                contractData["Số Khung"] ||
+                contractData.chassisNumber ||
+                ""
               );
             }
 
@@ -248,9 +249,9 @@ const GiayThoaThuanHTLS_VPBank = () => {
             ) {
               setSoMay(
                 contractData.soMay ||
-                  contractData["Số Máy"] ||
-                  contractData.engineNumber ||
-                  ""
+                contractData["Số Máy"] ||
+                contractData.engineNumber ||
+                ""
               );
             }
 
@@ -293,9 +294,9 @@ const GiayThoaThuanHTLS_VPBank = () => {
             ) {
               setDiaChiKH(
                 contractData.address ||
-                  contractData["Địa chỉ"] ||
-                  contractData["Địa Chỉ"] ||
-                  ""
+                contractData["Địa chỉ"] ||
+                contractData["Địa Chỉ"] ||
+                ""
               );
             }
 
@@ -307,9 +308,9 @@ const GiayThoaThuanHTLS_VPBank = () => {
             ) {
               setDienThoaiKH(
                 contractData.phone ||
-                  contractData["Số Điện Thoại"] ||
-                  contractData["Số điện thoại"] ||
-                  ""
+                contractData["Số Điện Thoại"] ||
+                contractData["Số điện thoại"] ||
+                ""
               );
             }
 
@@ -321,9 +322,9 @@ const GiayThoaThuanHTLS_VPBank = () => {
             ) {
               setMaSoThueKH(
                 contractData.maSoThue ||
-                  contractData["Mã số thuế"] ||
-                  contractData["Mã Số Thuế"] ||
-                  ""
+                contractData["Mã số thuế"] ||
+                contractData["Mã Số Thuế"] ||
+                ""
               );
             }
 
@@ -336,10 +337,10 @@ const GiayThoaThuanHTLS_VPBank = () => {
             ) {
               setCanCuocKH(
                 contractData.cccd ||
-                  contractData.CCCD ||
-                  contractData["Căn cước"] ||
-                  contractData.customerCCCD ||
-                  ""
+                contractData.CCCD ||
+                contractData["Căn cước"] ||
+                contractData.customerCCCD ||
+                ""
               );
             }
 
@@ -370,10 +371,10 @@ const GiayThoaThuanHTLS_VPBank = () => {
             ) {
               setNoiCapKH(
                 contractData.noiCap ||
-                  contractData.issuePlace ||
-                  contractData["Nơi Cấp"] ||
-                  contractData["Nơi cấp"] ||
-                  ""
+                contractData.issuePlace ||
+                contractData["Nơi Cấp"] ||
+                contractData["Nơi cấp"] ||
+                ""
               );
             }
 
@@ -398,8 +399,8 @@ const GiayThoaThuanHTLS_VPBank = () => {
               } else {
                 setSoTienVayBangChu(
                   contractData.soTienVayBangChu ||
-                    contractData["Số Tiền Vay Bằng Chữ"] ||
-                    ""
+                  contractData["Số Tiền Vay Bằng Chữ"] ||
+                  ""
                 );
               }
             }
@@ -478,8 +479,8 @@ const GiayThoaThuanHTLS_VPBank = () => {
           } else {
             setSoTienVayBangChu(
               stateData.soTienVayBangChu ||
-                stateData["Số Tiền Vay Bằng Chữ"] ||
-                ""
+              stateData["Số Tiền Vay Bằng Chữ"] ||
+              ""
             );
           }
         }
@@ -532,6 +533,9 @@ const GiayThoaThuanHTLS_VPBank = () => {
         >
           {/* Title */}
           <div className="text-center mb-6">
+            <div className="w-32 mx-auto mb-4">
+              <img src={vinfastLogo} alt="VinFast Logo" className="w-full" />
+            </div>
             <h1 className="text-xl font-bold uppercase mb-4">
               THỎA THUẬN HỖ TRỢ LÃI VAY
             </h1>

@@ -6,6 +6,9 @@ import {
   getBranchByShowroomName,
   getDefaultBranch,
 } from "../../data/branchData";
+import vinfastLogo from "../../assets/vinfast.svg";
+import { uploadImageToCloudinary } from "../../config/cloudinary";
+import { toast } from "react-toastify";
 
 const PDI_KH = () => {
   const location = useLocation();
@@ -37,16 +40,21 @@ const PDI_KH = () => {
   const [coVanDV, setCoVanDV] = useState("");
   const [dienThoaiDV, setDienThoaiDV] = useState("");
   const [tgXeVao, setTgXeVao] = useState("");
-  const [tgBatDauSC, setTgBatDauSC] = useState("");
-  const [tgKetThucSC, setTgKetThucSC] = useState("");
-  const [tgHoanTatCV, setTgHoanTatCV] = useState("");
+
+  // Time fields
+  const [tgBatDauSC_Gio, setTgBatDauSC_Gio] = useState("");
+  const [tgBatDauSC_Ngay, setTgBatDauSC_Ngay] = useState("");
+  const [tgDuKienGiao_Gio, setTgDuKienGiao_Gio] = useState("");
+  const [tgDuKienGiao_Ngay, setTgDuKienGiao_Ngay] = useState("");
+  const [tgHoanTat_Gio, setTgHoanTat_Gio] = useState("");
+  const [tgHoanTat_Ngay, setTgHoanTat_Ngay] = useState("");
 
   // Khách hàng yêu cầu
   const [ruaXe, setRuaXe] = useState(false);
   const [danhBongXe, setDanhBongXe] = useState(false);
   const [veSinhXe, setVeSinhXe] = useState(false);
 
-  // Nguyên nhân cơ thể
+  // Nguyên nhân có thể
   const [nguyenNhan, setNguyenNhan] = useState("");
 
   // Biện pháp xử lý
@@ -59,15 +67,39 @@ const PDI_KH = () => {
   const [luuY, setLuuY] = useState("");
 
   // Bộ dụng cụ theo xe
-  const [mucNhieuLieu, setMucNhieuLieu] = useState("");
-  const [binhXeDuPho, setBinhXeDuPho] = useState({
+  const [mucNhieuLieu, setMucNhieuLieu] = useState({
     "0": false,
     "1/4": false,
     "1/2": false,
     "3/4": false,
     "1": false,
-    TTCK: false,
   });
+
+  // Phương thức thanh toán
+  const [ttTienMat, setTtTienMat] = useState(false);
+  const [ttChuyenKhoan, setTtChuyenKhoan] = useState(false);
+
+  // Sơ đồ xe
+  const [soDoXeImage, setSoDoXeImage] = useState("");
+  const [uploadingSoDoXe, setUploadingSoDoXe] = useState(false);
+
+  const handleSoDoXeUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      setUploadingSoDoXe(true);
+      const url = await uploadImageToCloudinary(file);
+      setSoDoXeImage(url);
+      toast.success("Upload ảnh sơ đồ xe thành công!");
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      toast.error("Lỗi khi upload ảnh: " + error.message);
+    } finally {
+      setUploadingSoDoXe(false);
+      e.target.value = "";
+    }
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -100,16 +132,29 @@ const PDI_KH = () => {
         setData(stateData);
 
         // Auto-fill từ location.state
-        if (stateData.customerName) setKhachHang(stateData.customerName);
-        if (stateData.customerAddress) setDiaChi(stateData.customerAddress);
-        if (stateData.customerPhone) setDienThoai(stateData.customerPhone);
-        if (stateData.customerEmail) setEmail(stateData.customerEmail);
-        if (stateData.hieuxe) {
-          setHieuxe(stateData.hieuxe);
-          setModel(stateData.hieuxe);
+        if (stateData.customerName || stateData.tenKh) {
+          setKhachHang(stateData.customerName || stateData.tenKh);
         }
+        if (stateData.customerAddress || stateData.diaChi) {
+          setDiaChi(stateData.customerAddress || stateData.diaChi);
+        }
+        if (stateData.customerPhone || stateData.soDienThoai) {
+          setDienThoai(stateData.customerPhone || stateData.soDienThoai);
+        }
+        if (stateData.customerEmail || stateData.email) {
+          setEmail(stateData.customerEmail || stateData.email);
+        }
+
+        const carModel = stateData.hieuxe || stateData.dongXe || stateData.model;
+        if (carModel) {
+          setHieuxe(carModel);
+          setModel(carModel);
+        }
+
         if (stateData.soKhung) setSoKhung(stateData.soKhung);
         if (stateData.soMay) setSoMay(stateData.soMay);
+        if (stateData.maMau || stateData.ngoaiThat) setMaMau(stateData.maMau || stateData.ngoaiThat);
+        if (stateData.namSX) setNamSX(stateData.namSX);
       } else {
         setData({
           customerName: "",
@@ -157,8 +202,8 @@ const PDI_KH = () => {
         >
           {/* Header */}
           <div className="flex items-start justify-between mb-6">
-            <div className="w-20">
-              <img src="/vinfast.svg" alt="VinFast Logo" className="w-full" />
+            <div className="w-32">
+              <img src={vinfastLogo} alt="VinFast Logo" className="w-full" />
             </div>
             <div className="flex-1 text-center text-xs">
               <p className="font-bold">
@@ -444,10 +489,78 @@ const PDI_KH = () => {
                   <span className="ml-2 hidden print:inline">{tgXeVao}</span>
                 </div>
               </div>
-              <div className="text-xs mt-1 italic">
-                TG bắt đầu SC: .......giờ..........TG dự kiến giao xe .......giờ
-                ........./......../.............TG hoàn tất CV thực tế:
-                .....giờ......../......./..........
+              <div className="text-xs mt-1 italic flex flex-wrap items-center gap-1">
+                <span>TG bắt đầu SC:</span>
+                <span className="print:hidden">
+                  <input
+                    type="text"
+                    value={tgBatDauSC_Gio}
+                    onChange={(e) => setTgBatDauSC_Gio(e.target.value)}
+                    className="border-b border-gray-400 px-1 w-12 text-center focus:outline-none focus:border-blue-500"
+                    placeholder="giờ"
+                  />
+                </span>
+                <span className="hidden print:inline">{tgBatDauSC_Gio || "......."}</span>
+                <span>giờ</span>
+
+                <span className="print:hidden">
+                  <input
+                    type="text"
+                    value={tgBatDauSC_Ngay}
+                    onChange={(e) => setTgBatDauSC_Ngay(e.target.value)}
+                    className="border-b border-gray-400 px-1 w-20 text-center focus:outline-none focus:border-blue-500"
+                    placeholder="ngày/tháng"
+                  />
+                </span>
+                <span className="hidden print:inline">{tgBatDauSC_Ngay || "........./......../............."}</span>
+
+                <span className="ml-4">TG dự kiến giao xe:</span>
+                <span className="print:hidden">
+                  <input
+                    type="text"
+                    value={tgDuKienGiao_Gio}
+                    onChange={(e) => setTgDuKienGiao_Gio(e.target.value)}
+                    className="border-b border-gray-400 px-1 w-12 text-center focus:outline-none focus:border-blue-500"
+                    placeholder="giờ"
+                  />
+                </span>
+                <span className="hidden print:inline">{tgDuKienGiao_Gio || "......."}</span>
+                <span>giờ</span>
+
+                <span className="print:hidden">
+                  <input
+                    type="text"
+                    value={tgDuKienGiao_Ngay}
+                    onChange={(e) => setTgDuKienGiao_Ngay(e.target.value)}
+                    className="border-b border-gray-400 px-1 w-20 text-center focus:outline-none focus:border-blue-500"
+                    placeholder="ngày/tháng"
+                  />
+                </span>
+                <span className="hidden print:inline">{tgDuKienGiao_Ngay || "........./......../............."}</span>
+
+                <span className="ml-4">TG hoàn tất CV thực tế:</span>
+                <span className="print:hidden">
+                  <input
+                    type="text"
+                    value={tgHoanTat_Gio}
+                    onChange={(e) => setTgHoanTat_Gio(e.target.value)}
+                    className="border-b border-gray-400 px-1 w-12 text-center focus:outline-none focus:border-blue-500"
+                    placeholder="giờ"
+                  />
+                </span>
+                <span className="hidden print:inline">{tgHoanTat_Gio || "....."}</span>
+                <span>giờ</span>
+
+                <span className="print:hidden">
+                  <input
+                    type="text"
+                    value={tgHoanTat_Ngay}
+                    onChange={(e) => setTgHoanTat_Ngay(e.target.value)}
+                    className="border-b border-gray-400 px-1 w-20 text-center focus:outline-none focus:border-blue-500"
+                    placeholder="ngày/tháng"
+                  />
+                </span>
+                <span className="hidden print:inline">{tgHoanTat_Ngay || "......../......./.........."}</span>
               </div>
             </div>
 
@@ -496,9 +609,9 @@ const PDI_KH = () => {
               </div>
             </div>
 
-            {/* Nguyên nhân cơ thể */}
+            {/* Nguyên nhân có thể */}
             <div className="border-b border-black pb-2">
-              <p className="font-bold underline mb-2">Nguyên nhân cơ thể :</p>
+              <p className="font-bold underline mb-2">Nguyên nhân có thể :</p>
               <span className="print:hidden">
                 <textarea
                   value={nguyenNhan}
@@ -557,8 +670,36 @@ const PDI_KH = () => {
                     {luuY}
                   </span>
                 </div>
-                <div className="w-32 h-32 border border-black flex items-center justify-center">
-                  <span className="text-xs text-gray-400">Sơ đồ xe</span>
+                <div className="w-32 h-32 border border-black flex items-center justify-center relative group">
+                  {soDoXeImage ? (
+                    <>
+                      <img
+                        src={soDoXeImage}
+                        alt="Sơ đồ xe"
+                        className="w-full h-full object-contain"
+                      />
+                      <button
+                        onClick={() => setSoDoXeImage("")}
+                        className="absolute top-0 right-0 bg-red-500 text-white w-5 h-5 flex items-center justify-center rounded-full -mt-2 -mr-2 opacity-0 group-hover:opacity-100 transition-opacity print:hidden"
+                        title="Xóa ảnh"
+                      >
+                        ×
+                      </button>
+                    </>
+                  ) : (
+                    <label className="w-full h-full flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors">
+                      <span className="text-xs text-gray-400 text-center px-1">
+                        {uploadingSoDoXe ? "Đang tải..." : "Sơ đồ xe (Click tải ảnh)"}
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleSoDoXeUpload}
+                        className="hidden"
+                        disabled={uploadingSoDoXe}
+                      />
+                    </label>
+                  )}
                 </div>
               </div>
             </div>
@@ -566,52 +707,65 @@ const PDI_KH = () => {
             {/* Footer section */}
             <div className="pt-4">
               <div className="flex justify-between items-start">
-                <div className="text-xs">
+                <div className="text-xs max-w-[60%]">
                   <p className="mb-2">
-                    Quý khách hàng không nên để tiền bạc, từ trang qui giá, vn
-                    khi quản dụng trên xe khi xe đang sửa chữa
+                    Quý khách hàng không nên để tiền bạc, tư trang quí giá, vũ khí quân dụng trên xe khi xe đang sửa chữa
                   </p>
+
+                  {/* Phương thức thanh toán */}
+                  <div className="mt-4 border border-black p-2">
+                    <p className="font-bold mb-2">Phương thức thanh toán:</p>
+                    <div className="flex gap-6">
+                      <label className="flex items-center gap-1">
+                        <input
+                          type="checkbox"
+                          checked={ttTienMat}
+                          onChange={(e) => setTtTienMat(e.target.checked)}
+                          className="print:hidden"
+                        />
+                        <span className="hidden print:inline">
+                          {ttTienMat ? "☑" : "☐"}
+                        </span>
+                        <span>Tiền mặt</span>
+                      </label>
+                      <label className="flex items-center gap-1">
+                        <input
+                          type="checkbox"
+                          checked={ttChuyenKhoan}
+                          onChange={(e) => setTtChuyenKhoan(e.target.checked)}
+                          className="print:hidden"
+                        />
+                        <span className="hidden print:inline">
+                          {ttChuyenKhoan ? "☑" : "☐"}
+                        </span>
+                        <span>Chuyển khoản</span>
+                      </label>
+                    </div>
+                  </div>
                 </div>
+
                 <div className="border border-black p-2 text-xs">
                   <p className="mb-2">
                     <strong>Bộ dụng cụ theo xe:</strong>
                   </p>
-                  <p className="mb-2">
-                    <span>Mức nhiên liệu trên xe:</span>
-                    <span className="ml-2 print:hidden">
-                      <input
-                        type="text"
-                        value={mucNhieuLieu}
-                        onChange={(e) => setMucNhieuLieu(e.target.value)}
-                        className="border-b border-gray-400 px-1 w-24 focus:outline-none focus:border-blue-500"
-                      />
-                    </span>
-                    <span className="ml-2 hidden print:inline">
-                      {mucNhieuLieu}
-                    </span>
-                  </p>
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="font-bold">Bình xe dự phô</span>
-                    <div className="flex gap-1 ml-4">
-                      {["0", "1/4", "1/2", "3/4", "1", "TTCK"].map((level) => (
+                  <div className="mb-2">
+                    <p className="mb-1">Mức nhiên liệu trên xe:</p>
+                    <div className="flex gap-1">
+                      {["0", "1/4", "1/2", "3/4", "1"].map((level) => (
                         <label key={level} className="flex items-center">
                           <input
                             type="checkbox"
-                            checked={
-                              binhXeDuPho[level]
-                            }
+                            checked={mucNhieuLieu[level]}
                             onChange={(e) =>
-                              setBinhXeDuPho({
-                                ...binhXeDuPho,
+                              setMucNhieuLieu({
+                                ...mucNhieuLieu,
                                 [level]: e.target.checked,
                               })
                             }
                             className="print:hidden mr-1"
                           />
                           <span className="hidden print:inline mr-1">
-                            {binhXeDuPho[level]
-                              ? "☑"
-                              : "☐"}
+                            {mucNhieuLieu[level] ? "☑" : "☐"}
                           </span>
                           <span className="text-xs">{level}</span>
                         </label>
@@ -627,7 +781,7 @@ const PDI_KH = () => {
                   <p className="font-bold mb-16">TƯ VẤN BÁN HÀNG</p>
                 </div>
                 <div className="text-center">
-                  <p className="font-bold mb-16">TEKINH DOANH</p>
+                  <p className="font-bold mb-16">TP.KINHDOANH</p>
                 </div>
                 <div className="text-center">
                   <p className="font-bold mb-16">TỔNG GĐ/GIÁM ĐỐC</p>

@@ -1825,6 +1825,27 @@ export default function HopDongDaXuatPage() {
                         >
                           Phụ lục hợp đồng
                         </button>
+
+                        <button
+                          onClick={() => handlePrintNavigate("/pdi-kh")}
+                          className="w-full px-3 sm:px-4 py-2 sm:py-2.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm sm:text-base"
+                        >
+                          Phiếu yêu cầu sửa chữa
+                        </button>
+
+                        <button
+                          onClick={() => handlePrintNavigate("/phieu-de-nghi-lap-phu-kien")}
+                          className="w-full px-3 sm:px-4 py-2 sm:py-2.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm sm:text-base"
+                        >
+                          Phiếu đề nghị lắp phụ kiện
+                        </button>
+
+                        <button
+                          onClick={() => handlePrintNavigate("/phieu-rut-coc")}
+                          className="w-full px-3 sm:px-4 py-2 sm:py-2.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm sm:text-base"
+                        >
+                          Phiếu rút cọc
+                        </button>
                       </div>
 
                       {/* Group 2: BỘ GIẢI NGÂN CỦA NGÂN HÀNG */}
@@ -1904,6 +1925,45 @@ export default function HopDongDaXuatPage() {
                             className="w-full px-3 sm:px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors text-xs sm:text-sm"
                           >
                             Xác nhận công nợ
+                          </button>
+                        </div>
+
+                        {/* Thỏa thuận hỗ trợ lãi vay 80% */}
+                        <div className="space-y-2 mt-3 pl-2 sm:pl-4 border-l-4 border-green-400 bg-green-50 p-2 sm:p-3 rounded">
+                          <p className="text-xs sm:text-sm font-semibold text-green-800 mb-2">
+                            Thỏa thuận hỗ trợ lãi vay 80%:
+                          </p>
+                          <button
+                            onClick={() =>
+                              handlePrintNavigate("/bidv-thoa-thuan-ho-tro-lai-vay")
+                            }
+                            className="w-full px-3 sm:px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-xs sm:text-sm"
+                          >
+                            BIDV - Thỏa thuận hỗ trợ lãi vay
+                          </button>
+                          <button
+                            onClick={() =>
+                              handlePrintNavigate("/bieu-mau-tpbank")
+                            }
+                            className="w-full px-3 sm:px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-xs sm:text-sm"
+                          >
+                            TPBank - Thỏa thuận hỗ trợ lãi vay
+                          </button>
+                          <button
+                            onClick={() =>
+                              handlePrintNavigate("/giay-thoa-thuan-htls-vpbank")
+                            }
+                            className="w-full px-3 sm:px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-xs sm:text-sm"
+                          >
+                            VPBank - Thỏa thuận hỗ trợ lãi suất
+                          </button>
+                          <button
+                            onClick={() =>
+                              handlePrintNavigate("/thoa-thuan-ho-tro-lai-vay-shinhan-cdx")
+                            }
+                            className="w-full px-3 sm:px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-xs sm:text-sm"
+                          >
+                            Shinhan - Thỏa thuận hỗ trợ lãi vay
                           </button>
                         </div>
 

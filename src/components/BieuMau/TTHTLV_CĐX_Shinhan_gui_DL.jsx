@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ref, get } from "firebase/database";
 import { database } from "../../firebase/config";
+import vinfastLogo from "../../assets/vinfast.svg";
 
 const TTHTLV_CĐX_Shinhan_gui_DL = () => {
   const location = useLocation();
@@ -167,6 +168,9 @@ const TTHTLV_CĐX_Shinhan_gui_DL = () => {
 
         {/* Header with logo and title */}
         <div className="text-center mb-6">
+          <div className="w-32 mx-auto mb-4">
+            <img src={vinfastLogo} alt="VinFast Logo" className="w-full" />
+          </div>
           <h1 className="text-xl font-bold uppercase">
             THỎA THUẬN HỖ TRỢ LÃI VAY
           </h1>
