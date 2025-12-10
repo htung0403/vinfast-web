@@ -91,79 +91,91 @@ function Home() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-gray-200 bg-white">
+              <thead className="bg-gradient-to-r from-blue-600 to-blue-700">
                 <tr>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 sm:px-6 py-4 text-left text-sm font-bold text-white uppercase tracking-wider">
                     STT
                   </th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Ảnh
+                  <th className="px-4 sm:px-6 py-4 text-left text-sm font-bold text-white uppercase tracking-wider">
+                    ẢNH
                   </th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Dòng xe
+                  <th className="px-4 sm:px-6 py-4 text-left text-sm font-bold text-white uppercase tracking-wider">
+                    DÒNG XE
                   </th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Phiên bản
+                  <th className="px-4 sm:px-6 py-4 text-left text-sm font-bold text-white uppercase tracking-wider">
+                    PHIÊN BẢN
                   </th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Ngoại thất
+                  <th className="px-4 sm:px-6 py-4 text-left text-sm font-bold text-white uppercase tracking-wider">
+                    NGOẠI THẤT
                   </th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Nội thất
+                  <th className="px-4 sm:px-6 py-4 text-left text-sm font-bold text-white uppercase tracking-wider">
+                    NỘI THẤT
                   </th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Giá bán
+                  <th className="px-4 sm:px-6 py-4 text-left text-sm font-bold text-white uppercase tracking-wider">
+                    GIÁ BÁN
                   </th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Giá cuối
+                  <th className="px-4 sm:px-6 py-4 text-left text-sm font-bold text-white uppercase tracking-wider">
+                    GIÁ CUỐI
                   </th>
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Thao tác
+                  <th className="px-4 sm:px-6 py-4 text-left text-sm font-bold text-white uppercase tracking-wider">
+                    THAO TÁC
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white divide-y divide-gray-100">
                 {quotes.map((quote, index) => (
-                  <tr key={quote.id} className="hover:bg-gray-50">
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {index + 1}
+                  <tr key={quote.id} className="hover:bg-blue-50 transition-colors duration-200">
+                    <td className="px-4 sm:px-6 py-6 whitespace-nowrap">
+                      <div className="flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-800 font-bold text-lg rounded-full">
+                        {index + 1}
+                      </div>
                     </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                      <img
-                        src={quote.carImageUrl}
-                        alt={`${quote.carModel} ${quote.carVersion}`}
-                        className="h-12 w-20 object-contain rounded"
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                        }}
-                      />
+                    <td className="px-4 sm:px-6 py-6 whitespace-nowrap">
+                      <div className="flex items-center justify-center">
+                        <img
+                          src={quote.carImageUrl}
+                          alt={`${quote.carModel} ${quote.carVersion}`}
+                          className="h-20 w-32 object-contain rounded"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                      </div>
                     </td>
-                    <td className="px-3 sm:px-6 py-4 text-sm text-gray-900">
-                      <div className="font-semibold">{quote.carModel}</div>
+                    <td className="px-4 sm:px-6 py-6">
+                      <div className="font-bold text-lg text-gray-900">{quote.carModel}</div>
                     </td>
-                    <td className="px-3 sm:px-6 py-4 text-sm text-gray-900">
-                      <div>{quote.carVersion}</div>
+                    <td className="px-4 sm:px-6 py-6">
+                      <div className="font-semibold text-base text-gray-700">{quote.carVersion}</div>
                     </td>
-                    <td className="px-3 sm:px-6 py-4 text-sm text-gray-900">
-                      <div className="text-xs">{quote.exteriorColorName}</div>
+                    <td className="px-4 sm:px-6 py-6">
+                      <div className="text-sm font-medium text-gray-600">
+                        {quote.exteriorColorName}
+                      </div>
                     </td>
-                    <td className="px-3 sm:px-6 py-4 text-sm text-gray-900">
-                      <div className="text-xs">{quote.interiorColorName || 'N/A'}</div>
+                    <td className="px-4 sm:px-6 py-6">
+                      <div className="text-sm font-medium text-gray-600">
+                        {quote.interiorColorName || 'N/A'}
+                      </div>
                     </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                      {formatCurrency(quote.basePrice)}
+                    <td className="px-4 sm:px-6 py-6 whitespace-nowrap">
+                      <div className="text-lg font-bold text-gray-800">
+                        {formatCurrency(quote.basePrice)}
+                      </div>
                     </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-semibold text-blue-600">
-                      {formatCurrency(quote.totalCost)}
+                    <td className="px-4 sm:px-6 py-6 whitespace-nowrap">
+                      <div className="text-xl font-bold text-green-600">
+                        {formatCurrency(quote.totalCost)}
+                      </div>
                     </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm">
+                    <td className="px-4 sm:px-6 py-6 whitespace-nowrap text-center">
                       <button
                         onClick={() => deleteQuote(quote.id)}
-                        className="text-red-600 hover:text-red-900 transition-colors"
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-full transition-all duration-200"
                         title="Xóa báo giá"
                       >
-                        <Trash2 className="w-5 h-5" />
+                        <Trash2 className="w-6 h-6" />
                       </button>
                     </td>
                   </tr>
@@ -189,10 +201,10 @@ function Home() {
             <p className="text-sm sm:text-base">Chưa có ưu đãi nào được thêm.</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {promotions.map((promotion, index) => (
-              <div key={promotion.id} className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg hover:shadow-md transition-shadow">
-                <div className="flex items-center space-x-4 flex-1">
+              <div key={promotion.id} className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg hover:shadow-md transition-shadow">
+                <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center space-x-2">
                     <Gift className="w-5 h-5 text-blue-600 flex-shrink-0" />
                     <span className="text-sm font-medium text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
@@ -200,19 +212,30 @@ function Home() {
                     </span>
                   </div>
                   
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-gray-900 text-sm">
-                      {promotion.name}
-                    </h3>
-                    {promotion.createdAt && (
-                      <p className="text-xs text-gray-400 mt-1">
-                        {new Date(promotion.createdAt).toLocaleDateString('vi-VN')}
-                      </p>
-                    )}
-                  </div>
+                  {promotion.type && (
+                    <span className={`text-xs px-2 py-1 rounded-full ${
+                      promotion.type === 'fixed' ? 'bg-green-100 text-green-700' :
+                      promotion.type === 'percentage' ? 'bg-orange-100 text-orange-700' :
+                      'bg-gray-100 text-gray-700'
+                    }`}>
+                      {promotion.type === 'fixed' ? 'Cố định' :
+                       promotion.type === 'percentage' ? 'Phần trăm' : 'Hiển thị'}
+                    </span>
+                  )}
                 </div>
                 
-                <div className="flex items-center space-x-3">
+                <div className="mb-3">
+                  <h3 className="font-semibold text-gray-900 text-sm mb-1">
+                    {promotion.name}
+                  </h3>
+                  {promotion.createdAt && (
+                    <p className="text-xs text-gray-400">
+                      {new Date(promotion.createdAt).toLocaleDateString('vi-VN')}
+                    </p>
+                  )}
+                </div>
+                
+                <div className="flex justify-end">
                   {promotion.type === 'fixed' && promotion.value > 0 && (
                     <span className="text-green-600 font-bold text-sm">
                       -{formatCurrency(promotion.value)}
@@ -228,17 +251,6 @@ function Home() {
                         </p>
                       )}
                     </div>
-                  )}
-                  
-                  {promotion.type && (
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      promotion.type === 'fixed' ? 'bg-green-100 text-green-700' :
-                      promotion.type === 'percentage' ? 'bg-orange-100 text-orange-700' :
-                      'bg-gray-100 text-gray-700'
-                    }`}>
-                      {promotion.type === 'fixed' ? 'Cố định' :
-                       promotion.type === 'percentage' ? 'Phần trăm' : 'Hiển thị'}
-                    </span>
                   )}
                 </div>
               </div>
