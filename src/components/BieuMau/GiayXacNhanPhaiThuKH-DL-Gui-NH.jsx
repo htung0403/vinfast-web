@@ -246,11 +246,11 @@ const GiayXacNhanPhaiThuKH_DL_Gui_NH = () => {
 
   return (
     <div
-      className="min-h-screen bg-gray-50 p-8"
+      className="min-h-screen bg-gray-50 p-8 print:p-0 print:m-0"
       style={{ fontFamily: "Times New Roman" }}
     >
-      <div className="max-w-4xl mx-auto print:max-w-3xl print:mx-auto">
-        <div className="bg-white p-12 print:p-8 text-[14px]" id="printable-content">
+      <div className="max-w-4xl mx-auto print:max-w-none print:mx-0">
+        <div className="bg-white p-12 print:p-0 print:bg-white text-[14px] print:text-[14px]" id="printable-content">
           {/* Header */}
           <div className="text-center mb-2">
             <p className="font-bold">
@@ -673,7 +673,12 @@ const GiayXacNhanPhaiThuKH_DL_Gui_NH = () => {
       <style>{`
         @media print {
           @page {
-            margin: 20mm;
+            margin: 15mm 10mm;
+            size: A4;
+          }
+          * {
+            -webkit-print-color-adjust: exact !important;
+            color-adjust: exact !important;
           }
           body * {
             visibility: hidden;
@@ -683,12 +688,17 @@ const GiayXacNhanPhaiThuKH_DL_Gui_NH = () => {
             visibility: visible;
           }
           #printable-content {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
+            position: static !important;
+            left: auto !important;
+            top: auto !important;
+            width: 100% !important;
+            max-width: none !important;
+            margin: 0 !important;
             padding: 0 !important;
             font-family: 'Times New Roman', Times, serif !important;
+            font-size: 14px !important;
+            line-height: 1.4 !important;
+            page-break-after: avoid !important;
           }
           .print\\:hidden {
             display: none !important;
@@ -697,6 +707,24 @@ const GiayXacNhanPhaiThuKH_DL_Gui_NH = () => {
             margin: 0 !important;
             padding: 0 !important;
             font-family: 'Times New Roman', Times, serif !important;
+            height: auto !important;
+            overflow: visible !important;
+          }
+          .min-h-screen {
+            min-height: auto !important;
+          }
+          .bg-gray-50 {
+            background: white !important;
+          }
+          .max-w-4xl {
+            max-width: none !important;
+          }
+          .mx-auto {
+            margin-left: 0 !important;
+            margin-right: 0 !important;
+          }
+          .p-8, .p-12 {
+            padding: 0 !important;
           }
         }
       `}</style>

@@ -741,7 +741,12 @@ export default function HopDongDaXuatPage() {
   };
 
   // Calculate days from export date to today
-  const calculateDaysFromExport = (exportDate) => {
+  const calculateDaysFromExport = (exportDate, tinhTrang) => {
+    // Nếu tình trạng là "đã giải ngân" thì không hiển thị số ngày
+    if (tinhTrang && tinhTrang.toLowerCase() === "đã giải ngân") {
+      return "-";
+    }
+    
     if (!exportDate) return "-";
     try {
       const exportDateObj = new Date(exportDate);
@@ -1349,8 +1354,8 @@ export default function HopDongDaXuatPage() {
                             {formatCurrency(calculateBankLoan(contract))}
                           </td>
                           <td className="px-2 sm:px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-black border border-secondary-400 text-center font-semibold">
-                            {calculateDaysFromExport(contract.ngayXhd)}
-                            {calculateDaysFromExport(contract.ngayXhd) !==
+                            {calculateDaysFromExport(contract.ngayXhd, contract.tinhTrang)}
+                            {calculateDaysFromExport(contract.ngayXhd, contract.tinhTrang) !==
                               "-" && " ngày"}
                           </td>
                           {/* Actions column - sticky to right */}
