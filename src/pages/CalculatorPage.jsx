@@ -943,20 +943,24 @@ export default function CalculatorPage() {
     
     const priceAfterBasicPromotions = Math.max(0, basePrice - totalPromotionDiscounts);
 
-    // Amount before VinClub
-    const amountBeforeVinClub = Math.max(0, priceAfterBasicPromotions - convertSupportDiscount - bhvc2 - premiumColor);
-
-    // VinClub discount - không áp dụng nếu KH tham gia Hỗ trợ lãi suất
+    // VinClub discount - tính trên (Giá niêm yết - fix discount)
+    // Công thức: VinClub = (Giá niêm yết - fix discount) * % VinClub
     let vinClubDiscount = 0;
     if (vinClubVoucher !== 'none' && !hoTroLaiSuat) {
       const vinClubData = getDataByKey(uu_dai_vin_club, 'hang', vinClubVoucher);
       if (vinClubData) {
-        vinClubDiscount = Math.round(amountBeforeVinClub * vinClubData.ty_le);
+        vinClubDiscount = Math.round(priceAfterBasicPromotions * vinClubData.ty_le);
       }
     }
 
-    // Final payable
-    const finalPayable = Math.max(0, amountBeforeVinClub - vinClubDiscount);
+    // Giá XHD = Giá niêm yết - fix discount - VinClub
+    const giaXuatHoaDon = Math.max(0, priceAfterBasicPromotions - vinClubDiscount);
+    
+    // Amount before other discounts (for compatibility)
+    const amountBeforeVinClub = Math.max(0, priceAfterBasicPromotions - convertSupportDiscount - bhvc2 - premiumColor);
+
+    // Final payable (Giá thanh toán thực tế)
+    const finalPayable = Math.max(0, giaXuatHoaDon - convertSupportDiscount - bhvc2 - premiumColor);
     const totalDiscount = totalPromotionDiscounts + (vinClubDiscount || 0) + (convertSupportDiscount || 0) + (bhvc2 || 0) + (premiumColor || 0);    const priceAfterDiscount = Math.max(0, basePrice - totalDiscount);
 
     // On-road costs
@@ -1041,6 +1045,7 @@ export default function CalculatorPage() {
       premiumColorPotential,
       vinClubDiscount,
       amountBeforeVinClub,
+      giaXuatHoaDon,
       finalPayable,
       totalDiscount,
       priceAfterDiscount,
@@ -1154,7 +1159,9 @@ export default function CalculatorPage() {
       },
 
       // Final prices
-      giaXuatHoaDon: calculations.finalPayable || 0,
+      // Giá XHD = Giá niêm yết - fix discount - VinClub
+      giaXuatHoaDon: calculations.giaXuatHoaDon || 0,
+      // Giá thanh toán thực tế = Giá XHD - các ưu đãi khác (BHVC2, màu, xăng điện)
       giaThanhToanThucTe: calculations.finalPayable || 0,
       tongChiPhiLanBanh: calculations.totalOnRoadCost || 0,
     };
