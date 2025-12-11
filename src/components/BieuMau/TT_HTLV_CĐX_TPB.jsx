@@ -363,11 +363,13 @@ const TT_HTLV_CĐX_TPB = () => {
             if (
               contractData.customerName ||
               contractData["Tên KH"] ||
+              contractData["Tên Kh"] ||
               contractData.khachHang
             ) {
               setTenKH(
                 contractData.customerName ||
                 contractData["Tên KH"] ||
+                contractData["Tên Kh"] ||
                 contractData.khachHang ||
                 ""
               );

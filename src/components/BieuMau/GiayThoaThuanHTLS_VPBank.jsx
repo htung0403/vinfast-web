@@ -327,9 +327,9 @@ const GiayThoaThuanHTLS_VPBank = () => {
 
             // Lấy thông tin khách hàng từ database
             // Tên khách hàng
-            if (contractData.customerName || contractData["Tên KH"]) {
+            if (contractData.customerName || contractData["Tên KH"] || contractData["Tên Kh"]) {
               setOngBaKH(
-                contractData.customerName || contractData["Tên KH"] || ""
+                contractData.customerName || contractData["Tên KH"] || contractData["Tên Kh"] || ""
               );
             }
 

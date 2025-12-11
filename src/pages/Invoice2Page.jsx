@@ -115,7 +115,7 @@ export default function Invoice2Page() {
   const year = today.getFullYear();
 
   return (
-    <div className="min-h-screen bg-white p-4 print:p-5">
+    <div className="min-h-screen bg-white p-4 print:p-0 print:min-h-0">
       {/* Back Button - Hidden when printing */}
       <div className="no-print mb-4">
         <button
@@ -129,8 +129,15 @@ export default function Invoice2Page() {
       </div>
       <style>{`
         @media print {
+          @page {
+            size: A4;
+            margin: 8mm 10mm;
+          }
           body {
-            padding: 20px;
+            padding: 0;
+            margin: 0;
+            font-size: 9pt !important;
+            line-height: 1.2 !important;
           }
           .no-print {
             display: none !important;
@@ -142,7 +149,51 @@ export default function Invoice2Page() {
             page-break-inside: avoid;
           }
           .section-title {
-            margin-top: 10px;
+            margin-top: 4px !important;
+          }
+          .max-w-4xl {
+            max-width: 100% !important;
+            padding: 0 !important;
+          }
+          td, th {
+            padding: 2px 4px !important;
+            font-size: 9pt !important;
+          }
+          .p-1 {
+            padding: 2px 4px !important;
+          }
+          .p-2 {
+            padding: 4px !important;
+          }
+          .mb-0, .mb-3, .mt-3 {
+            margin: 2px 0 !important;
+          }
+          .my-4 {
+            margin: 4px 0 !important;
+          }
+          .mt-2, .mt-4, .mt-5 {
+            margin-top: 4px !important;
+          }
+          h2 {
+            font-size: 11pt !important;
+            padding: 4px !important;
+            margin-bottom: 4px !important;
+          }
+          .text-sm {
+            font-size: 9pt !important;
+          }
+          .text-xs {
+            font-size: 8pt !important;
+          }
+          .text-base {
+            font-size: 10pt !important;
+          }
+          footer {
+            margin-top: 8px !important;
+          }
+          input[type="checkbox"] {
+            width: 10px !important;
+            height: 10px !important;
           }
         }
       `}</style>
@@ -243,92 +294,150 @@ export default function Invoice2Page() {
         <table className="w-full border-collapse mb-0 text-sm bg-white">
           <tbody>
             <tr>
-              <td
-                className="border border-gray-900 p-1"
-                style={{ width: "50%" }}
-              >
+              <td className="border border-gray-900 p-1" style={{ width: "40%" }}>
                 <strong>Giá Xe Đã Bao Gồm VAT</strong>
               </td>
-              <td className="border border-gray-900 p-1 text-right">
+              <td className="border border-gray-900 p-1 text-center" style={{ width: "8%" }}>
+                <input type="checkbox" checked readOnly className="w-3 h-3" />
+              </td>
+              <td className="border border-gray-900 p-1 text-center" style={{ width: "12%" }}>
+                Kèm Pin
+              </td>
+              <td className="border border-gray-900 p-1 text-right" style={{ width: "20%" }}>
                 <strong>{formatCurrency(invoiceData.carBasePrice || 0)}</strong>
               </td>
+              <td className="border border-gray-900 p-1" style={{ width: "20%" }}></td>
             </tr>
-            <tr>
-              <td className="border border-gray-900 p-1 bg-blue-50" colSpan="2">
-                <strong>Chương trình khuyến mãi</strong>
+            {/* Selected promotions from Firebase */}
+            {invoiceData.selectedPromotions && invoiceData.selectedPromotions.length > 0 && 
+              invoiceData.selectedPromotions.map((promo, index) => (
+                <tr key={promo.id || index}>
+                  <td className="border border-gray-900 p-1">{promo.name || promo.ten_chuong_trinh}</td>
+                  <td className="border border-gray-900 p-1 text-center">
+                    <input type="checkbox" checked readOnly className="w-3 h-3" />
+                  </td>
+                  <td className="border border-gray-900 p-1 text-center">
+                    {promo.type === 'percentage' ? `${promo.value || 0}%` : ''}
+                  </td>
+                  <td className="border border-gray-900 p-1 text-right">
+                    {formatCurrency(promo.calculatedDiscount || promo.value || 0)}
+                  </td>
+                  <td className="border border-gray-900 p-1"></td>
+                </tr>
+              ))
+            }
+            {/* CS QDND&CAND - chỉ hiện nếu được chọn */}
+            {invoiceData.promotionCheckboxes?.discount2 && (
+              <tr>
+                <td className="border border-gray-900 p-1">CS QDND& CAND</td>
+                <td className="border border-gray-900 p-1 text-center">
+                  <input type="checkbox" checked readOnly className="w-3 h-3" />
+                </td>
+                <td className="border border-gray-900 p-1 text-center">0,00%</td>
+                <td className="border border-gray-900 p-1 text-right">0</td>
+                <td className="border border-gray-900 p-1"></td>
+              </tr>
+            )}
+            {/* Vin 2024 - chỉ hiện nếu được chọn */}
+            {invoiceData.promotionCheckboxes?.discount3 && (
+              <tr>
+                <td className="border border-gray-900 p-1">Vin 2024</td>
+                <td className="border border-gray-900 p-1 text-center">
+                  <input type="checkbox" checked readOnly className="w-3 h-3" />
+                </td>
+                <td className="border border-gray-900 p-1 text-center"></td>
+                <td className="border border-gray-900 p-1 text-right">0</td>
+                <td className="border border-gray-900 p-1"></td>
+              </tr>
+            )}
+            {/* Hỗ trợ lãi Suất - chỉ hiện nếu được chọn */}
+            {invoiceData.promotionCheckboxes?.hoTroLaiSuat && (
+              <tr>
+                <td className="border border-gray-900 p-1">Hỗ trợ lãi Suất</td>
+                <td className="border border-gray-900 p-1 text-center">
+                  <input type="checkbox" checked readOnly className="w-3 h-3" />
+                </td>
+                <td className="border border-gray-900 p-1 text-center"></td>
+                <td className="border border-gray-900 p-1 text-right"></td>
+                <td className="border border-gray-900 p-1"></td>
+              </tr>
+            )}
+            {/* Quy đổi 2 năm bảo hiểm - chỉ hiện nếu được chọn */}
+            {invoiceData.promotionCheckboxes?.discountBhvc2 && (
+              <tr>
+                <td className="border border-gray-900 p-1">Quy đổi 2 năm bảo hiểm</td>
+                <td className="border border-gray-900 p-1 text-center">
+                  <input type="checkbox" checked readOnly className="w-3 h-3" />
+                </td>
+                <td className="border border-gray-900 p-1 text-center"></td>
+                <td className="border border-gray-900 p-1 text-right">
+                  {formatCurrency(invoiceData.bhvc2Discount || 0)}
+                </td>
+                <td className="border border-gray-900 p-1"></td>
+              </tr>
+            )}
+            {/* Miễn Phí Màu Nâng Cao - chỉ hiện nếu được chọn */}
+            {invoiceData.promotionCheckboxes?.discountPremiumColor && (
+              <tr>
+                <td className="border border-gray-900 p-1">Miễn Phí Màu Nâng Cao</td>
+                <td className="border border-gray-900 p-1 text-center">
+                  <input type="checkbox" checked readOnly className="w-3 h-3" />
+                </td>
+                <td className="border border-gray-900 p-1 text-center"></td>
+                <td className="border border-gray-900 p-1 text-right">
+                  {formatCurrency(invoiceData.premiumColorDiscount || 0)}
+                </td>
+                <td className="border border-gray-900 p-1"></td>
+              </tr>
+            )}
+            {/* Xăng Đổi Điện - chỉ hiện nếu được chọn */}
+            {invoiceData.promotionCheckboxes?.convertCheckbox && (
+              <tr>
+                <td className="border border-gray-900 p-1">Xăng Đổi Điện</td>
+                <td className="border border-gray-900 p-1 text-center">
+                  <input type="checkbox" checked readOnly className="w-3 h-3" />
+                </td>
+                <td className="border border-gray-900 p-1 text-center"></td>
+                <td className="border border-gray-900 p-1 text-right">
+                  {formatCurrency(invoiceData.convertSupportDiscount || 0)}
+                </td>
+                <td className="border border-gray-900 p-1"></td>
+              </tr>
+            )}
+            {/* Hạng thành viên VinClub - chỉ hiện nếu có chọn và không có hỗ trợ lãi suất */}
+            {invoiceData.promotionCheckboxes?.vinClubVoucher && invoiceData.promotionCheckboxes.vinClubVoucher !== 'none' && !invoiceData.promotionCheckboxes?.hoTroLaiSuat && (
+              <tr>
+                <td className="border border-gray-900 p-1">
+                  Hạng thành viên VinClub - {invoiceData.promotionCheckboxes.vinClubVoucher.charAt(0).toUpperCase() + invoiceData.promotionCheckboxes.vinClubVoucher.slice(1)}
+                </td>
+                <td className="border border-gray-900 p-1 text-center">
+                  <input type="checkbox" checked readOnly className="w-3 h-3" />
+                </td>
+                <td className="border border-gray-900 p-1 text-center">
+                  {invoiceData.vinClubDiscount > 0 ? '0,50%' : ''}
+                </td>
+                <td className="border border-gray-900 p-1 text-right">
+                  {formatCurrency(invoiceData.vinClubDiscount || 0)}
+                </td>
+                <td className="border border-gray-900 p-1"></td>
+              </tr>
+            )}
+            {/* Giá Xuất Hóa Đơn */}
+            <tr className="bg-yellow-100">
+              <td className="border border-gray-900 p-1" colSpan="3">
+                <strong>Giá Xuất Hóa Đơn</strong>
+              </td>
+              <td className="border border-gray-900 p-1 text-right" colSpan="2">
+                <strong>{formatCurrency(invoiceData.giaXuatHoaDon || invoiceData.priceFinalPayment || invoiceData.carTotal || 0)}</strong>
               </td>
             </tr>
-            <tr>
-              <td
-                className="border border-gray-900 p-1"
-                style={{ width: "50%" }}
-              >
-                Giảm giá khuyến mãi cơ bản
+            {/* Giá Thanh toán thực tế */}
+            <tr className="bg-yellow-100">
+              <td className="border border-gray-900 p-1" colSpan="3">
+                <strong>Giá Thanh toán thực tế</strong>
               </td>
-              <td className="border border-gray-900 p-1 text-right">
-                {formatCurrency(
-                  Math.max(
-                    0,
-                    (invoiceData.carBasePrice || 0) -
-                      (invoiceData.carPriceAfterPromotions || 0)
-                  )
-                )}
-              </td>
-            </tr>
-            <tr>
-              <td
-                className="border border-gray-900 p-1"
-                style={{ width: "50%" }}
-              >
-                Giảm giá hạng thành viên
-              </td>
-              <td className="border border-gray-900 p-1 text-right">
-                {formatCurrency(invoiceData.vinClubDiscount || 0)}
-              </td>
-            </tr>
-            <tr>
-              <td
-                className="border border-gray-900 p-1"
-                style={{ width: "50%" }}
-              >
-                Ưu đãi BHVC (Quy đổi 2 năm)
-              </td>
-              <td className="border border-gray-900 p-1 text-right">
-                {formatCurrency(invoiceData.bhvc2Discount || 0)}
-              </td>
-            </tr>
-            <tr>
-              <td
-                className="border border-gray-900 p-1"
-                style={{ width: "50%" }}
-              >
-                Hỗ trợ đổi xe xăng → điện
-              </td>
-              <td className="border border-gray-900 p-1 text-right">
-                {formatCurrency(invoiceData.convertSupportDiscount || 0)}
-              </td>
-            </tr>
-            <tr>
-              <td
-                className="border border-gray-900 p-1"
-                style={{ width: "50%" }}
-              >
-                Miễn Phí Màu Nâng Cao
-              </td>
-              <td className="border border-gray-900 p-1 text-right">
-                {formatCurrency(invoiceData.premiumColorDiscount || 0)}
-              </td>
-            </tr>
-            <tr>
-              <td className="border border-gray-900 p-1 bg-blue-50">
-                <strong>Giá xuất hóa đơn</strong>
-              </td>
-              <td className="border border-gray-900 p-1 text-right bg-blue-50">
-                <strong>
-                  {formatCurrency(
-                    invoiceData.priceFinalPayment || invoiceData.carTotal || 0
-                  )}
-                </strong>
+              <td className="border border-gray-900 p-1 text-right" colSpan="2">
+                <strong>{formatCurrency(invoiceData.giaThanhToanThucTe || invoiceData.priceFinalPayment || invoiceData.carTotal || 0)}</strong>
               </td>
             </tr>
           </tbody>

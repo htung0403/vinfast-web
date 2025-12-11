@@ -160,6 +160,7 @@ export default function CalculatorPage() {
   const [discountPremiumColor, setDiscountPremiumColor] = useState(false);
   const [convertCheckbox, setConvertCheckbox] = useState(false);
   const [vinClubVoucher, setVinClubVoucher] = useState('none');
+  const [hoTroLaiSuat, setHoTroLaiSuat] = useState(false); // Hỗ trợ lãi suất - nếu chọn thì không được hưởng VinClub
 
   // Loan options
   const [loanToggle, setLoanToggle] = useState(true);
@@ -945,9 +946,9 @@ export default function CalculatorPage() {
     // Amount before VinClub
     const amountBeforeVinClub = Math.max(0, priceAfterBasicPromotions - convertSupportDiscount - bhvc2 - premiumColor);
 
-    // VinClub discount
+    // VinClub discount - không áp dụng nếu KH tham gia Hỗ trợ lãi suất
     let vinClubDiscount = 0;
-    if (vinClubVoucher !== 'none') {
+    if (vinClubVoucher !== 'none' && !hoTroLaiSuat) {
       const vinClubData = getDataByKey(uu_dai_vin_club, 'hang', vinClubVoucher);
       if (vinClubData) {
         vinClubDiscount = Math.round(amountBeforeVinClub * vinClubData.ty_le);
@@ -1065,6 +1066,7 @@ export default function CalculatorPage() {
     discountPremiumColor,
     convertCheckbox,
     vinClubVoucher,
+    hoTroLaiSuat,
     customerType,
     businessType,
     registrationLocation,
@@ -1129,6 +1131,32 @@ export default function CalculatorPage() {
       loanRatio: loanRatio || 0,
       loanAmount: calculations.loanData?.loanAmount || 0,
       downPayment: calculations.loanData?.downPayment || 0,
+
+      // Detailed promotions for invoice display
+      selectedPromotions: selectedPromotions || [],
+      promotionCheckboxes: {
+        discount2,
+        discount3,
+        discountBhvc2,
+        discountPremiumColor,
+        convertCheckbox,
+        vinClubVoucher,
+        hoTroLaiSuat,
+      },
+
+      // Calculated promotion values
+      promotionDetails: {
+        basicDiscount: (calculations.basePrice || 0) - (calculations.priceAfterBasicPromotions || 0),
+        vinClubDiscount: calculations.vinClubDiscount || 0,
+        bhvc2Discount: calculations.bhvc2Potential || 0,
+        premiumColorDiscount: calculations.premiumColorPotential || 0,
+        convertSupportDiscount: calculations.convertSupportDiscount || 0,
+      },
+
+      // Final prices
+      giaXuatHoaDon: calculations.finalPayable || 0,
+      giaThanhToanThucTe: calculations.finalPayable || 0,
+      tongChiPhiLanBanh: calculations.totalOnRoadCost || 0,
     };
 
     // Save to localStorage
@@ -2068,21 +2096,40 @@ export default function CalculatorPage() {
               )}
 
               <div className="my-4 space-y-3">
+                {/* Hỗ trợ lãi suất - nếu chọn thì không được hưởng VinClub */}
+                <div className="flex justify-between items-center py-3 border-b border-gray-200">
+                  <label className="flex items-center gap-2 flex-1">
+                    <input
+                      type="checkbox"
+                      checked={hoTroLaiSuat}
+                      onChange={(e) => setHoTroLaiSuat(e.target.checked)}
+                      className="w-5 h-5 text-blue-600"
+                    />
+                    <span className="text-sm text-gray-700">Hỗ trợ lãi suất (không áp dụng ưu đãi VinClub)</span>
+                  </label>
+                </div>
+
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">Hạng thành viên</label>
+                  <label className="block text-sm font-medium text-gray-600 mb-2">Hạng thành viên VinClub</label>
                   <div className="flex gap-4 justify-between items-center">
                     <select
-                      value={vinClubVoucher}
+                      value={hoTroLaiSuat ? 'none' : vinClubVoucher}
                       onChange={(e) => setVinClubVoucher(e.target.value)}
-                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      disabled={hoTroLaiSuat}
+                      className={`flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${hoTroLaiSuat ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                     >
                       <option value="none">Không áp dụng</option>
                       <option value="gold">Gold (0.5%)</option>
                       <option value="platinum">Platinum (1%)</option>
                       <option value="diamond">Diamond (1.5%)</option>
                     </select>
-                    <div className="text-red-600 font-semibold">{formatCurrency(calculations.vinClubDiscount)}</div>
+                    <div className={`font-semibold ${hoTroLaiSuat ? 'text-gray-400 line-through' : 'text-red-600'}`}>
+                      {formatCurrency(hoTroLaiSuat ? 0 : calculations.vinClubDiscount)}
+                    </div>
                   </div>
+                  {hoTroLaiSuat && (
+                    <p className="text-xs text-orange-600 mt-1">* KH tham gia CT hỗ trợ lãi suất không được hưởng ưu đãi này</p>
+                  )}
                 </div>
 
                 <div className="flex justify-between items-center py-3 border-b border-gray-200">

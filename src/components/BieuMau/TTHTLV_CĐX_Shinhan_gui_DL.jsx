@@ -2,15 +2,34 @@ import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ref, get } from "firebase/database";
 import { database } from "../../firebase/config";
+import { getBranchByShowroomName, getDefaultBranch } from "../../data/branchData";
 import vinfastLogo from "../../assets/vinfast.svg";
 
 const TTHTLV_CĐX_Shinhan_gui_DL = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [branch, setBranch] = useState(null);
 
   // Helper functions
   const pad = (num) => String(num).padStart(2, "0");
+
+  const formatDate = (dateString) => {
+    if (!dateString) return "";
+    if (dateString.includes("/") || (dateString.includes("-") && dateString.split("-")[0].length <= 2)) {
+      return dateString;
+    }
+    try {
+      const date = new Date(dateString);
+      if (!isNaN(date.getTime())) {
+        const day = String(date.getDate()).padStart(2, "0");
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const year = date.getFullYear();
+        return `${day}/${month}/${year}`;
+      }
+    } catch (e) {}
+    return dateString;
+  };
 
   // Editable fields
   const [ngayKy, setNgayKy] = useState("");
@@ -53,58 +72,122 @@ const TTHTLV_CĐX_Shinhan_gui_DL = () => {
 
   // Firebase effect
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        if (location.state?.contractId) {
-          const contractRef = ref(
-            database,
-            `contracts/${location.state.contractId}`
-          );
-          const snapshot = await get(contractRef);
-          if (snapshot.exists()) {
-            const contractData = snapshot.val();
+    const loadData = async () => {
+      let showroomName = location.state?.showroom || "";
+      let showroomLoadedFromContracts = false;
 
-            // Auto-fill fields
-            if (contractData.khachHang) {
-              setTenKH(contractData.khachHang || "");
-              setDiaChiKH(contractData.diaChiKhachHang || "");
-              setDienThoaiKH(contractData.soDienThoaiKhachHang || "");
-              setCccdKH(contractData.soCccdKhachHang || "");
-              setNgayCapKH(contractData.ngayCapCccdKhachHang || "");
-              setNoiCapKH(contractData.noiCapCccdKhachHang || "");
-              setMaSoThueKH(contractData.maSoThueKhachHang || "");
+      // Set default date
+      const now = new Date();
+      setNgayKy(pad(now.getDate()));
+      setThangKy(pad(now.getMonth() + 1));
+      setNamKy(now.getFullYear().toString());
+
+      // Load from contracts or exportedContracts
+      const contractId = location.state?.firebaseKey || location.state?.contractId;
+      
+      if (contractId) {
+        try {
+          // Try exportedContracts first
+          let contractData = null;
+          const exportedRef = ref(database, `exportedContracts/${contractId}`);
+          const exportedSnapshot = await get(exportedRef);
+          
+          if (exportedSnapshot.exists()) {
+            contractData = exportedSnapshot.val();
+            console.log("Loaded from exportedContracts:", contractData);
+          } else {
+            // Try contracts path
+            const contractsRef = ref(database, `contracts/${contractId}`);
+            const contractsSnapshot = await get(contractsRef);
+            if (contractsSnapshot.exists()) {
+              contractData = contractsSnapshot.val();
+              console.log("Loaded from contracts:", contractData);
             }
-
-            if (contractData.thongTinXe) {
-              setMauXe(contractData.tenXe || "");
-              setSoKhung(contractData.soKhung || "");
-              setSoMay(contractData.soMay || "");
-            }
-
-            setSoHopDong(contractData.soHopDong || "");
-
-            // Set current date
-            const now = new Date();
-            setNgayKy(pad(now.getDate()));
-            setThangKy(pad(now.getMonth() + 1));
-            setNamKy(now.getFullYear().toString());
           }
-        } else {
-          // Set default date if no contract
-          const now = new Date();
-          setNgayKy(pad(now.getDate()));
-          setThangKy(pad(now.getMonth() + 1));
-          setNamKy(now.getFullYear().toString());
+
+          if (contractData) {
+            // Load customer info (handle both camelCase and Vietnamese field names)
+            setTenKH(contractData.customerName || contractData.khachHang || contractData["Tên KH"] || contractData["Tên Kh"] || "");
+            setDiaChiKH(contractData.address || contractData.diaChiKhachHang || contractData["Địa chỉ"] || contractData["Địa Chỉ"] || "");
+            setDienThoaiKH(contractData.phone || contractData.soDienThoaiKhachHang || contractData["Số điện thoại"] || contractData["Số Điện Thoại"] || "");
+            setCccdKH(contractData.cccd || contractData.CCCD || contractData.soCccdKhachHang || contractData["Căn cước"] || "");
+            setMaSoThueKH(contractData.maSoThue || contractData["Mã số thuế"] || contractData.msdn || "");
+            
+            // Ngày cấp CCCD
+            const ngayCap = contractData.ngayCap || contractData.issueDate || contractData["Ngày cấp"] || contractData["Ngày Cấp"] || "";
+            setNgayCapKH(formatDate(ngayCap));
+            
+            // Nơi cấp
+            setNoiCapKH(contractData.noiCap || contractData.issuePlace || contractData["Nơi cấp"] || contractData["Nơi Cấp"] || "");
+
+            // Load vehicle info
+            setMauXe(contractData.dongXe || contractData.model || contractData.tenXe || contractData["Dòng xe"] || "");
+            setSoKhung(contractData.soKhung || contractData["Số Khung"] || contractData.chassisNumber || "");
+            setSoMay(contractData.soMay || contractData["Số Máy"] || contractData.engineNumber || "");
+            
+            // Load contract number (VSO)
+            setSoHopDong(contractData.vso || contractData.VSO || contractData.soHopDong || contractData.contractNumber || "");
+
+            // Load showroom/branch info
+            if (contractData.showroom) {
+              showroomName = contractData.showroom;
+              showroomLoadedFromContracts = true;
+            }
+          }
+
+          // If no showroom in exportedContracts, try to get from contracts path
+          if (!showroomLoadedFromContracts) {
+            const contractsRef = ref(database, `contracts/${contractId}`);
+            const contractsSnapshot = await get(contractsRef);
+            if (contractsSnapshot.exists()) {
+              const contractsData = contractsSnapshot.val();
+              if (contractsData.showroom) {
+                showroomName = contractsData.showroom;
+                showroomLoadedFromContracts = true;
+                console.log("Showroom loaded from contracts:", showroomName);
+              }
+            }
+          }
+
+          // Set branch info if showroom found
+          if (showroomLoadedFromContracts && showroomName) {
+            const branchInfo = getBranchByShowroomName(showroomName) || getDefaultBranch();
+            setBranch(branchInfo);
+            if (branchInfo) {
+              setCongTy(`CHI NHÁNH ${branchInfo.shortName.toUpperCase()} - CÔNG TY CP ĐẦU TƯ THƯƠNG MẠI VÀ DỊCH VỤ Ô TÔ ĐÔNG SÀI GÒN`);
+              setDiaChiTruSo(branchInfo.address);
+              setMaSoDN(branchInfo.taxCode || "");
+              setTaiKhoan(branchInfo.bankAccount || "");
+              setNganHangTK(branchInfo.bankName || "");
+              setDaiDien(branchInfo.representativeName || "");
+              setChucVu(branchInfo.position || "");
+            }
+          }
+        } catch (error) {
+          console.error("Error loading contract data:", error);
         }
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      } finally {
-        setLoading(false);
       }
+
+      // If showroom from location.state and not loaded from contracts
+      if (!showroomLoadedFromContracts && location.state?.showroom) {
+        const branchInfo = getBranchByShowroomName(location.state.showroom) || getDefaultBranch();
+        setBranch(branchInfo);
+        if (branchInfo) {
+          setCongTy(`CHI NHÁNH ${branchInfo.shortName.toUpperCase()} - CÔNG TY CP ĐẦU TƯ THƯƠNG MẠI VÀ DỊCH VỤ Ô TÔ ĐÔNG SÀI GÒN`);
+          setDiaChiTruSo(branchInfo.address);
+          setMaSoDN(branchInfo.taxCode || "");
+          setTaiKhoan(branchInfo.bankAccount || "");
+          setNganHangTK(branchInfo.bankName || "");
+          setDaiDien(branchInfo.representativeName || "");
+          setChucVu(branchInfo.position || "");
+        }
+      }
+
+      setLoading(false);
     };
 
-    fetchData();
-  }, [location]);
+    loadData();
+  }, [location.state]);
 
   const handleBack = () => {
     navigate(-1);
