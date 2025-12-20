@@ -390,7 +390,7 @@ const GiayXacNhanSKSM = () => {
           id="printable-content"
         >
           {/* Header */}
-          <div className="mb-6">
+          <div className="mb-4 print:mb-3">
             <table className="w-full border-2 border-black">
               <tbody>
                 <tr>
@@ -435,12 +435,12 @@ const GiayXacNhanSKSM = () => {
           </div>
 
           {/* Title */}
-          <div className="text-center mb-6">
-            <h1 className="text-xl font-bold uppercase mb-4">GIẤY XÁC NHẬN</h1>
+          <div className="text-center mb-4 print:mb-3">
+            <h1 className="text-xl font-bold uppercase mb-2 print:mb-1">GIẤY XÁC NHẬN</h1>
           </div>
 
           {/* Main Content */}
-          <div className="text-sm space-y-3">
+          <div className="text-sm space-y-2 print:space-y-1">
             {/* Kính gửi */}
             <div className="flex items-start">
               <span className="font-bold inline-block w-20">Kính gửi:</span>
@@ -458,7 +458,7 @@ const GiayXacNhanSKSM = () => {
             </div>
 
             {/* Bên bán */}
-            <div className="space-y-1 mt-4">
+            <div className="space-y-1 mt-2 print:mt-1">
               <div className="flex items-start">
                 <span className="font-bold text-red-600 inline-block w-20">BÊN BÁN</span>
                 <span className="inline-block w-4 text-center">:</span>
@@ -500,7 +500,7 @@ const GiayXacNhanSKSM = () => {
             </div>
 
             {/* Bên mua */}
-            <div className="space-y-1 mt-4">
+            <div className="space-y-1 mt-2 print:mt-1">
               <div className="flex items-start">
                 <span className="font-bold inline-block w-20">BÊN MUA</span>
                 <span className="inline-block w-4 text-center">:</span>
@@ -579,7 +579,7 @@ const GiayXacNhanSKSM = () => {
             </div>
 
             {/* Mã số thuế */}
-            <div className="mt-3">
+            <div className="mt-2 print:mt-1">
               <div className="flex items-start">
                 <span className="font-bold inline-block w-20">Mã số thuế</span>
                 <span className="inline-block w-4 text-center">:</span>
@@ -595,13 +595,13 @@ const GiayXacNhanSKSM = () => {
                   <span className="hidden print:inline">{maSoThue}</span>
                 </span>
               </div>
-              <p className="text-sm mt-2">
+              <p className="text-sm mt-1 print:mt-0">
                 Bên Bán xác nhận Bên Mua có mua 1 chiếc ô tô của Bên Bán
               </p>
             </div>
 
             {/* Thông tin xe */}
-            <div className="space-y-1 mt-4 ml-24">
+            <div className="space-y-1 mt-2 print:mt-1 ml-24">
               <div className="flex items-start">
                 <span className="inline-block w-20">Hiệu xe</span>
                 <span className="inline-block w-4 text-center">:</span>
@@ -650,7 +650,7 @@ const GiayXacNhanSKSM = () => {
             </div>
 
             {/* Giá trị khai báo */}
-            <div className="mt-4 flex items-start">
+            <div className="mt-2 print:mt-1 flex items-start">
               <span className="inline-block w-32">Giá trị khai báo</span>
               <span className="inline-block w-4 text-center">:</span>
               <span className="font-bold flex-1">
@@ -667,15 +667,16 @@ const GiayXacNhanSKSM = () => {
             </div>
           </div>
 
-          {/* Signature Section */}
-          <div className="mt-12 mb-8">
+          {/* Signature Section - flex-grow pushes footer to bottom */}
+          <div className="mt-4 print:mt-2 flex-grow flex flex-col">
             <div className="text-right mr-16">
-              <p className="font-bold text-sm mb-20">ĐẠI DIỆN BÊN BÁN</p>
+              <p className="font-bold text-sm">ĐẠI DIỆN BÊN BÁN</p>
+              <div className="h-16 print:h-12"></div>
             </div>
           </div>
 
-          {/* Footer */}
-          <div className="mt-auto pt-4 w-full text-right mr-16 border-t border-black print:mt-auto print:pt-4">
+          {/* Footer - stays at bottom */}
+          <div className="pt-4 w-full text-right mr-16 border-t border-black">
             <p className="text-sm italic">
               Biểu mẫu QTTCKT-BM06 ban hành lần 1 ngày 01/7/2014
             </p>
@@ -703,15 +704,14 @@ const GiayXacNhanSKSM = () => {
         @media print {
           @page {
             size: A4;
-            margin: 8mm;
+            margin: 10mm;
           }
 
           html, body {
             margin: 0 !important;
             padding: 0 !important;
-            height: auto !important;
-            min-height: 0 !important;
-            max-height: 297mm !important;
+            height: 277mm !important;
+            max-height: 277mm !important;
             overflow: hidden !important;
           }
 
@@ -733,18 +733,28 @@ const GiayXacNhanSKSM = () => {
             position: absolute;
             left: 0;
             top: 0;
-            width: 194mm !important;
-            min-height: 0 !important;
-            height: auto !important;
-            max-height: 281mm !important;
-            overflow: hidden !important;
+            width: 190mm !important;
+            height: 277mm !important;
+            max-height: 277mm !important;
+            display: flex !important;
+            flex-direction: column !important;
             padding: 5mm !important;
             margin: 0 !important;
             background: white !important;
             font-family: 'Times New Roman', Times, serif !important;
-            font-size: 11pt !important;
-            line-height: 1.3 !important;
+            font-size: 10pt !important;
+            line-height: 1.2 !important;
             box-sizing: border-box !important;
+            overflow: hidden !important;
+            page-break-after: avoid !important;
+            page-break-inside: avoid !important;
+          }
+
+          /* Prevent page breaks */
+          #printable-content * {
+            page-break-inside: avoid !important;
+            page-break-after: avoid !important;
+            page-break-before: avoid !important;
           }
 
           .print\\:hidden {

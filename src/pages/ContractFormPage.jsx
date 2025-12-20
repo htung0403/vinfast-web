@@ -124,6 +124,7 @@ export default function ContractFormPage() {
     interior: "",
     contractPrice: "",
     deposit: "",
+    tienDoiUng: "",
     payment: "",
     loanAmount: "",
     bank: "",
@@ -298,6 +299,7 @@ export default function ContractFormPage() {
         interior: mapInteriorColor(contractData.interior || contractData.noiThat || ""),
         contractPrice: contractData.contractPrice || contractData.giaHD || "",
         deposit: contractData.deposit || contractData.soTienCoc || "",
+        tienDoiUng: contractData.tienDoiUng || contractData["Tiền đối ứng"] || contractData.convertSupportDiscount || "",
         payment: contractData.payment || contractData.thanhToan || "",
         loanAmount: contractData.loanAmount || contractData.soTienVay || contractData.tienVay || "",
         bank: contractData.bank || contractData.nganHang || "",
@@ -608,6 +610,28 @@ export default function ContractFormPage() {
     try {
       const safeValue = (val) => val !== undefined && val !== null ? val : "";
 
+      // Auto-calculate tiền đối ứng = Giá hợp đồng - Số tiền vay
+      const parseValue = (val) => {
+        if (!val) return 0;
+        if (typeof val === "string") {
+          return parseFloat(val.replace(/[^\d]/g, "")) || 0;
+        }
+        return typeof val === "number" ? val : 0;
+      };
+
+      const contractPriceNum = parseValue(contract.contractPrice);
+      const loanAmountNum = parseValue(contract.loanAmount);
+      let calculatedTienDoiUng = contract.tienDoiUng;
+
+      // Nếu có giá hợp đồng và số tiền vay, tự động tính tiền đối ứng
+      if (contractPriceNum > 0 && loanAmountNum > 0) {
+        const tienDoiUngNum = contractPriceNum - loanAmountNum;
+        calculatedTienDoiUng = tienDoiUngNum > 0 ? tienDoiUngNum.toString() : "0";
+      } else if (contractPriceNum > 0 && (contract.payment === "trả thẳng" || contract.payment === "tra thang")) {
+        // Nếu trả thẳng (không vay), tiền đối ứng = giá hợp đồng
+        calculatedTienDoiUng = contractPriceNum.toString();
+      }
+
       if (isEditMode && contractData.firebaseKey) {
         // Get old status to check if we need to sync with exportedContracts
         const oldStatus = contractData.status || contractData.trangThai || "";
@@ -636,13 +660,14 @@ export default function ContractFormPage() {
           noiThat: safeValue(contract.interior),
           giaHD: safeValue(contract.contractPrice),
           soTienCoc: safeValue(contract.deposit),
+          tienDoiUng: safeValue(calculatedTienDoiUng),
+          "Tiền đối ứng": safeValue(calculatedTienDoiUng),
           thanhToan: safeValue(contract.payment),
           soTienVay: safeValue(contract.loanAmount),
           nganHang: safeValue(contract.bank),
           uuDai: Array.isArray(contract.uuDai) ? contract.uuDai : [],
           quaTang: safeValue(contract.quaTang),
           quaTangKhac: safeValue(contract.quaTangKhac),
-          soTienVay: safeValue(contract.soTienVay),
           soTienPhaiThu: safeValue(contract.soTienPhaiThu),
           trangThai: newStatus,
           // Company fields
@@ -692,6 +717,8 @@ export default function ContractFormPage() {
             "Giá Hợp Đồng": safeValue(contract.contractPrice),
             "Tiền đặt cọc": safeValue(contract.deposit),
             tienDatCoc: safeValue(contract.deposit),
+            "Tiền đối ứng": safeValue(calculatedTienDoiUng),
+            tienDoiUng: safeValue(calculatedTienDoiUng),
             "Số Khung": safeValue(contractData.soKhung || contractData.chassisNumber || contractData["Số Khung"] || ""),
             "Số Máy": safeValue(contractData.soMay || contractData.engineNumber || contractData["Số Máy"] || ""),
             "Tình Trạng": safeValue(contractData.tinhTrangXe || contractData.vehicleStatus || contractData["Tình Trạng Xe"] || ""),
@@ -711,7 +738,6 @@ export default function ContractFormPage() {
             "Số tiền phải thu": safeValue(contract.soTienPhaiThu),
             quaTang: safeValue(contract.quaTang),
             quaTangKhac: safeValue(contract.quaTangKhac),
-            soTienVay: safeValue(contract.soTienVay),
             soTienPhaiThu: safeValue(contract.soTienPhaiThu),
           };
 
@@ -746,13 +772,14 @@ export default function ContractFormPage() {
           noiThat: safeValue(contract.interior),
           giaHD: safeValue(contract.contractPrice),
           soTienCoc: safeValue(contract.deposit),
+          tienDoiUng: safeValue(calculatedTienDoiUng),
+          "Tiền đối ứng": safeValue(calculatedTienDoiUng),
           thanhToan: safeValue(contract.payment),
           soTienVay: safeValue(contract.loanAmount),
           nganHang: safeValue(contract.bank),
           uuDai: Array.isArray(contract.uuDai) ? contract.uuDai : [],
           quaTang: safeValue(contract.quaTang),
           quaTangKhac: safeValue(contract.quaTangKhac),
-          soTienVay: safeValue(contract.soTienVay),
           soTienPhaiThu: safeValue(contract.soTienPhaiThu),
           trangThai: safeValue(contract.status) || "mới",
           // Company fields
@@ -801,6 +828,8 @@ export default function ContractFormPage() {
               "Giá Hợp Đồng": safeValue(contract.contractPrice),
               "Tiền đặt cọc": safeValue(contract.deposit),
               tienDatCoc: safeValue(contract.deposit),
+              "Tiền đối ứng": safeValue(calculatedTienDoiUng),
+              tienDoiUng: safeValue(calculatedTienDoiUng),
               "Số Khung": "",
               "Số Máy": "",
               "Tình Trạng": "",
@@ -820,7 +849,6 @@ export default function ContractFormPage() {
               "Số tiền phải thu": safeValue(contract.soTienPhaiThu),
               quaTang: safeValue(contract.quaTang),
               quaTangKhac: safeValue(contract.quaTangKhac),
-              soTienVay: safeValue(contract.soTienVay),
               soTienPhaiThu: safeValue(contract.soTienPhaiThu),
             };
 

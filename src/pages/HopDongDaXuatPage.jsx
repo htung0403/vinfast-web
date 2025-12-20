@@ -66,6 +66,39 @@ export default function HopDongDaXuatPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 30;
 
+  // Restore print modal from sessionStorage when returning from a form page
+  useEffect(() => {
+    const savedPrintState = sessionStorage.getItem('printModalState');
+    if (savedPrintState) {
+      try {
+        const { printContract: savedContract, contractKey, bankLoanFile: savedBankLoanFile } = JSON.parse(savedPrintState);
+        if (savedContract) {
+          setPrintContract(savedContract);
+          setCurrentContractKey(contractKey);
+          setBankLoanFile(savedBankLoanFile || null);
+          setIsPrintModalOpen(true);
+        }
+      } catch (e) {
+        console.error('Error restoring print modal state:', e);
+        sessionStorage.removeItem('printModalState');
+      }
+    }
+  }, []);
+
+  // Helper function to save print modal state to sessionStorage
+  const savePrintModalState = (contract, contractKey, file) => {
+    sessionStorage.setItem('printModalState', JSON.stringify({
+      printContract: contract,
+      contractKey: contractKey,
+      bankLoanFile: file
+    }));
+  };
+
+  // Helper function to clear print modal state from sessionStorage
+  const clearPrintModalState = () => {
+    sessionStorage.removeItem('printModalState');
+  };
+
   useEffect(() => {
     const team = localStorage.getItem("userTeam") || "";
     const role = localStorage.getItem("userRole") || "user";
@@ -281,6 +314,7 @@ export default function HopDongDaXuatPage() {
       giaNiemYet: c["Giá Niêm Yết"] || "",
       giaGiam: c["Giá Giảm"] || "",
       giaHopDong: c["Giá Hợp Đồng"] || "",
+      giaXuatHoaDon: c.giaXuatHoaDon || c["Giá Xuất Hóa Đơn"] || c["Giá Hợp Đồng"] || "",
       soKhung: c["Số Khung"] || "",
       soMay: c["Số Máy"] || "",
       tinhTrang: c["Tình Trạng"] || "",
@@ -733,7 +767,8 @@ export default function HopDongDaXuatPage() {
     return 0;
   };
 
-  // Calculate counterpart payment (tiền đối ứng)
+  // Calculate counterpart payment (tiền đối ứng) = Giá hợp đồng - Số tiền vay
+  // Đây là số tiền khách hàng tự bỏ ra (không phải từ ngân hàng)
   const calculateCounterpartPayment = (contract) => {
     const parseValue = (val) => {
       if (!val) return 0;
@@ -743,17 +778,28 @@ export default function HopDongDaXuatPage() {
       return typeof val === "number" ? val : 0;
     };
 
-    // If already has explicit tienDoiUng, use it
-    if (contract.tienDoiUng) {
+    // 1. Nếu đã có tienDoiUng được lưu trong hợp đồng, sử dụng nó
+    if (contract.tienDoiUng && parseValue(contract.tienDoiUng) > 0) {
       return parseValue(contract.tienDoiUng);
     }
 
-    // Calculate: giaHopDong - soTienVay
+    // 2. Tính toán: Tiền đối ứng = Giá hợp đồng - Số tiền vay
     const giaHopDong = parseValue(contract.giaHopDong);
-    const soTienVay = calculateBankLoan(contract);
+    const soTienVay = parseValue(contract.soTienVay || contract.tienVayNganHang);
 
-    const counterpartAmount = giaHopDong - soTienVay;
-    return counterpartAmount > 0 ? counterpartAmount : giaHopDong;
+    // Nếu có giá hợp đồng và số tiền vay
+    if (giaHopDong > 0 && soTienVay > 0) {
+      const tienDoiUng = giaHopDong - soTienVay;
+      return tienDoiUng > 0 ? tienDoiUng : 0;
+    }
+
+    // 3. Nếu thanh toán "trả thẳng" (không vay) thì tiền đối ứng = giá hợp đồng
+    if (contract.thanhToan === "trả thẳng" || contract.thanhToan === "tra thang") {
+      return giaHopDong;
+    }
+
+    // 4. Không có đủ dữ liệu để tính
+    return 0;
   };
 
   // Calculate days from export date to today
@@ -1450,6 +1496,8 @@ export default function HopDongDaXuatPage() {
                                     exterior: contract.ngoaiThat,
                                     interior: contract.noiThat,
                                     contractPrice: contract.giaHopDong,
+                                    giaXuatHoaDon: contract.giaXuatHoaDon || contract.giaHopDong,
+                                    soTienVay: contract.soTienVay || contract.tienVayNganHang || "",
                                     deposit: contract.tienDatCoc,
                                     payment: "",
                                     bank: contract.nganHang || "",
@@ -1724,12 +1772,11 @@ export default function HopDongDaXuatPage() {
                   ...printContract,
                   ...(includeFile && bankLoanFile ? { bankLoanFile } : {}),
                 };
+                // Save state to sessionStorage so modal can be reopened when user returns
+                savePrintModalState(printContract, currentContractKey, bankLoanFile);
                 setIsPrintModalOpen(false);
                 navigate(route, { state: printData });
-                setPrintContract(null);
-                setCurrentContractKey(null);
-                // Don't reset bankLoanFile here - keep it for next time modal opens
-                // setBankLoanFile(null);
+                // Don't clear printContract here - keep for when user returns
               };
 
               // Handle print file directly
@@ -1754,8 +1801,7 @@ export default function HopDongDaXuatPage() {
                             setIsPrintModalOpen(false);
                             setPrintContract(null);
                             setCurrentContractKey(null);
-                            // Don't reset bankLoanFile here - keep it for next time modal opens
-                            // setBankLoanFile(null);
+                            clearPrintModalState(); // Clear sessionStorage when manually closing
                           }}
                           className="text-white hover:text-gray-200 transition-colors"
                           aria-label="Đóng"
@@ -2141,8 +2187,7 @@ export default function HopDongDaXuatPage() {
                           setIsPrintModalOpen(false);
                           setPrintContract(null);
                           setCurrentContractKey(null);
-                          // Don't reset bankLoanFile here - keep it for next time modal opens
-                          // setBankLoanFile(null);
+                          clearPrintModalState(); // Clear sessionStorage when manually closing
                         }}
                         className="w-full sm:w-auto px-4 sm:px-6 py-2 border border-gray-300 rounded-md hover:bg-gray-100 transition-colors text-sm sm:text-base"
                       >

@@ -776,15 +776,15 @@ const PDI_KH = () => {
               </div>
 
               {/* Signature */}
-              <div className="mt-8 flex justify-between text-xs">
+              <div className="mt-2 flex justify-between text-xs">
                 <div className="text-center flex-1">
-                  <p className="font-bold mb-20">TƯ VẤN BÁN HÀNG</p>
+                  <p className="font-bold mb-12">TƯ VẤN BÁN HÀNG</p>
                 </div>
                 <div className="text-center flex-1">
-                  <p className="font-bold mb-20">TP.KINH DOANH</p>
+                  <p className="font-bold mb-12">TP.KINH DOANH</p>
                 </div>
                 <div className="text-center flex-1">
-                  <p className="font-bold mb-20">TỔNG GĐ/GIÁM ĐỐC</p>
+                  <p className="font-bold mb-12">TỔNG GĐ/GIÁM ĐỐC</p>
                 </div>
               </div>
             </div>

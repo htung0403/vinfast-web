@@ -79,7 +79,9 @@ export default function EditHopDongDaXuatPage() {
     giaNiemYet: "",
     giaGiam: "",
     giaHopDong: "",
+    giaXuatHoaDon: "",
     soTienCoc: "",
+    tienDoiUng: "",
     thanhToan: "",
     soTienVay: "",
     soKhung: "",
@@ -88,7 +90,6 @@ export default function EditHopDongDaXuatPage() {
     nganHang: "",
     quaTang: "",
     quaTangKhac: "",
-    soTienVay: "",
     soTienPhaiThu: "",
     // Company customer fields
     khachHangLa: "",
@@ -162,7 +163,9 @@ export default function EditHopDongDaXuatPage() {
           giaNiemYet: contractData.giaNiemYet || contractData["Giá Niêm Yết"] || contractData.listPrice || "",
           giaGiam: contractData.giaGiam || contractData["Giá Giảm"] || contractData.discountPrice || "",
           giaHopDong: contractData.giaHopDong || contractData["Giá Hợp Đồng"] || contractData.contractPrice || "",
+          giaXuatHoaDon: contractData.giaXuatHoaDon || contractData["Giá Xuất Hóa Đơn"] || contractData.giaHopDong || contractData["Giá Hợp Đồng"] || contractData.contractPrice || "",
           soTienCoc: contractData.soTienCoc || contractData["Số tiền cọc"] || contractData.deposit || "",
+          tienDoiUng: contractData.tienDoiUng || contractData["Tiền đối ứng"] || contractData.convertSupportDiscount || "",
           thanhToan: contractData.thanhToan || contractData.payment || "",
           soTienVay: contractData.soTienVay || contractData.tienVay || contractData.loanAmount || contractData.tienVayNganHang || "",
           soKhung: contractData.soKhung || contractData["Số Khung"] || contractData.chassisNumber || "",
@@ -171,7 +174,6 @@ export default function EditHopDongDaXuatPage() {
           nganHang: contractData.nganHang || contractData["ngân hàng"] || contractData.bank || "",
           quaTang: contractData.quaTang || contractData["Quà tặng"] || contractData["quà tặng"] || "",
           quaTangKhac: contractData.quaTangKhac || contractData["Quà tặng khác"] || contractData["quà tặng khác"] || "",
-          soTienVay: contractData.soTienVay || contractData["Số tiền vay"] || "",
           soTienPhaiThu: contractData.soTienPhaiThu || contractData["Số tiền phải thu"] || contractData.giamGia || contractData["Giảm giá"] || "",
           // Company customer fields
           khachHangLa: contractData.khachHangLa || "",
@@ -444,10 +446,14 @@ export default function EditHopDongDaXuatPage() {
         "Giá Niêm Yết": safeValue(contract.giaNiemYet),
         "Giá Giảm": safeValue(contract.giaGiam),
         "Giá Hợp Đồng": safeValue(contract.giaHopDong),
+        giaXuatHoaDon: safeValue(contract.giaXuatHoaDon),
+        "Giá Xuất Hóa Đơn": safeValue(contract.giaXuatHoaDon),
         "Số tiền cọc": safeValue(contract.soTienCoc),
         "Tiền đặt cọc": safeValue(contract.soTienCoc),
         soTienCoc: safeValue(contract.soTienCoc),
         tienDatCoc: safeValue(contract.soTienCoc),
+        "Tiền đối ứng": safeValue(contract.tienDoiUng),
+        tienDoiUng: safeValue(contract.tienDoiUng),
         thanhToan: safeValue(contract.thanhToan),
         soTienVay: safeValue(contract.soTienVay),
         tienVayNganHang: safeValue(contract.soTienVay),
@@ -463,7 +469,6 @@ export default function EditHopDongDaXuatPage() {
         "Số tiền phải thu": safeValue(contract.soTienPhaiThu),
         quaTang: safeValue(contract.quaTang),
         quaTangKhac: safeValue(contract.quaTangKhac),
-        soTienVay: safeValue(contract.soTienVay),
         soTienPhaiThu: safeValue(contract.soTienPhaiThu),
         // Company customer fields
         khachHangLa: safeValue(contract.khachHangLa),
@@ -1002,6 +1007,21 @@ export default function EditHopDongDaXuatPage() {
                   />
                 </div>
 
+                {/* Invoice Price - Giá Xuất Hóa Đơn */}
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
+                    Giá Xuất Hóa Đơn
+                    <span className="text-xs text-gray-500 font-normal ml-1">(Giá gửi ngân hàng)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formatCurrency(contract.giaXuatHoaDon)}
+                    onChange={(e) => handleCurrencyChange("giaXuatHoaDon", e.target.value)}
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm"
+                    placeholder="Nhập giá xuất hóa đơn"
+                  />
+                </div>
+
                 {/* Deposit Amount */}
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
@@ -1013,6 +1033,21 @@ export default function EditHopDongDaXuatPage() {
                     onChange={(e) => handleCurrencyChange("soTienCoc", e.target.value)}
                     className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm"
                     placeholder="Nhập số tiền cọc"
+                  />
+                </div>
+
+                {/* Tiền đối ứng = Giá hợp đồng - Số tiền vay */}
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
+                    Tiền đối ứng
+                    <span className="text-xs text-gray-500 font-normal ml-1">(Giá HĐ - Số tiền vay)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formatCurrency(contract.tienDoiUng)}
+                    onChange={(e) => handleCurrencyChange("tienDoiUng", e.target.value)}
+                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm"
+                    placeholder="Số tiền khách tự trả"
                   />
                 </div>
 
@@ -1107,20 +1142,6 @@ export default function EditHopDongDaXuatPage() {
                     onChange={(e) => handleChange("quaTangKhac", e.target.value)}
                     className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm"
                     placeholder="Bảo Hiểm Vật Chất Kinh Doanh, Cam, Film, Sàn"
-                  />
-                </div>
-
-                {/* Số tiền vay */}
-                <div className="sm:col-span-2 lg:col-span-1">
-                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
-                    Số tiền vay
-                  </label>
-                  <input
-                    type="text"
-                    value={formatCurrency(contract.soTienVay)}
-                    onChange={(e) => handleCurrencyChange("soTienVay", e.target.value)}
-                    className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-xs sm:text-sm"
-                    placeholder="Nhập số tiền vay"
                   />
                 </div>
 

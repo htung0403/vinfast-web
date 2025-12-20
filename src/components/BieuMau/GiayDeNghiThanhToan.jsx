@@ -52,22 +52,22 @@ const GiayDeNghiThanhToan = () => {
     return found ? found.name : colorCode; // Return name if found, otherwise return original value
   };
 
-  // Helper function to calculate remaining amount (salePrice - advancePayment)
-  const calculateRemainingAmount = (salePrice, advancePayment) => {
-    const salePriceNum =
-      typeof salePrice === "string"
-        ? salePrice.replace(/\D/g, "")
-        : String(salePrice);
-    const advancePaymentNum =
-      typeof advancePayment === "string"
-        ? advancePayment.replace(/\D/g, "")
-        : String(advancePayment);
+  // Helper function to calculate advance payment (giaXuatHoaDon - soTienVay)
+  const calculateAdvancePayment = (giaXuatHoaDon, soTienVay) => {
+    const giaXuatHoaDonNum =
+      typeof giaXuatHoaDon === "string"
+        ? giaXuatHoaDon.replace(/\D/g, "")
+        : String(giaXuatHoaDon);
+    const soTienVayNum =
+      typeof soTienVay === "string"
+        ? soTienVay.replace(/\D/g, "")
+        : String(soTienVay);
 
-    const sale = parseInt(salePriceNum, 10) || 0;
-    const advance = parseInt(advancePaymentNum, 10) || 0;
-    const remaining = sale - advance;
+    const giaXuat = parseInt(giaXuatHoaDonNum, 10) || 0;
+    const tienVay = parseInt(soTienVayNum, 10) || 0;
+    const advancePayment = giaXuat - tienVay;
 
-    return remaining > 0 ? remaining.toString() : "0";
+    return advancePayment > 0 ? advancePayment.toString() : "0";
   };
 
   useEffect(() => {
@@ -110,12 +110,16 @@ const GiayDeNghiThanhToan = () => {
           getBranchByShowroomName(showroomName) || getDefaultBranch();
         setBranch(branchInfo);
 
-        const salePrice = incoming.contractPrice || "230.400.000";
-        const advancePayment = incoming.deposit || "216.000.000";
-        const calculatedRemaining = calculateRemainingAmount(
-          salePrice,
-          advancePayment
-        );
+        // Logic mới: Giá bán = Giá xuất hóa đơn
+        // Số tiền trả trước = Giá xuất hóa đơn - Số tiền vay
+        // Số tiền còn thiếu (ngân hàng thanh toán) = Số tiền vay
+        const giaXuatHoaDon = incoming.giaXuatHoaDon || incoming.contractPrice || "230.400.000";
+        const soTienVay = incoming.soTienVay || "";
+
+        // Tính số tiền trả trước: Giá xuất hóa đơn - Số tiền vay
+        const calculatedAdvancePayment = soTienVay
+          ? calculateAdvancePayment(giaXuatHoaDon, soTienVay)
+          : (incoming.deposit || "0");
 
         const processedData = {
           customerName:
@@ -123,9 +127,9 @@ const GiayDeNghiThanhToan = () => {
           contractNumber: incoming.vso || "S00901-VSO-25-01-0041",
           createdAt: formatDateString(incoming.createdAt) || "28/06/2024",
           model: incoming.model || "VF8",
-          salePrice: salePrice,
-          advancePayment: advancePayment,
-          remainingAmount: incoming.remainingAmount || calculatedRemaining,
+          salePrice: giaXuatHoaDon,
+          advancePayment: calculatedAdvancePayment,
+          remainingAmount: soTienVay || "0",
           bankAccount: incoming.bankAccount || branchInfo.bankAccount,
           bankBranch:
             incoming.bankBranch ||

@@ -523,25 +523,28 @@ const DeNghiXuatHoaDon = () => {
           </div>
 
           {/* Footer - Signatures */}
-          <div className="mt-4 print:mt-2">
+          <div className="mt-4 print:mt-4 flex-grow">
             <p className="text-sm mb-2">
               <strong>Ghi chú:</strong>
             </p>
-            <div className="flex justify-between mt-4 print:mt-2">
+            <div className="flex justify-between mt-4 print:mt-4">
               <div className="flex-1 text-center">
-                <p className="font-bold text-sm mb-16 print:mb-8">BỘ PHẬN KẾ TOÁN</p>
+                <p className="font-bold text-sm">BỘ PHẬN KẾ TOÁN</p>
+                <div className="h-24 print:h-20"></div>
               </div>
               <div className="flex-1 text-center">
-                <p className="font-bold text-sm mb-16 print:mb-8">BỘ PHẬN KINH DOANH</p>
+                <p className="font-bold text-sm">BỘ PHẬN KINH DOANH</p>
+                <div className="h-24 print:h-20"></div>
               </div>
               <div className="flex-1 text-center">
-                <p className="font-bold text-sm mb-16 print:mb-8">NGƯỜI ĐỀ NGHỊ</p>
+                <p className="font-bold text-sm">NGƯỜI ĐỀ NGHỊ</p>
+                <div className="h-24 print:h-20"></div>
               </div>
             </div>
           </div>
 
           {/* Form Reference */}
-          <div className="mt-auto pt-2 w-full text-right mr-16 border-t border-black print:mt-2 print:pt-1">
+          <div className="pt-4 w-full text-right mr-16 border-t border-black print:pt-2">
             <p className="text-xs italic">
               Biểu mẫu QTTCKT-BM06 ban hành lần 1 ngày 01/7/2014
             </p>
@@ -569,52 +572,52 @@ const DeNghiXuatHoaDon = () => {
         @media print {
           @page {
             size: A4;
-            margin: 8mm;
+            margin: 10mm;
           }
-          
+
           html, body {
             margin: 0 !important;
             padding: 0 !important;
-            height: auto !important;
-            min-height: 0 !important;
-            max-height: 297mm !important;
-            overflow: hidden !important;
+            height: 100% !important;
           }
-          
+
           body * {
             visibility: hidden;
           }
-          
+
           #printable-content,
           #printable-content * {
             visibility: visible;
           }
-          
+
           .min-h-screen {
             min-height: 0 !important;
             height: auto !important;
           }
-          
+
           #printable-content {
             position: absolute;
             left: 0;
             top: 0;
-            width: 194mm !important;
-            min-height: 0 !important;
-            height: auto !important;
-            max-height: 281mm !important;
-            overflow: hidden !important;
-            padding: 5mm !important;
+            width: 190mm !important;
+            min-height: 277mm !important;
+            padding: 8mm !important;
             margin: 0 !important;
             background: white !important;
             font-family: 'Times New Roman', Times, serif !important;
             font-size: 11pt !important;
-            line-height: 1.3 !important;
+            line-height: 1.4 !important;
             box-sizing: border-box !important;
+            display: flex !important;
+            flex-direction: column !important;
           }
-          
+
           .print\\:hidden {
             display: none !important;
+          }
+
+          .flex-grow {
+            flex-grow: 1 !important;
           }
         }
       `}</style>
